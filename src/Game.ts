@@ -4,11 +4,11 @@ import { UIManager } from './UIManager';
 import { CONFIG } from './Config';
 import { CardSystem, ICard } from './CardSystem';
 import { EventEmitter } from './Events';
-import { InputSystem } from './InputSystem';   // <-- Новая система ввода
-import { EffectSystem } from './EffectSystem'; // <-- Новая система эффектов
-import { Tower } from './Tower';               // <-- Башни
-import { Projectile } from './Projectile';     // <-- Снаряды
-import { ObjectPool } from './Utils';          // <-- Пул объектов
+import { InputSystem } from './InputSystem';
+import { EffectSystem } from './EffectSystem';
+import { Tower } from './Tower';
+import { Projectile } from './Projectile';
+import { ObjectPool } from './Utils';
 
 export class Game {
     public canvas: HTMLCanvasElement;
@@ -45,15 +45,15 @@ export class Game {
         this.canvas.width = window.innerWidth;
         this.canvas.height = window.innerHeight;
 
-        // 2. Инициализация систем (Порядок важен!)
+        // 2. Инициализация систем
         this.events = new EventEmitter();
         this.projectilePool = new ObjectPool<Projectile>(() => new Projectile());
         
         this.map = new MapManager(this.canvas.width, this.canvas.height);
         this.effects = new EffectSystem(this.ctx);
         this.cardSys = new CardSystem(this);
-        this.input = new InputSystem(this); // Подключаем управление
-        this.ui = new UIManager(this);      // UI в последнюю очередь
+        this.input = new InputSystem(this);
+        this.ui = new UIManager(this);
         
         this.ui.update();
         this.loop = this.loop.bind(this);
@@ -84,25 +84,26 @@ export class Game {
     public spawnEnemy() {
         // Берем координаты старта из карты (путь)
         const startPath = this.map.path[0];
-        // Немного смещаем, чтобы не шли по одной линии
-        const offset = (Math.random() - 0.5) * 20; 
+        // Рандомизация позиции (чтобы враги шли толпой, а не линией)
+        const offset = (Math.random() - 0.5) * 30; 
         
         const enemy = new Enemy({
             id: `enemy_${Date.now()}_${Math.random()}`,
             health: CONFIG.ENEMY.BASE_HP * Math.pow(CONFIG.ENEMY.HP_GROWTH, this.wave),
             speed: (CONFIG.ENEMY_TYPES.GRUNT as any).speed,
+            // Стартовые координаты
             x: startPath.x * CONFIG.TILE_SIZE + 32 + offset,
-            y: startPath.y * CONFIG.TILE_SIZE + 32 + offset
+            y: startPath.y * CONFIG.TILE_SIZE + 32 + offset,
+            // Передаем путь для навигации
+            path: this.map.path 
         });
         
         this.enemies.push(enemy);
     }
 
-    // --- ВЗАИМОДЕЙСТВИЕ (Вызывается из InputSystem/CardSystem) ---
+    // --- ВЗАИМОДЕЙСТВИЕ ---
 
-    // Игрок кликнул по клетке (без карты)
     public handleGridClick(col: number, row: number) {
-        // Можно реализовать выделение башни для просмотра радиуса
         const tower = this.towers.find(t => t.col === col && t.row === row);
         if (tower) {
             console.log("Выбрана башня:", tower);
@@ -110,50 +111,47 @@ export class Game {
         }
     }
 
-    // Игрок отпустил карту над полем (Самое важное!)
     public handleCardDrop(card: ICard): boolean {
         const col = this.input.hoverCol;
         const row = this.input.hoverRow;
 
-        // 1. Проверка границ и типа местности
+        // Проверка границ
         if (col < 0 || col >= this.map.cols || row < 0 || row >= this.map.rows) return false;
+        
+        // Проверка типа местности
         const cell = this.map.grid[row][col];
-        if (cell.type !== 0) { // 0 = Buildable (Трава)
+        if (cell.type !== 0) { 
             this.showFloatingText("Здесь нельзя строить!", col, row, 'red');
             return false;
         }
 
-        // 2. Ищем, есть ли тут уже башня
         const existingTower = this.towers.find(t => t.col === col && t.row === row);
 
         if (existingTower) {
-            // --- УЛУЧШЕНИЕ БАШНИ ---
+            // УЛУЧШЕНИЕ
             if (existingTower.cards.length >= 3) {
                 this.showFloatingText("Башня переполнена!", col, row, 'orange');
                 return false;
             }
-            
             existingTower.addCard(card);
             this.effects.add({
                 type: 'text', text: "UPGRADE!", x: existingTower.x, y: existingTower.y - 20,
                 life: 60, color: '#00ff00', vy: -1
             });
-            return true; // Успех
+            return true;
         } 
         else {
-            // --- СТРОИТЕЛЬСТВО НОВОЙ ---
+            // СТРОИТЕЛЬСТВО
             if (this.money < CONFIG.TOWER.COST) {
                 this.showFloatingText("Не хватает золота!", col, row, 'red');
                 return false;
             }
 
-            // Строим
             this.money -= CONFIG.TOWER.COST;
             const newTower = new Tower(col, row);
-            newTower.addCard(card); // Сразу вставляем карту-основу
+            newTower.addCard(card);
             this.towers.push(newTower);
 
-            // Эффекты
             this.effects.add({
                 type: 'explosion', x: newTower.x, y: newTower.y, 
                 radius: 40, life: 20, color: '#ffffff'
@@ -161,7 +159,7 @@ export class Game {
             this.showFloatingText(`-${CONFIG.TOWER.COST}💰`, col, row, 'gold');
             
             this.ui.update();
-            return true; // Успех
+            return true;
         }
     }
 
@@ -180,26 +178,22 @@ export class Game {
     // --- ГЛАВНЫЙ ЦИКЛ ---
     private loop() {
         if (!this.isRunning) return;
-
-        // 1. Обновление логики
         this.update();
-        
-        // 2. Отрисовка
         this.render();
-
         requestAnimationFrame(this.loop);
     }
 
     private update() {
-        // Эффекты
+        // 1. Эффекты
         this.effects.update();
 
-        // Башни (стрельба)
+        // 2. Башни (Стрельба)
         this.towers.forEach(t => t.update(this.enemies, this.projectiles, this.projectilePool));
 
-        // Снаряды
-        this.projectiles.forEach(p => p.update(this.enemies));
-        // Удаляем мертвые снаряды
+        // 3. Снаряды (ОБНОВЛЕНО: теперь передаем effects для взрывов)
+        this.projectiles.forEach(p => p.update(this.enemies, this.effects));
+        
+        // Удаление мертвых снарядов
         for (let i = this.projectiles.length - 1; i >= 0; i--) {
             if (!this.projectiles[i].alive) {
                 this.projectilePool.free(this.projectiles[i]);
@@ -207,42 +201,42 @@ export class Game {
             }
         }
 
-        // Враги
+        // 4. Враги
         for (let i = this.enemies.length - 1; i >= 0; i--) {
             const e = this.enemies[i];
-            
-            // Двигаем врага по пути (нужно дописать логику пути в Enemy, 
-            // но пока используем простой move() из демо)
-            // В идеале: e.followPath(this.map.path); 
-            // Сейчас просто оставим e.move() или доработаем Enemy позже.
-            e.move(); // Временное движение вправо
+            e.move(); // Умное движение
 
-            // Проверка на смерть
             if (!e.isAlive()) {
-                this.money += 10; // Награда
+                // Смерть от урона
+                this.money += 10; 
                 this.effects.add({type: 'explosion', x: e.x, y: e.y, life: 15, radius: 20, color: '#9c27b0'});
                 this.enemies.splice(i, 1);
                 this.ui.update();
             }
-            // Проверка выхода за карту (потеря жизней)
-            else if (e.x > this.canvas.width) {
+            else if (e.finished) {
+                // Враг дошел до базы
                 this.lives--;
+                this.effects.add({type: 'text', text: "-1❤️", x: e.x, y: e.y, life: 40, color: 'red', vy: -1});
                 this.enemies.splice(i, 1);
                 this.ui.update();
-                if(this.lives <= 0) alert("GAME OVER");
+                
+                if(this.lives <= 0) {
+                    alert("GAME OVER");
+                    this.isRunning = false;
+                }
             }
         }
     }
 
     private render() {
-        // Очистка
+        // Фон
         this.ctx.fillStyle = '#222';
         this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
 
-        // 1. Карта
+        // Карта
         this.map.draw(this.ctx);
 
-        // 2. Подсветка клетки под мышью
+        // Подсветка клетки под курсором
         if (this.input.hoverCol >= 0) {
             const hx = this.input.hoverCol * CONFIG.TILE_SIZE;
             const hy = this.input.hoverRow * CONFIG.TILE_SIZE;
@@ -251,23 +245,23 @@ export class Game {
             this.ctx.strokeRect(hx, hy, CONFIG.TILE_SIZE, CONFIG.TILE_SIZE);
         }
 
-        // 3. Башни
+        // Башни
         this.towers.forEach(t => t.draw(this.ctx));
 
-        // 4. Враги
+        // Враги (ОБНОВЛЕНО: цвет зависит от статуса)
         this.enemies.forEach(e => {
-            // Временная отрисовка врага здесь, пока не перенесем draw() в Enemy.ts
-            this.ctx.fillStyle = e.getHealthPercent() > 0.5 ? '#2ecc71' : '#e74c3c';
+            this.ctx.fillStyle = e.getColor(); // Синий если лед, иначе зеленый/красный
             this.ctx.beginPath(); this.ctx.arc(e.x, e.y, 16, 0, Math.PI*2); this.ctx.fill();
+            
             // HP Bar
             this.ctx.fillStyle = '#fff'; this.ctx.fillRect(e.x-10, e.y-25, 20, 4);
             this.ctx.fillStyle = '#f00'; this.ctx.fillRect(e.x-10, e.y-25, 20 * e.getHealthPercent(), 4);
         });
 
-        // 5. Снаряды
+        // Снаряды
         this.projectiles.forEach(p => p.draw(this.ctx));
-
-        // 6. Эффекты (поверх всего)
+        
+        // Эффекты (поверх всего)
         this.effects.draw();
     }
 }

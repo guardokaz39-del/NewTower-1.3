@@ -1,6 +1,6 @@
 import { Enemy } from './Enemy';
+import { EffectSystem } from './EffectSystem'; // Нужен для взрывов
 
-// Описываем характеристики снаряда
 export interface IProjectileStats {
     dmg: number;
     speed: number;
@@ -17,36 +17,33 @@ export class Projectile {
     public radius: number = 4;
     public alive: boolean = false;
     
-    // Характеристики
     public damage: number = 0;
     public life: number = 0;
     public color: string = '#fff';
     public effects: any[] = [];
     public pierce: number = 0;
-    public hitList: Enemy[] = []; // Кого мы уже задели (для сквозных выстрелов)
+    public hitList: Enemy[] = [];
 
     constructor() {
         this.reset();
     }
 
-    // Инициализация (вызывается при выстреле)
     init(x: number, y: number, target: {x: number, y: number}, stats: IProjectileStats) {
         this.x = x; 
         this.y = y; 
         this.alive = true;
         this.damage = stats.dmg; 
         this.color = stats.color; 
-        this.effects = stats.effects;
+        this.effects = stats.effects; // <-- Тут лежат эффекты (splash, slow)
         this.pierce = stats.pierce || 0; 
         this.hitList = [];
         
-        // Вычисляем угол полета
         const angle = Math.atan2(target.y - y, target.x - x);
         const speed = stats.speed;
         this.vx = Math.cos(angle) * speed; 
         this.vy = Math.sin(angle) * speed;
         
-        this.life = 100; // Живет 100 кадров (около 1.5 сек), чтобы не лететь вечно
+        this.life = 100;
     }
 
     reset() {
@@ -55,31 +52,26 @@ export class Projectile {
         this.alive = false;
     }
 
-    update(enemies: Enemy[]) {
+    // Теперь update принимает еще и EffectSystem, чтобы создавать взрывы
+    update(enemies: Enemy[], effectsSys: EffectSystem) {
         if (!this.alive) return;
 
-        // Движение
         this.x += this.vx; 
         this.y += this.vy; 
         this.life--;
         
-        // Если время жизни вышло
         if(this.life <= 0) {
             this.alive = false;
             return;
         }
 
-        // Проверка столкновений
         for(let e of enemies) {
             if (!e.isAlive()) continue;
-
-            // Если уже попали в этого врага (для пробивающих снарядов) — пропускаем
             if(this.hitList.indexOf(e) !== -1) continue;
             
-            // Простая проверка дистанции (радиус врага + радиус пули)
-            // У врага нет поля radius в нашем коде, добавим жесткое число 16
             if (Math.hypot(e.x - this.x, e.y - this.y) < (16 + this.radius)) {
-                this.hit(e);
+                // Передаем весь список врагов в hit, чтобы сделать Splash
+                this.hit(e, enemies, effectsSys);
                 
                 if(this.pierce > 0) { 
                     this.pierce--; 
@@ -92,10 +84,42 @@ export class Projectile {
         }
     }
 
-    hit(target: Enemy) {
+    // Логика попадания
+    hit(target: Enemy, allEnemies: Enemy[], effectsSys: EffectSystem) {
+        // 1. Прямой урон
         target.takeDamage(this.damage);
-        
-        // Тут можно добавить эффекты (замедление, взрыв), пока оставим базу
+
+        // 2. Проверяем Сплэш (Взрыв)
+        const splash = this.effects.find(e => e.type === 'splash');
+        if (splash) {
+            // Рисуем взрыв
+            effectsSys.add({
+                type: 'explosion', x: target.x, y: target.y, 
+                radius: splash.radius, life: 15, color: 'rgba(255, 100, 0, 0.5)'
+            });
+
+            // Наносим урон соседям
+            for (let neighbor of allEnemies) {
+                if (neighbor === target || !neighbor.isAlive()) continue;
+                const dist = Math.hypot(neighbor.x - target.x, neighbor.y - target.y);
+                if (dist <= splash.radius) {
+                    neighbor.takeDamage(this.damage * 0.7); // 70% урона по площади
+                }
+            }
+        }
+
+        // 3. Проверяем Замедление (Лед)
+        const slow = this.effects.find(e => e.type === 'slow');
+        if (slow) {
+            // Применяем статус (тип, длительность, сила)
+            // slow.dur берется из конфига Tower.ts
+            target.applyStatus('slow', slow.dur || 60, 0.4); // 40% замедление
+            
+            // Эффект частиц льда
+            effectsSys.add({
+                type: 'particle', x: target.x, y: target.y, life: 20, color: '#00bcd4'
+            });
+        }
     }
     
     draw(ctx: CanvasRenderingContext2D) {
