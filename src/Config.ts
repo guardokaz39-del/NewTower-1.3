@@ -27,6 +27,14 @@ export const CONFIG = {
         BASE_HP: 30, HP_GROWTH: 1.15, DROP_CHANCE: 0.08
     },
 
+    // ВОТ ЭТОГО БЛОКА НЕ ХВАТАЛО:
+    CARD_TYPES: {
+        FIRE: { id: 'fire', name: 'Сплэш', icon: '🔥', color: '#f44336' },
+        ICE: { id: 'ice', name: 'Холод', icon: '❄️', color: '#00bcd4' },
+        SNIPER: { id: 'sniper', name: 'Снайпер', icon: '🎯', color: '#4caf50' },
+        MULTISHOT: { id: 'multi', name: 'Залп', icon: '💥', color: '#ff9800' }
+    } as Record<string, any>,
+
     ENEMY_TYPES: {
         GRUNT: { id: 'grunt', symbol: '👾', hpMod: 1.1, speed: 1.5, reward: 5, color: '#9c27b0' },
         SCOUT: { id: 'scout', symbol: '🦇', hpMod: 0.6, speed: 3.1, reward: 3, color: '#ffeb3b' },
@@ -35,11 +43,15 @@ export const CONFIG = {
             id: 'boss', symbol: '👹', hpMod: 15.0, speed: 0.6, reward: 150, color: '#ff0000',
             ability: 'summon', summonType: 'SCOUT', summonCd: 180 
         }
-    } as Record<string, any>, // Подсказка для TS
+    } as Record<string, any>,
     
     WAVES: [
         [ { type: 'GRUNT', count: 15, interval: 80 } ],
         [ { type: 'GRUNT', count: 12, interval: 60 }, { type: 'SCOUT', count: 7, interval: 40 } ],
-        // ... остальные волны (сократил для краткости, они в безопасности)
+        [ { type: 'GRUNT', count: 30, interval: 25 } ],
+        [ { type: 'GRUNT', count: 12, interval: 50 }, { type: 'TANK', count: 5, interval: 120 }, { type: 'GRUNT', count: 15, interval: 50 } ],
+        [ { type: 'SCOUT', count: 18, interval: 30 }, { type: 'TANK', count: 6, interval: 100 } ],
+        [ { type: 'TANK', count: 7, interval: 90 }, { type: 'SCOUT', count: 20, interval: 20 } ],
+        [ { type: 'GRUNT', count: 30, interval: 20 }, { type: 'BOSS', count: 1, interval: 200 } ]
     ]
 };

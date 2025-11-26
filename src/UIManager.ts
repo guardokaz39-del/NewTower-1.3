@@ -14,6 +14,7 @@ export class UIManager {
     constructor(game: Game) {
         this.game = game;
         
+        // Получаем ссылки на элементы из index.html
         this.elMoney = document.getElementById('money')!;
         this.elWave = document.getElementById('wave')!;
         this.elLives = document.getElementById('lives')!;
@@ -22,16 +23,37 @@ export class UIManager {
 
         // Подключаем кнопку старта
         this.elStartBtn.addEventListener('click', () => {
-             // Пока просто выводим лог, позже подключим реальный старт
-             console.log("Кнопка старта нажата");
-             // this.game.startWave(); 
+             this.game.startWave(); 
         });
     }
 
     public update() {
+        // 1. Обновляем цифры
         this.elMoney.innerText = this.game.money.toString();
         this.elLives.innerText = this.game.lives.toString();
-        // Временно просто показываем номер волны
         this.elWave.innerText = "1/" + CONFIG.WAVES.length;
+        
+        // 2. Логика кнопки Кузницы
+        const cardSys = this.game.cardSys;
+        
+        // Проверяем: можно ли ковать (есть ли 2 карты) и есть ли деньги
+        const canForge = cardSys && cardSys.canForge();
+        const hasMoney = this.game.money >= CONFIG.FORGE.COST;
+
+        if (canForge && hasMoney) {
+            // АКТИВНО
+            this.elForgeBtn.disabled = false;
+            this.elForgeBtn.innerHTML = `<span>⚒️</span> КОВАТЬ`;
+            
+            // Назначаем действие на клик
+            this.elForgeBtn.onclick = () => {
+                this.game.cardSys.tryForge();
+            };
+        } else {
+            // НЕАКТИВНО
+            this.elForgeBtn.disabled = true;
+            this.elForgeBtn.innerHTML = `<span>⚒️</span> ${CONFIG.FORGE.COST}💰`;
+            this.elForgeBtn.onclick = null;
+        }
     }
 }

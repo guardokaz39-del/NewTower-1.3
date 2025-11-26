@@ -6,11 +6,9 @@
     <style>
         body { margin: 0; overflow: hidden; background: #222; font-family: 'Segoe UI', sans-serif; user-select: none; }
         
-        /* Игровой слой */
         #game-container { position: relative; width: 100vw; height: 100vh; display: flex; justify-content: center; align-items: center; }
         canvas { box-shadow: 0 0 30px rgba(0,0,0,0.5); border-radius: 4px; }
         
-        /* UI: Верхняя панель */
         #ui-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; }
         .top-bar { 
             position: absolute; top: 20px; left: 50%; transform: translateX(-50%);
@@ -19,9 +17,7 @@
             box-shadow: 0 4px 15px rgba(0,0,0,0.3); pointer-events: auto;
         }
         .stat { display: flex; align-items: center; gap: 8px; }
-        .stat span { font-size: 24px; }
 
-        /* UI: Нижняя панель (Карты) */
         #hand-panel {
             position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%);
             height: 140px; width: 600px;
@@ -29,7 +25,6 @@
             pointer-events: auto;
         }
         
-        /* UI: Кузница (Справа) */
         #forge-panel {
             position: absolute; bottom: 20px; right: 40px;
             width: 140px; height: 140px;
@@ -49,7 +44,6 @@
         }
         #forge-btn:disabled { background: #555; color: #888; cursor: not-allowed; }
 
-        /* Кнопка Старта */
         #start-wave-btn {
             position: absolute; top: 100px; right: 40px;
             width: 80px; height: 80px; border-radius: 50%;
@@ -60,7 +54,6 @@
         #start-wave-btn:active { transform: scale(0.95); }
         #start-wave-btn:disabled { background: #555; border-color: #333; cursor: default; }
 
-        /* Карты (Стили) */
         .card {
             width: 70px; height: 100px; background: #fff; border-radius: 8px;
             display: flex; flex-direction: column; align-items: center; justify-content: center;
@@ -71,7 +64,42 @@
         .card-level { position: absolute; top: 4px; right: 4px; font-size: 12px; font-weight: bold; color: #333; }
         .card-icon { font-size: 32px; }
         
-        /* Типы карт (Цвета) */
         .type-fire { background: #ffcdd2; border-bottom: 4px solid #f44336; }
         .type-ice { background: #b2ebf2; border-bottom: 4px solid #00bcd4; }
-        .type-sniper { background: #c8e6c9; border-bottom: 4px
+        .type-sniper { background: #c8e6c9; border-bottom: 4px solid #4caf50; }
+        .type-multi { background: #ffe0b2; border-bottom: 4px solid #ff9800; }
+
+        #drag-ghost { position: absolute; pointer-events: none; z-index: 1000; opacity: 0.8; display: none; }
+    </style>
+</head>
+<body>
+    <div id="game-container">
+        <canvas id="game-canvas"></canvas>
+        
+        <div id="effects-layer" style="position:absolute; top:0; left:0; width:100%; height:100%; pointer-events:none;"></div>
+
+        <div id="ui-layer">
+            <div class="top-bar">
+                <div class="stat"><span>❤️</span> <div id="lives">20</div></div>
+                <div class="stat"><span>💰</span> <div id="money">125</div></div>
+                <div class="stat"><span>🌊</span> <div id="wave">0/7</div></div>
+            </div>
+
+            <button id="start-wave-btn">⚔️</button>
+
+            <div id="hand-panel">
+                <div id="hand" style="display:flex; gap:10px;"></div>
+            </div>
+
+            <div id="forge-panel">
+                <div class="forge-slots">
+                    <div id="forge-slot-0" class="slot"></div>
+                    <div id="forge-slot-1" class="slot"></div>
+                </div>
+                <button id="forge-btn" disabled><span>⚒️</span> 50💰</button>
+            </div>
+        </div>
+    </div>
+    <div id="drag-ghost" class="card"></div>
+</body>
+</html>
