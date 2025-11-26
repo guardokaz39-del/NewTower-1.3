@@ -9,97 +9,148 @@
         #game-container { position: relative; width: 100vw; height: 100vh; display: flex; justify-content: center; align-items: center; }
         canvas { box-shadow: 0 0 30px rgba(0,0,0,0.5); border-radius: 4px; }
         
+        /* UI Слой */
         #ui-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; }
+        
         .top-bar { 
             position: absolute; top: 20px; left: 50%; transform: translateX(-50%);
             background: rgba(0,0,0,0.8); padding: 10px 30px; border-radius: 20px;
             display: flex; gap: 30px; color: white; font-size: 20px; font-weight: bold;
             box-shadow: 0 4px 15px rgba(0,0,0,0.3); pointer-events: auto;
         }
-        .stat { display: flex; align-items: center; gap: 8px; }
 
-        #hand-panel {
-            position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%);
-            height: 140px; width: 600px;
-            display: flex; justify-content: center; align-items: center; gap: 10px;
-            pointer-events: auto;
-        }
+        /* --- НОВЫЙ НИЖНИЙ ЛЕЙАУТ --- */
         
-        #forge-panel {
-            position: absolute; bottom: 20px; right: 40px;
-            width: 140px; height: 140px;
-            background: rgba(0,0,0,0.6); border-radius: 15px; border: 2px solid #444;
-            display: flex; flex-direction: column; align-items: center; justify-content: space-evenly;
-            pointer-events: auto;
-        }
-        .forge-slots { display: flex; gap: 10px; }
-        .slot { 
-            width: 50px; height: 70px; background: rgba(0,0,0,0.3); border: 2px dashed #666; border-radius: 6px; 
-            display: flex; justify-content: center; align-items: center;
-        }
-        #forge-btn {
-            background: #ff9800; border: none; color: white; padding: 5px 15px; border-radius: 5px;
-            cursor: pointer; font-weight: bold; font-size: 14px; width: 90%;
-            transition: 0.2s;
-        }
-        #forge-btn:disabled { background: #555; color: #888; cursor: not-allowed; }
-
+        /* Кнопка Старта (НОВОЕ МЕСТО) */
         #start-wave-btn {
-            position: absolute; top: 100px; right: 40px;
-            width: 80px; height: 80px; border-radius: 50%;
-            background: #d32f2f; border: 4px solid #b71c1c; color: white; font-size: 30px;
+            position: absolute; top: 20px; left: 20px; /* Слева сверху */
+            width: 50px; height: 50px; border-radius: 50%; /* Сделаем симметричным */
+            background: #d32f2f; border: 4px solid #b71c1c; color: white; font-size: 24px;
             cursor: pointer; box-shadow: 0 5px 15px rgba(0,0,0,0.4);
             pointer-events: auto; transition: transform 0.1s;
+            display: flex; align-items: center; justify-content: center;
         }
         #start-wave-btn:active { transform: scale(0.95); }
-        #start-wave-btn:disabled { background: #555; border-color: #333; cursor: default; }
 
+        /* Кузница (Слева) */
+        #forge-container {
+            position: absolute; bottom: 20px; left: 20px;
+            pointer-events: auto;
+        }
+
+        /* Рука (Центр) */
+        #hand-container {
+            position: absolute; bottom: 20px; left: 50%; 
+            transform: translateX(-50%);
+            width: 50vw; /* 50% ширины экрана */
+            pointer-events: auto;
+        }
+        #hand {
+            display: flex; gap: 10px; padding: 15px; background: rgba(0,0,0,0.6);
+            border-radius: 15px; justify-content: center; 
+        }
+
+        /* Магазин (Справа) */
+        #shop-container {
+            position: absolute; bottom: 20px; right: 20px;
+            pointer-events: auto;
+        }
+
+        /* Общие стили для панелей */
+        .ui-panel {
+            padding: 15px; border-radius: 15px; background: rgba(40, 40, 50, 0.9);
+            border: 2px solid #444; width: 250px; /* Фиксированная ширина */
+        }
+        .panel-title { 
+            color: #ddd; font-weight: bold; margin-bottom: 10px; border-bottom: 1px solid #555; 
+            padding-bottom: 5px; font-size: 14px; text-align: center; 
+        }
+        
+        /* Стили слотов */
+        .slots-container { display: flex; gap: 10px; margin-bottom: 10px; }
+        .slot {
+            width: 70px; height: 100px; border: 2px dashed #666; border-radius: 8px;
+            display: flex; align-items: center; justify-content: center; color: #555; font-size: 24px;
+        }
+        .slot.shop-slot { border-color: gold; } /* Золотая рамка для магазина */
+
+        /* Кнопки */
+        button {
+            padding: 10px 20px; border: none; border-radius: 8px; font-weight: bold; cursor: pointer;
+            color: white; background: #555; font-size: 16px; transition: 0.2s;
+        }
+        #forge-btn { background: #e65100; width: 100%; }
+        #shop-btn { background: #1976d2; width: 100%; }
+        button:disabled { background: #555; color: #888; cursor: not-allowed; }
+
+        /* Карты */
         .card {
             width: 70px; height: 100px; background: #fff; border-radius: 8px;
             display: flex; flex-direction: column; align-items: center; justify-content: center;
             position: relative; box-shadow: 0 4px 8px rgba(0,0,0,0.3);
-            cursor: grab; transition: transform 0.1s; border: 2px solid rgba(0,0,0,0.1);
+            cursor: grab; border: 2px solid rgba(0,0,0,0.1);
         }
-        .card:hover { transform: translateY(-10px); }
-        .card-level { position: absolute; top: 4px; right: 4px; font-size: 12px; font-weight: bold; color: #333; }
+        .card.type-fire { background: linear-gradient(135deg, #ffcdd2, #e57373); border-color: #b71c1c; }
+        .card.type-ice { background: linear-gradient(135deg, #b3e5fc, #4fc3f7); border-color: #0288d1; }
+        .card.type-sniper { background: linear-gradient(135deg, #c8e6c9, #81c784); border-color: #388e3c; }
+        
+        .card-level { position: absolute; top: 5px; right: 5px; font-weight: bold; color: #333; }
         .card-icon { font-size: 32px; }
         
-        .type-fire { background: #ffcdd2; border-bottom: 4px solid #f44336; }
-        .type-ice { background: #b2ebf2; border-bottom: 4px solid #00bcd4; }
-        .type-sniper { background: #c8e6c9; border-bottom: 4px solid #4caf50; }
-        .type-multi { background: #ffe0b2; border-bottom: 4px solid #ff9800; }
-
-        #drag-ghost { position: absolute; pointer-events: none; z-index: 1000; opacity: 0.8; display: none; }
+        #drag-ghost {
+            position: fixed; pointer-events: none; z-index: 9999; display: none;
+            opacity: 0.8; transform: scale(1.1); box-shadow: 0 10px 20px rgba(0,0,0,0.3);
+        }
+        .shaking { animation: shake 0.5s; }
+        @keyframes shake { 0% { transform: translateX(0); } 25% { transform: translateX(-5px); } 75% { transform: translateX(5px); } 100% { transform: translateX(0); } }
     </style>
 </head>
 <body>
     <div id="game-container">
         <canvas id="game-canvas"></canvas>
         
-        <div id="effects-layer" style="position:absolute; top:0; left:0; width:100%; height:100%; pointer-events:none;"></div>
-
         <div id="ui-layer">
             <div class="top-bar">
-                <div class="stat"><span>❤️</span> <div id="lives">20</div></div>
-                <div class="stat"><span>💰</span> <div id="money">125</div></div>
-                <div class="stat"><span>🌊</span> <div id="wave">0/7</div></div>
+                <div>💰 <span id="money">0</span></div>
+                <div>❤️ <span id="lives">20</span></div>
+                <div>🌊 <span id="wave">1</span></div>
             </div>
 
             <button id="start-wave-btn">⚔️</button>
-
-            <div id="hand-panel">
-                <div id="hand" style="display:flex; gap:10px;"></div>
-            </div>
-
-            <div id="forge-panel">
-                <div class="forge-slots">
-                    <div id="forge-slot-0" class="slot"></div>
-                    <div id="forge-slot-1" class="slot"></div>
+            
+            <div id="forge-container" class="ui-panel">
+                <div class="panel-title">⚒️ КУЗНИЦА (Forge)</div>
+                <div class="slots-container">
+                    <div class="slot" id="forge-slot-0">1</div>
+                    <div class="slot" id="forge-slot-1">2</div>
                 </div>
                 <button id="forge-btn" disabled><span>⚒️</span> 50💰</button>
             </div>
+
+            <div id="hand-container">
+                <div id="hand"></div>
+            </div>
+
+            <div id="shop-container" class="ui-panel">
+                <div class="panel-title">🛒 МАГАЗИН (Shop)</div>
+                <div class="slots-container" id="shop-slots">
+                    <div class="slot shop-slot">?</div>
+                    <div class="slot shop-slot">?</div>
+                    <div class="slot shop-slot">?</div>
+                </div>
+                <button id="shop-btn" disabled><span>🛒</span> 100💰</button>
+            </div>
+
+
+            <div id="game-over">
+                <h1>GAME OVER</h1>
+                <p>Wave reached: <span id="final-wave">0</span></p>
+                <br>
+                <button id="restart-btn">Try Again</button>
+            </div>
         </div>
+        
+        <div id="drag-ghost" class="card"></div>
     </div>
-    <div id="drag-ghost" class="card"></div>
 </body>
 </html>

@@ -15,9 +15,8 @@ export class CardSystem {
     public forgeSlots: (ICard | null)[] = [null, null];
     public isForging: boolean = false;
     
-    // Для Drag & Drop
     public dragCard: ICard | null = null;
-    private ghostEl: HTMLElement; // Призрак карты
+    private ghostEl: HTMLElement;
 
     private handContainer: HTMLElement;
     private forgeContainers: HTMLElement[];
@@ -31,13 +30,11 @@ export class CardSystem {
         ];
         this.ghostEl = document.getElementById('drag-ghost')!;
 
-        // Стартовая рука
+        // Стартовые карты
         this.addCard('FIRE', 1);
         this.addCard('ICE', 1);
         this.addCard('SNIPER', 1);
     }
-
-    // --- Логика Drag & Drop ---
 
     public startDrag(card: ICard, e: MouseEvent) {
         if (this.isForging) return;
@@ -45,7 +42,6 @@ export class CardSystem {
         this.dragCard = card;
         card.isDragging = true;
         
-        // Настраиваем призрака
         this.ghostEl.style.display = 'flex';
         this.ghostEl.className = `card type-${card.type.id}`;
         this.ghostEl.innerHTML = `
@@ -54,12 +50,11 @@ export class CardSystem {
         `;
         
         this.updateDrag(e.clientX, e.clientY);
-        this.render(); // Скрываем оригинал в руке (класс dragging-placeholder)
+        this.render();
     }
 
     public updateDrag(x: number, y: number) {
         if (!this.dragCard) return;
-        // Центрируем призрака под курсором
         this.ghostEl.style.left = (x - 35) + 'px';
         this.ghostEl.style.top = (y - 50) + 'px';
     }
@@ -68,42 +63,31 @@ export class CardSystem {
         if (!this.dragCard) return;
 
         this.ghostEl.style.display = 'none';
-        let dropped = false;
-
-        // 1. Проверяем зону Кузницы
+        
+        // Проверка зоны Кузницы
         const forgeRect = document.getElementById('forge-panel')!.getBoundingClientRect();
         if (
             e.clientX >= forgeRect.left && e.clientX <= forgeRect.right &&
             e.clientY >= forgeRect.top && e.clientY <= forgeRect.bottom
         ) {
-            // Определяем левый или правый слот
             const idx = e.clientX < (forgeRect.left + forgeRect.width/2) ? 0 : 1;
             this.putInForge(idx, this.dragCard);
-            dropped = true;
         } 
-        // 2. Проверяем Игровое Поле (Canvas)
+        // Проверка Игрового Поля
         else {
             const canvasRect = this.game.canvas.getBoundingClientRect();
-            // Если курсор над канвасом
             if (e.clientY < canvasRect.bottom) {
-                // Передаем в Game для обработки (строительство или улучшение)
-                // Координаты уже посчитаны в InputSystem, Game их знает
                 const success = this.game.handleCardDrop(this.dragCard);
                 if (success) {
-                    // Удаляем карту из руки, так как она использована
                     this.hand = this.hand.filter(c => c.id !== this.dragCard!.id);
-                    dropped = true;
                 }
             }
         }
 
-        // Если никуда не положили - возвращаем
         this.dragCard.isDragging = false;
         this.dragCard = null;
         this.render();
     }
-
-    // --- Стандартная логика (без изменений) ---
 
     public addCard(typeKey: string, level: number): boolean {
         if (this.hand.length >= CONFIG.PLAYER.HAND_LIMIT) return false;
@@ -131,13 +115,16 @@ export class CardSystem {
         return !!(c1 && c2 && c1.type.id === c2.type.id && c1.level === c2.level && c1.level < 3);
     }
 
+    // ИСПРАВЛЕНИЕ ЗДЕСЬ: используем CONFIG.ECONOMY.FORGE_COST
     public tryForge() {
-        if (!this.canForge() || this.game.money < CONFIG.FORGE.COST) return;
-        this.game.money -= CONFIG.FORGE.COST;
+        const cost = CONFIG.ECONOMY.FORGE_COST;
+
+        if (!this.canForge() || this.game.money < cost) return;
+        
+        this.game.money -= cost;
         this.game.ui.update();
         this.isForging = true;
         
-        // Анимация ковки
         const f0 = this.forgeContainers[0].firstElementChild;
         const f1 = this.forgeContainers[1].firstElementChild;
         if(f0) f0.classList.add('shaking');
@@ -147,7 +134,6 @@ export class CardSystem {
             const c1 = this.forgeSlots[0]!;
             const newLevel = c1.level + 1;
             let typeKey = 'FIRE';
-            // Reverse lookup ключа типа
             for (const key in CONFIG.CARD_TYPES) {
                 if ((CONFIG.CARD_TYPES as any)[key].id === c1.type.id) typeKey = key;
             }
@@ -169,7 +155,6 @@ export class CardSystem {
         this.handContainer.innerHTML = '';
         this.hand.forEach(card => {
             const el = this.createCardElement(card);
-            // При нажатии начинаем Drag
             el.onmousedown = (e) => this.startDrag(card, e);
             if(card.isDragging) el.classList.add('dragging-placeholder');
             this.handContainer.appendChild(el);
