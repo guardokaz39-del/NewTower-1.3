@@ -1,119 +1,130 @@
-import { Game } from './Game';
+import { GameScene } from './scenes/GameScene';
 import { CONFIG } from './Config';
 
 export class BestiarySystem {
-    private game: Game;
+    private scene: GameScene;
     private unlockedEnemies: Set<string> = new Set();
-    private panel: HTMLElement;
+    
     private btn: HTMLElement;
+    private panel: HTMLElement;
+    private listContainer: HTMLElement;
+    private isVisible: boolean = false;
 
-    constructor(game: Game) {
-        this.game = game;
-        this.btn = this.createBtn(); // Сначала создаем кнопку
-        this.panel = this.createPanel(); // Потом панель
-        this.unlock('GRUNT');
+    constructor(scene: GameScene) {
+        this.scene = scene;
+        
+        // Создаем UI элементы
+        this.createUI();
+        
+        // По умолчанию открываем первого врага
+        this.unlock('grunt'); 
     }
 
     public unlock(typeId: string) {
-        if (!this.unlockedEnemies.has(typeId)) {
-            this.unlockedEnemies.add(typeId);
-            this.game.showFloatingText("NEW ENEMY ENTRY!", window.innerWidth/2, 100, '#00ffff');
+        const id = typeId.toLowerCase();
+        if (!this.unlockedEnemies.has(id)) {
+            this.unlockedEnemies.add(id);
+            // Можно добавить всплывающее уведомление через scene.showFloatingText
+            // Но пока просто обновим список, если панель открыта
+            if (this.isVisible) this.renderList();
         }
     }
 
-    private createBtn(): HTMLElement {
-        const btn = document.createElement('div');
-        btn.innerText = '📖';
-        Object.assign(btn.style, {
-            fontSize: '30px', cursor: 'pointer',
-            background: 'rgba(0,0,0,0.5)', padding: '5px', borderRadius: '5px',
-            width: '50px', height: '50px', display: 'flex', 
-            alignItems: 'center', justifyContent: 'center',
-            border: '2px solid #555'
-        });
-        btn.onclick = () => this.toggle();
-        
-        // Вставляем в левую колонку ПЕРЕД кузницей
-        const leftCol = document.getElementById('ui-left');
-        const forge = document.getElementById('forge-container');
-        if (leftCol) {
-            if (forge) leftCol.insertBefore(btn, forge);
-            else leftCol.appendChild(btn);
-        } else {
-            document.body.appendChild(btn); // Фоллбэк
-        }
-        
-        return btn;
-    }
-
-    private createPanel(): HTMLElement {
-        const panel = document.createElement('div');
-        Object.assign(panel.style, {
-            position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)',
-            width: '600px', height: '500px', background: '#2c3e50', border: '4px solid #34495e',
-            borderRadius: '10px', display: 'none', flexDirection: 'column', zIndex: '2000',
-            color: 'white', padding: '20px', boxShadow: '0 0 50px rgba(0,0,0,0.8)'
+    private createUI() {
+        // 1. Кнопка (Книга)
+        this.btn = document.createElement('div');
+        this.btn.innerText = '📖';
+        this.btn.title = "Bestiary";
+        Object.assign(this.btn.style, {
+            position: 'absolute', top: '20px', left: '20px',
+            width: '40px', height: '40px',
+            background: 'rgba(0,0,0,0.6)', color: '#fff',
+            border: '2px solid #aaa', borderRadius: '50%',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            fontSize: '24px', cursor: 'pointer', zIndex: '100',
+            userSelect: 'none', transition: 'transform 0.1s'
         });
         
-        panel.innerHTML = `
-            <div style="display:flex; justify-content:space-between; margin-bottom:20px;">
-                <h2 style="margin:0;">BESTIARY</h2>
-                <button id="close-bestiary" style="background:none; border:none; color:white; font-size:24px; cursor:pointer;">❌</button>
-            </div>
-            <div id="bestiary-list" style="display:grid; grid-template-columns: 1fr 1fr; gap: 15px; overflow-y: auto;"></div>
-        `;
+        this.btn.onmousedown = () => this.btn.style.transform = 'scale(0.9)';
+        this.btn.onmouseup = () => this.btn.style.transform = 'scale(1)';
+        this.btn.onclick = () => this.toggle();
         
-        document.body.appendChild(panel);
-        document.getElementById('close-bestiary')!.onclick = () => this.toggle();
+        document.body.appendChild(this.btn);
 
-        return panel;
+        // 2. Панель (Список)
+        this.panel = document.createElement('div');
+        Object.assign(this.panel.style, {
+            position: 'absolute', top: '70px', left: '20px',
+            width: '300px', maxHeight: '400px',
+            background: 'rgba(20, 20, 30, 0.95)',
+            border: '2px solid #888', borderRadius: '8px',
+            padding: '10px', display: 'none', flexDirection: 'column',
+            gap: '10px', overflowY: 'auto', zIndex: '100',
+            color: '#fff', fontFamily: 'Segoe UI, sans-serif'
+        });
+        
+        // Заголовок панели
+        const title = document.createElement('div');
+        title.innerText = "BESTIARY";
+        title.style.textAlign = "center";
+        title.style.fontWeight = "bold";
+        title.style.borderBottom = "1px solid #555";
+        title.style.paddingBottom = "5px";
+        this.panel.appendChild(title);
+
+        // Контейнер для элементов
+        this.listContainer = document.createElement('div');
+        this.listContainer.style.display = 'flex';
+        this.listContainer.style.flexDirection = 'column';
+        this.listContainer.style.gap = '8px';
+        this.panel.appendChild(this.listContainer);
+
+        document.body.appendChild(this.panel);
     }
 
-    public toggle() {
-        const isHidden = this.panel.style.display === 'none';
-        if (isHidden) {
-            this.renderContent();
-            this.panel.style.display = 'flex';
-        } else {
-            this.panel.style.display = 'none';
+    private toggle() {
+        this.isVisible = !this.isVisible;
+        this.panel.style.display = this.isVisible ? 'flex' : 'none';
+        if (this.isVisible) {
+            this.renderList();
         }
     }
 
-    private renderContent() {
-        const list = document.getElementById('bestiary-list')!;
-        list.innerHTML = '';
+    private renderList() {
+        this.listContainer.innerHTML = '';
 
-        for (const key in CONFIG.ENEMY_TYPES) {
-            const conf = (CONFIG.ENEMY_TYPES as any)[key];
-            const isUnlocked = this.unlockedEnemies.has(key);
-            
-            const item = document.createElement('div');
-            item.style.background = 'rgba(0,0,0,0.3)';
-            item.style.padding = '10px';
-            item.style.borderRadius = '5px';
-            item.style.display = 'flex';
-            item.style.alignItems = 'center';
-            item.style.gap = '15px';
+        // Проходим по всем типам врагов из конфига
+        const types = CONFIG.ENEMY_TYPES as any;
+        for (const key in types) {
+            const conf = types[key];
+            const isUnlocked = this.unlockedEnemies.has(conf.id.toLowerCase());
+
+            const row = document.createElement('div');
+            Object.assign(row.style, {
+                display: 'flex', alignItems: 'center', gap: '10px',
+                padding: '8px', background: 'rgba(255,255,255,0.05)',
+                borderRadius: '4px'
+            });
 
             if (isUnlocked) {
-                item.innerHTML = `
-                    <div style="font-size: 40px;">${conf.symbol}</div>
+                row.innerHTML = `
+                    <div style="font-size: 24px; width: 30px; text-align: center;">${conf.symbol}</div>
                     <div>
-                        <div style="font-weight:bold; color:${conf.color}">${conf.name}</div>
-                        <div style="font-size:12px; color:#aaa;">${conf.desc}</div>
-                        <div style="font-size:12px; margin-top:5px;">HP: ${CONFIG.ENEMY.BASE_HP * conf.hpMod} | Spd: ${conf.speed}</div>
+                        <div style="font-weight: bold; color: ${conf.color || '#fff'}">${key}</div>
+                        <div style="font-size: 11px; color: #aaa;">HP: ${Math.round(CONFIG.ENEMY.BASE_HP * conf.hpMod)} | Spd: ${conf.speed}</div>
+                        <div style="font-size: 11px; color: gold;">Reward: ${conf.reward}💰</div>
                     </div>
                 `;
             } else {
-                item.innerHTML = `
-                    <div style="font-size: 40px; filter: grayscale(1);">❓</div>
+                row.innerHTML = `
+                    <div style="font-size: 24px; width: 30px; text-align: center; filter: grayscale(1); opacity: 0.5;">❓</div>
                     <div>
-                        <div style="font-weight:bold; color:#555">Locked</div>
-                        <div style="font-size:12px; color:#555;">Encounter this enemy to unlock</div>
+                        <div style="font-weight: bold; color: #555">???</div>
+                        <div style="font-size: 11px; color: #555;">Locked</div>
                     </div>
                 `;
             }
-            list.appendChild(item);
+            this.listContainer.appendChild(row);
         }
     }
 }

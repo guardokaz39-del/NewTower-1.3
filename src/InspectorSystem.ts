@@ -1,129 +1,109 @@
-import { Game } from './Game';
-import { Tower } from './Tower';
+import { GameScene } from './scenes/GameScene';
 import { CONFIG } from './Config';
+import { Tower } from './Tower';
 
 export class InspectorSystem {
-    private game: Game;
-    private panel: HTMLElement;
-    private content: HTMLElement;
+    private scene: GameScene;
+    private elInspector: HTMLElement;
+    private elName: HTMLElement;
+    private elStats: HTMLElement;
+    private elSellBtn: HTMLButtonElement;
 
-    constructor(game: Game) {
-        this.game = game;
-        this.panel = document.createElement('div');
-        this.content = document.createElement('div');
-        this.initUI();
+    constructor(scene: GameScene) {
+        this.scene = scene;
+        this.createUI();
     }
 
-    private initUI() {
-        // Стили панели (теперь без position: absolute)
-        Object.assign(this.panel.style, {
-            width: '250px', // Ширина как у магазина
-            background: 'rgba(20, 20, 30, 0.95)',
-            border: '2px solid #444', borderRadius: '15px',
-            padding: '15px', color: '#eee', fontFamily: 'Segoe UI, sans-serif',
-            fontSize: '14px', display: 'flex', flexDirection: 'column', gap: '10px',
-            pointerEvents: 'auto'
+    private createUI() {
+        this.elInspector = document.createElement('div');
+        this.elInspector.id = 'inspector-panel';
+        
+        // --- ВИЗУАЛЬНЫЕ ПРАВКИ ---
+        Object.assign(this.elInspector.style, {
+            position: 'absolute', 
+            bottom: '280px', // Подняли выше магазина (магазин ~220px высотой + отступ)
+            right: '20px',   // Выровняли по правому краю, как магазин
+            width: '260px',  // Фиксированная ширина для аккуратности
+            
+            background: 'rgba(20, 20, 30, 0.95)', // Единый стиль с другими панелями
+            border: '2px solid #555', 
+            borderRadius: '8px',
+            padding: '15px', 
+            color: '#fff', 
+            display: 'none',
+            fontFamily: 'Segoe UI, sans-serif', 
+            zIndex: '100',
+            boxShadow: '0 4px 15px rgba(0,0,0,0.5)'
         });
+        // -------------------------
 
-        this.panel.appendChild(this.content);
+        this.elName = document.createElement('div');
+        this.elName.style.fontWeight = 'bold';
+        this.elName.style.fontSize = '18px';
+        this.elName.style.marginBottom = '10px';
+        this.elName.style.borderBottom = '1px solid #777';
+        this.elName.style.paddingBottom = '5px';
+        this.elInspector.appendChild(this.elName);
 
-        // Вставляем в правую колонку в самое НАЧАЛО (prepend), чтобы быть НАД магазином
-        const rightCol = document.getElementById('ui-right');
-        if (rightCol) {
-            rightCol.prepend(this.panel);
-        } else {
-            // Фоллбэк (старый стиль)
-            this.panel.style.position = 'absolute';
-            this.panel.style.top = '100px';
-            this.panel.style.right = '20px';
-            document.body.appendChild(this.panel);
-        }
+        this.elStats = document.createElement('div');
+        this.elStats.style.fontSize = '14px';
+        this.elStats.style.lineHeight = '1.6';
+        this.elInspector.appendChild(this.elStats);
+
+        this.elSellBtn = document.createElement('button');
+        this.elSellBtn.innerText = 'SELL';
+        Object.assign(this.elSellBtn.style, {
+            marginTop: '15px', width: '100%', padding: '8px',
+            background: '#d32f2f', color: '#fff', border: 'none',
+            borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold'
+        });
+        this.elSellBtn.onclick = () => {
+            if (this.scene.selectedTower) {
+                this.scene.sellTower(this.scene.selectedTower);
+                this.scene.selectedTower = null;
+            }
+        };
+        this.elInspector.appendChild(this.elSellBtn);
+
+        document.body.appendChild(this.elInspector);
     }
 
     public update() {
-        // 1. Предсказание (drag)
-        const dragCard = this.game.cardSys.dragCard;
-        const hoverTower = this.getHoverTower();
-
-        if (dragCard && hoverTower && !hoverTower.isBuilding && hoverTower.cards.length < 3) {
-            this.renderPrediction(hoverTower, dragCard);
+        const tower = this.scene.selectedTower;
+        
+        if (!tower) {
+            this.elInspector.style.display = 'none';
             return;
         }
 
-        // 2. Выбрана башня
-        const selected = this.game.selectedTower;
-        if (selected) {
-            this.renderTowerStats(selected);
-            return;
+        this.elInspector.style.display = 'block';
+        
+        // Определяем имя башни по картам (примерно)
+        let name = "Empty Tower";
+        if (tower.cards.length > 0) {
+            // Берем имя первой карты или комбинированное
+            name = tower.cards[0].type.name;
+            if (tower.cards.length > 1) name += " +";
+        } else if (tower.isBuilding) {
+             name = "Building...";
         }
+        
+        this.elName.innerText = name;
 
-        // 3. Дефолт
-        this.renderGeneralInfo();
-    }
-
-    private getHoverTower(): Tower | undefined {
-        const col = this.game.input.hoverCol;
-        const row = this.game.input.hoverRow;
-        return this.game.towers.find(t => t.col === col && t.row === row);
-    }
-
-    private renderPrediction(tower: Tower, card: any) {
-        const current = tower.getStats();
-        const futureCards = [...tower.cards, card];
-        const future = Tower.getPreviewStats(futureCards);
-
-        this.content.innerHTML = `
-            <div style="text-align:center; font-weight:bold; color:cyan; margin-bottom:5px;">PREDICTION</div>
-            <div>Dmg: ${current.dmg.toFixed(1)} ${this.getDiffStr(current.dmg, future.dmg)}</div>
-            <div>Rng: ${current.range.toFixed(0)} ${this.getDiffStr(current.range, future.range)}</div>
-            <div>Spd: ${(60/current.cd).toFixed(1)} ${this.getDiffStr(60/current.cd, 60/future.cd)}/s</div>
-            <div style="font-size:12px; color:#aaa; margin-top:5px;">Release to Apply</div>
-        `;
-    }
-
-    private getDiffStr(v1: number, v2: number): string {
-        const diff = v2 - v1;
-        if (Math.abs(diff) < 0.01) return '';
-        const sign = diff > 0 ? '+' : '';
-        const color = diff > 0 ? '#0f0' : '#f00';
-        return `<span style="color:${color}">(${sign}${diff.toFixed(1)})</span>`;
-    }
-
-    private renderTowerStats(tower: Tower) {
-        const s = tower.getStats();
+        const stats = tower.getStats();
+        // refund cost
         const refund = Math.floor(tower.costSpent * CONFIG.ECONOMY.SELL_REFUND);
 
-        const cardsHtml = tower.cards.map(c => 
-            `<span style="font-size:16px;" title="${c.type.name} Lvl ${c.level}">${c.type.icon}</span>`
-        ).join(' ');
-
-        this.content.innerHTML = `
-            <div style="text-align:center; border-bottom:1px solid #555; padding-bottom:5px; margin-bottom:5px;">
-                <strong>TOWER LVL ${tower.cards.length}</strong>
-            </div>
-            <div>Runes: ${cardsHtml || '<span style="color:#666">Empty</span>'}</div>
-            <div style="margin-top:5px;">💥 Dmg: <span style="color:#ff9">${s.dmg.toFixed(1)}</span></div>
-            <div>🎯 Rng: <span style="color:#9f9">${s.range.toFixed(0)}</span></div>
-            <div>⚡ Spd: <span style="color:#9ff">${(60/s.cd).toFixed(1)}</span> /s</div>
-            
-            <button id="sell-btn" style="width:100%; margin-top:10px; background:#d32f2f; color:white; border:none; padding:5px; cursor:pointer;">
-                SELL (+${refund}💰)
-            </button>
-        `;
-
-        const btn = document.getElementById('sell-btn');
-        if (btn) btn.onclick = () => {
-            this.game.sellTower(tower);
-            this.game.selectedTower = null; 
-        };
-    }
-
-    private renderGeneralInfo() {
-        this.content.innerHTML = `
-            <div style="text-align:center; color:#aaa;">INFO</div>
-            <div style="font-size:12px; margin-top:10px; text-align: center;">
-                Select a tower to see stats
+        // Форматируем вывод
+        this.elStats.innerHTML = `
+            <div style="display:flex; justify-content:space-between;"><span>Damage:</span> <span style="color:#ff5252; font-weight:bold;">${stats.dmg}</span></div>
+            <div style="display:flex; justify-content:space-between;"><span>Range:</span> <span style="color:#448aff; font-weight:bold;">${stats.range}</span></div>
+            <div style="display:flex; justify-content:space-between;"><span>Speed:</span> <span style="color:#69f0ae; font-weight:bold;">${(60/stats.cd).toFixed(1)}/s</span></div>
+            <div style="margin-top:8px; border-top:1px solid #444; padding-top:5px; color:#aaa; font-size:12px;">
+                Cards: ${tower.cards.length} / 3
             </div>
         `;
+        
+        this.elSellBtn.innerHTML = `SELL (+${refund}💰)`;
     }
 }

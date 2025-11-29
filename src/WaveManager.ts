@@ -1,95 +1,83 @@
-import { Game } from './Game';
+import { GameScene } from './scenes/GameScene';
 import { CONFIG } from './Config';
 
 export class WaveManager {
-    private game: Game;
-    
-    public currentWaveIdx: number = 0; // Индекс текущей волны (0..N)
+    private scene: GameScene;
     public isWaveActive: boolean = false;
-    
-    // Состояние текущей волны
-    private currentWaveConfig: any[] = [];
-    private subWaveIdx: number = 0;      // Какая группа врагов сейчас идет
-    private spawnedInSubWave: number = 0; // Сколько врагов из группы уже вышло
-    private nextSpawnFrame: number = 0;   // Когда спавнить следующего
+    private enemiesToSpawn: string[] = [];
+    private spawnTimer: number = 0;
 
-    constructor(game: Game) {
-        this.game = game;
+    constructor(scene: GameScene) {
+        this.scene = scene;
     }
 
-    public startNextWave() {
-        if (this.isWaveActive) {
-            // Если волна уже идет - даем бонус
-            if (this.game.enemies.length > 0) {
-                this.game.money += CONFIG.ECONOMY.EARLY_WAVE_BONUS;
-                this.game.showFloatingText(`RISK! +${CONFIG.ECONOMY.EARLY_WAVE_BONUS}💰`, this.game.map.cols/2, this.game.map.rows/2, '#ffd700');
-            } else {
-                // Если ждем окончания (пауза между группами) - ускоряем
-                this.nextSpawnFrame = this.game.frames;
-            }
-            return;
-        }
+    public startWave() {
+        if (this.isWaveActive) return;
 
-        this.game.wave++; // Увеличиваем счетчик для UI
-        this.currentWaveIdx = (this.game.wave - 1) % CONFIG.WAVES.length;
-        this.currentWaveConfig = CONFIG.WAVES[this.currentWaveIdx];
-        
-        // Сброс счетчиков
-        this.subWaveIdx = 0;
-        this.spawnedInSubWave = 0;
+        this.scene.wave++;
         this.isWaveActive = true;
-        this.nextSpawnFrame = this.game.frames + 60; // Небольшая пауза перед стартом
+        
+        this.generateWave(this.scene.wave);
+        this.scene.showFloatingText(`WAVE ${this.scene.wave}`, this.scene.game.canvas.width / 2, this.scene.game.canvas.height / 2, '#fff');
+        
+        this.scene.ui.update();
+    }
 
-        this.game.ui.update();
+    private generateWave(waveNum: number) {
+        // Исправление: CONFIG.WAVES это массив массивов (или объектов, которые сразу содержат данные)
+        // Если ошибка говорит "enemies does not exist on type ...[]", значит conf - это массив врагов.
+        const conf = CONFIG.WAVES[Math.min(waveNum, CONFIG.WAVES.length) - 1] || CONFIG.WAVES[CONFIG.WAVES.length - 1];
+        
+        this.enemiesToSpawn = [];
+        
+        // ВАЖНО: Если conf это уже массив (как [ {type:..., count:...} ]), то перебираем его напрямую
+        if (Array.isArray(conf)) {
+             conf.forEach((entry: any) => {
+                for(let i=0; i<entry.count; i++) {
+                    this.enemiesToSpawn.push(entry.type);
+                }
+            });
+        } else if ((conf as any).enemies) {
+            // Если вдруг это объект { enemies: [...] }
+             (conf as any).enemies.forEach((entry: any) => {
+                for(let i=0; i<entry.count; i++) {
+                    this.enemiesToSpawn.push(entry.type);
+                }
+            });
+        }
+        
+        // Перемешиваем
+        this.enemiesToSpawn.sort(() => Math.random() - 0.5);
     }
 
     public update() {
-        // 1. Проверяем условие победы в волне
-        if (this.isWaveActive && this.subWaveIdx >= this.currentWaveConfig.length && this.game.enemies.length === 0) {
-            this.finishWave();
-            return;
-        }
+        if (!this.isWaveActive) return;
 
-        // 2. Логика спавна
-        if (this.isWaveActive && this.subWaveIdx < this.currentWaveConfig.length) {
-            if (this.game.frames >= this.nextSpawnFrame) {
-                this.spawnNextEnemy();
-            }
-        }
-    }
-
-    private spawnNextEnemy() {
-        const group = this.currentWaveConfig[this.subWaveIdx];
-        
-        // Спавним врага через Game (так как там список врагов)
-        this.game.spawnEnemy(group.type);
-        this.spawnedInSubWave++;
-
-        if (this.spawnedInSubWave >= group.count) {
-            // Группа закончилась, переходим к следующей
-            this.subWaveIdx++;
-            this.spawnedInSubWave = 0;
-            
-            if (this.subWaveIdx < this.currentWaveConfig.length) {
-                // Пауза перед следующей группой (берем interval следующей группы * 5)
-                const nextGroup = this.currentWaveConfig[this.subWaveIdx];
-                this.nextSpawnFrame = this.game.frames + nextGroup.interval * 5;
+        // Спавн врагов
+        if (this.enemiesToSpawn.length > 0) {
+            this.spawnTimer++;
+            if (this.spawnTimer >= 60) { // Раз в секунду (примерно)
+                const type = this.enemiesToSpawn.shift()!;
+                this.scene.spawnEnemy(type);
+                this.spawnTimer = 0;
             }
         } else {
-            // Пауза между врагами внутри группы
-            this.nextSpawnFrame = this.game.frames + group.interval;
+            // Если враги кончились и на поле никого нет -> волна закончена
+            if (this.scene.enemies.length === 0) {
+                this.endWave();
+            }
         }
     }
 
-    private finishWave() {
+    private endWave() {
         this.isWaveActive = false;
+        this.scene.showFloatingText("WAVE CLEARED!", this.scene.game.canvas.width/2, this.scene.game.canvas.height/2, 'gold');
         
         // Награда
-        for(let i=0; i < CONFIG.ECONOMY.WAVE_CLEAR_REWARD; i++) {
-            this.game.giveRandomCard();
+        for(let i=0; i<CONFIG.ECONOMY.WAVE_CLEAR_REWARD; i++) {
+            this.scene.giveRandomCard();
         }
         
-        this.game.showFloatingText("WAVE CLEAR!", this.game.map.cols/2, this.game.map.rows/2, '#00ff00');
-        this.game.ui.update();
+        this.scene.ui.update();
     }
 }

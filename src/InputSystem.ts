@@ -1,8 +1,8 @@
-import { Game } from './Game';
+import { GameScene } from './scenes/GameScene';
 import { CONFIG } from './Config';
 
 export class InputSystem {
-    private game: Game;
+    private scene: GameScene;
     private canvas: HTMLCanvasElement;
 
     public mouseX: number = 0;
@@ -18,9 +18,10 @@ export class InputSystem {
     private holdStartRow: number = -1;
     private readonly HOLD_THRESHOLD: number = 15; // Примерно 250мс (при 60fps)
 
-    constructor(game: Game) {
-        this.game = game;
-        this.canvas = game.canvas;
+    constructor(scene: GameScene) {
+        this.scene = scene;
+        // Канвас находится в движке (game), к которому у сцены есть доступ
+        this.canvas = scene.game.canvas;
         this.initListeners();
     }
 
@@ -46,15 +47,16 @@ export class InputSystem {
         this.holdTimer = 0;
         this.holdStartCol = -1;
         this.holdStartRow = -1;
-        this.game.stopBuildingTower();
+        this.scene.stopBuildingTower();
     }
 
     private initListeners() {
         window.addEventListener('mousemove', (e) => {
             this.updateMousePos(e.clientX, e.clientY);
             
-            if (this.game.cardSys.dragCard) {
-                this.game.cardSys.updateDrag(e.clientX, e.clientY);
+            // Обращаемся к cardSys через сцену
+            if (this.scene.cardSys.dragCard) {
+                this.scene.cardSys.updateDrag(e.clientX, e.clientY);
             }
         });
 
@@ -69,8 +71,6 @@ export class InputSystem {
                     this.holdStartRow = this.hoverRow;
                     this.holdTimer = 0;
                 }
-                // ВАЖНО: Мы НЕ вызываем handleGridClick здесь! 
-                // Мы ждем mouseup, чтобы понять, был это клик или стройка.
             }
         });
 
@@ -78,8 +78,8 @@ export class InputSystem {
             this.updateMousePos(e.clientX, e.clientY);
 
             // Если мы тащили карту - это дроп
-            if (this.game.cardSys.dragCard) {
-                this.game.cardSys.endDrag(e);
+            if (this.scene.cardSys.dragCard) {
+                this.scene.cardSys.endDrag(e);
                 this.forceReset();
                 return;
             }
@@ -87,7 +87,7 @@ export class InputSystem {
             // Если мы просто кликнули (быстро отпустили)
             if (this.isMouseDown && this.holdTimer < this.HOLD_THRESHOLD) {
                 // Это КЛИК -> Выделяем или Сбрасываем
-                this.game.handleGridClick(this.hoverCol, this.hoverRow);
+                this.scene.handleGridClick(this.hoverCol, this.hoverRow);
             }
 
             this.forceReset();
@@ -96,20 +96,20 @@ export class InputSystem {
 
     public update() {
         // Логика УДЕРЖАНИЯ (стройка)
-        if (this.isMouseDown && !this.game.cardSys.dragCard) {
+        if (this.isMouseDown && !this.scene.cardSys.dragCard) {
             // Если мышь все еще на той же клетке
             if (this.hoverCol === this.holdStartCol && this.hoverRow === this.holdStartRow && this.hoverCol !== -1) {
                 this.holdTimer++;
                 // Если держим долго -> начинаем строить
                 if (this.holdTimer >= this.HOLD_THRESHOLD) {
-                    this.game.startBuildingTower(this.hoverCol, this.hoverRow);
+                    this.scene.startBuildingTower(this.hoverCol, this.hoverRow);
                 }
             } else {
                 // Сдвинули мышь - сброс
                 this.holdTimer = 0;
                 this.holdStartCol = this.hoverCol;
                 this.holdStartRow = this.hoverRow;
-                this.game.stopBuildingTower();
+                this.scene.stopBuildingTower();
             }
         }
     }

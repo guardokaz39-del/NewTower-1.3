@@ -1,14 +1,14 @@
-import { Game } from './Game';
+import { GameScene } from './scenes/GameScene';
 
 export class DebugSystem {
-    private game: Game;
+    private scene: GameScene;
     private elDebugPanel: HTMLElement;
     private content: HTMLElement;
     private logs: string[] = [];
     private maxLogs: number = 50;
 
-    constructor(game: Game) {
-        this.game = game;
+    constructor(scene: GameScene) {
+        this.scene = scene;
         this.createUI();
         this.log("Debug System Initialized");
     }
@@ -21,7 +21,6 @@ export class DebugSystem {
     }
 
     private createUI() {
-        // 1. Кнопка-иконка (Справа сверху)
         const btn = document.createElement('div');
         btn.innerText = '🐞';
         btn.title = "Debug Info";
@@ -36,13 +35,9 @@ export class DebugSystem {
             transition: 'transform 0.1s'
         });
         
-        btn.onmousedown = () => { btn.style.transform = 'scale(0.9)'; };
-        btn.onmouseup = () => { btn.style.transform = 'scale(1)'; };
         btn.onclick = () => this.togglePanel();
-        
         document.body.appendChild(btn);
 
-        // 2. Панель (Скрыта по умолчанию)
         this.elDebugPanel = document.createElement('div');
         Object.assign(this.elDebugPanel.style, {
             position: 'absolute', top: '70px', right: '20px',
@@ -54,7 +49,6 @@ export class DebugSystem {
             overflowY: 'auto', zIndex: '20000', boxShadow: '0 5px 20px rgba(0,0,0,0.8)'
         });
 
-        // Кнопка копирования
         const copyBtn = document.createElement('button');
         copyBtn.innerText = '📋 COPY FULL REPORT';
         Object.assign(copyBtn.style, {
@@ -64,7 +58,6 @@ export class DebugSystem {
         copyBtn.onclick = () => this.copyReport();
         this.elDebugPanel.appendChild(copyBtn);
 
-        // Контент (статистика и логи)
         this.content = document.createElement('div');
         this.content.style.whiteSpace = 'pre-wrap';
         this.elDebugPanel.appendChild(this.content);
@@ -73,21 +66,19 @@ export class DebugSystem {
     }
 
     public update() {
-        // Обновляем текст только если панель открыта (экономия ресурсов)
         if (this.elDebugPanel.style.display === 'none') return;
 
         const info = [
             `--- STATS ---`,
-            `FPS Frame: ${this.game.frames}`,
-            `Enemies:   ${this.game.enemies.length}`,
-            `Towers:    ${this.game.towers.length}`,
-            `Projectiles: ${this.game.projectiles.length}`,
-            `Pool Size: ${this.game.projectilePool['pool'].length} (Free)`, // Доступ к приватному свойству через index signature для дебага
-            `Wave: ${this.game.wave} | Active: ${this.game.waveManager.isWaveActive}`,
-            `Selection: ${this.game.selectedTower ? 'YES' : 'NO'}`,
+            `FPS Frame: ${this.scene.frames}`,
+            `Enemies:   ${this.scene.enemies.length}`,
+            `Towers:    ${this.scene.towers.length}`,
+            `Projectiles: ${this.scene.projectiles.length}`,
+            `Wave: ${this.scene.wave} | Active: ${this.scene.waveManager.isWaveActive}`,
+            `Selection: ${this.scene.selectedTower ? 'YES' : 'NO'}`,
             ``,
             `--- LOGS ---`,
-            ...this.logs.slice().reverse().slice(0, 15) // Показываем последние 15
+            ...this.logs.slice().reverse().slice(0, 15)
         ].join('\n');
 
         this.content.innerText = info;
@@ -102,11 +93,11 @@ export class DebugSystem {
         const report = {
             meta: { ua: navigator.userAgent, res: `${window.innerWidth}x${window.innerHeight}` },
             state: {
-                money: this.game.money,
-                wave: this.game.wave,
-                frames: this.game.frames,
-                enemiesCount: this.game.enemies.length,
-                towersCount: this.game.towers.length
+                money: this.scene.money,
+                wave: this.scene.wave,
+                frames: this.scene.frames,
+                enemiesCount: this.scene.enemies.length,
+                towersCount: this.scene.towers.length
             },
             logs: this.logs
         };
@@ -114,10 +105,8 @@ export class DebugSystem {
         const text = "```json\n" + JSON.stringify(report, null, 2) + "\n```";
         navigator.clipboard.writeText(text).then(() => {
             this.log("Report copied!");
-            alert("Report copied to clipboard!");
         }).catch(err => {
             console.error('Failed to copy', err);
-            alert("Failed to copy. Check console.");
         });
     }
 }

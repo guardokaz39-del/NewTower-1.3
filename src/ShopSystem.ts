@@ -1,93 +1,147 @@
-import { Game } from './Game';
+import { GameScene } from './scenes/GameScene';
 import { CONFIG } from './Config';
 
 export class ShopSystem {
-    private game: Game;
-    public readonly cost: number = CONFIG.ECONOMY.SHOP_COST;
+    private scene: GameScene;
     
-    // Текущие карты в магазине (конфиги карт)
-    public shopCards: (any | null)[] = [null, null, null];
-    // Индекс выбранной карты
-    public selectedSlotIndex: number = -1;
+    private elShopBtn: HTMLButtonElement;
+    private elSlotsContainer: HTMLElement;
+    
+    private shopCards: string[] = []; 
+    private selectedSlot: number = -1; 
+    
+    public readonly cost: number = 100; 
 
-    constructor(game: Game) {
-        this.game = game;
-        this.rerollShop(); // Заполняем магазин при старте
+    constructor(scene: GameScene) {
+        this.scene = scene;
+        this.elShopBtn = document.getElementById('shop-btn') as HTMLButtonElement;
+        this.elSlotsContainer = document.getElementById('shop-slots')!;
+        
+        this.initListeners();
+        this.rerollShop(); 
     }
 
-    // Заполнить пустые слоты новыми случайными картами
+    private initListeners() {
+        this.elShopBtn.addEventListener('click', () => this.buySelectedCard());
+    }
+
     public rerollShop() {
-        const cardKeys = Object.keys(CONFIG.CARD_TYPES);
-        for (let i = 0; i < this.shopCards.length; i++) {
-            if (this.shopCards[i] === null) {
-                const randomKey = cardKeys[Math.floor(Math.random() * cardKeys.length)];
-                this.shopCards[i] = CONFIG.CARD_TYPES[randomKey];
-            }
+        this.shopCards = [];
+        for(let i=0; i<3; i++) {
+            this.shopCards.push(this.getRandomCardKey());
         }
+        this.selectedSlot = -1;
+        this.render();
     }
 
-    // Выбор карты в UI
-    public selectCard(index: number) {
-        if (this.shopCards[index] !== null) {
-            this.selectedSlotIndex = index;
-            this.game.ui.update(); // Обновляем UI для подсветки
-        }
+    private getRandomCardKey(): string {
+        const keys = Object.keys(CONFIG.CARD_TYPES);
+        return keys[Math.floor(Math.random() * keys.length)];
     }
 
-    public buyCard(): boolean {
-        // 0. Проверка выбора
-        if (this.selectedSlotIndex === -1 || this.shopCards[this.selectedSlotIndex] === null) {
-             return false;
+    public selectSlot(index: number) {
+        if (index < 0 || index >= this.shopCards.length) return;
+        
+        if (this.selectedSlot === index) {
+            this.selectedSlot = -1;
+        } else {
+            this.selectedSlot = index;
+        }
+        this.render();
+        this.scene.ui.update(); 
+    }
+
+    public buySelectedCard() {
+        if (this.selectedSlot === -1) return;
+
+        if (this.scene.money < this.cost) {
+            this.scene.showFloatingText("Не хватает золота!", 800, 800, 'red'); 
+            return;
         }
 
-        // 1. Проверка денег
-        if (this.game.money < this.cost) {
-            this.game.showFloatingText("Не хватает золота!", 800, 800, 'red'); 
-            return false;
-        }
-        
-        // 2. Проверка лимита руки
-        if (this.game.cardSys.hand.length >= CONFIG.PLAYER.HAND_LIMIT) {
-             this.game.showFloatingText("Рука переполнена!", 800, 800, 'orange');
-             return false;
+        if (this.scene.cardSys.hand.length >= CONFIG.PLAYER.HAND_LIMIT) {
+             this.scene.showFloatingText("Рука переполнена!", 800, 800, 'orange');
+             return;
         }
 
-        // 3. Покупка
-        this.game.money -= this.cost;
+        this.scene.money -= this.cost;
         
-        // Получаем ключ типа карты по её конфигу
-        const cardTypeConfig = this.shopCards[this.selectedSlotIndex];
-        let typeKey = 'FIRE'; // фоллбэк
-        for(const key in CONFIG.CARD_TYPES) {
-            if(CONFIG.CARD_TYPES[key].id === cardTypeConfig.id) {
-                typeKey = key;
-                break;
-            }
-        }
-        
-        this.game.cardSys.addCard(typeKey, 1);
-        
-        // Эффекты
-        this.game.effects.add({
+        const cardKey = this.shopCards[this.selectedSlot];
+        this.scene.cardSys.addCard(cardKey, 1);
+
+        this.scene.effects.add({
             type: 'text', text: `- ${this.cost}💰`, 
-            x: this.game.canvas.width - 200, y: this.game.canvas.height - 100,
+            x: this.scene.game.canvas.width - 200, y: this.scene.game.canvas.height - 100,
             life: 60, color: 'gold', vy: -1
         });
 
-        // Удаляем купленную карту из магазина и сбрасываем выбор
-        this.shopCards[this.selectedSlotIndex] = null;
-        this.selectedSlotIndex = -1;
+        this.shopCards[this.selectedSlot] = this.getRandomCardKey();
+        this.selectedSlot = -1;
         
-        // Заполняем пустой слот новой картой
-        this.rerollShop();
-        
-        this.game.ui.update();
-        return true;
+        this.render();
+        this.scene.ui.update();
     }
 
-    public canBuy(): boolean {
-        return this.game.money >= this.cost && 
-               this.game.cardSys.hand.length < CONFIG.PLAYER.HAND_LIMIT &&
-               this.selectedSlotIndex !== -1; // Обязательно должна быть выбрана карта
+    public update() {
+        this.elShopBtn.innerHTML = `<span>🛒</span> ${this.cost}💰`;
+        
+        const canAfford = this.scene.money >= this.cost;
+        const hasSelection = this.selectedSlot !== -1;
+        
+        if (canAfford && hasSelection) {
+            this.elShopBtn.disabled = false;
+            this.elShopBtn.style.opacity = '1';
+            this.elShopBtn.style.cursor = 'pointer';
+        } else {
+            this.elShopBtn.disabled = true;
+            this.elShopBtn.style.opacity = '0.5';
+            this.elShopBtn.style.cursor = 'not-allowed';
+        }
+    }
+
+    private render() {
+        this.elSlotsContainer.innerHTML = '';
+        
+        this.shopCards.forEach((key, idx) => {
+            const typeConfig = (CONFIG.CARD_TYPES as any)[key];
+            
+            // Контейнер слота
+            const slot = document.createElement('div');
+            slot.className = 'slot shop-slot';
+            
+            // --- ВИЗУАЛЬНОЕ ИЗМЕНЕНИЕ ---
+            // Создаем карту внутри, точно такую же, как в руке
+            const cardVisual = document.createElement('div');
+            cardVisual.className = `card type-${typeConfig.id}`;
+            // Убираем pointer-events, чтобы клик проходил сквозь карту на слот
+            // Немного уменьшаем (scale), чтобы влезла в слот красиво
+            cardVisual.style.pointerEvents = 'none';
+            cardVisual.style.transform = 'scale(0.9)'; 
+            
+            // В магазине мы продаем карты 1 уровня
+            cardVisual.innerHTML = `
+                <div class="card-level">1</div>
+                <div class="card-icon">${typeConfig.icon}</div>
+            `;
+            
+            slot.appendChild(cardVisual);
+            // -----------------------------
+            
+            // Подсветка выбора
+            if (this.selectedSlot === idx) {
+                slot.style.border = '2px solid #00ffff';
+                slot.style.boxShadow = '0 0 15px rgba(0, 255, 255, 0.5)';
+                slot.style.background = 'rgba(255, 255, 255, 0.1)';
+            } else {
+                slot.style.border = '1px solid #555';
+                slot.style.boxShadow = 'none';
+                slot.style.background = 'rgba(0, 0, 0, 0.3)';
+            }
+            
+            slot.style.cursor = 'pointer';
+            slot.onclick = () => this.selectSlot(idx);
+            
+            this.elSlotsContainer.appendChild(slot);
+        });
     }
 }
