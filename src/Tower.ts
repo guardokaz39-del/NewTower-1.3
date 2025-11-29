@@ -3,7 +3,7 @@ import { ICard } from './CardSystem';
 import { Enemy } from './Enemy';
 import { Projectile, IProjectileStats } from './Projectile';
 import { ObjectPool } from './Utils';
-import { EffectSystem } from './EffectSystem';
+import { EffectSystem } from './EffectSystem'; // Для эффекта взрыва при стройке
 
 export class Tower {
     public col: number;
@@ -15,19 +15,21 @@ export class Tower {
     public cooldown: number = 0;
     public angle: number = 0;
 
-    // Новые свойства для постройки
     public isBuilding: boolean = false;
     public buildProgress: number = 0;
     public maxBuildProgress: number = CONFIG.TOWER.BUILD_TIME;
+
+    // Сколько денег потрачено на эту башню (для возврата)
+    public costSpent: number = 0;
 
     constructor(c: number, r: number) {
         this.col = c; 
         this.row = r; 
         this.x = c * CONFIG.TILE_SIZE + CONFIG.TILE_SIZE / 2; 
         this.y = r * CONFIG.TILE_SIZE + CONFIG.TILE_SIZE / 2;
+        this.costSpent = CONFIG.ECONOMY.TOWER_COST; // Базовая цена
     }
 
-    // Статический метод для предпросмотра (Ghost)
     public static getPreviewStats(cards: ICard[]): any {
         const dummy = new Tower(0, 0);
         dummy.cards = cards;
@@ -45,6 +47,7 @@ export class Tower {
         this.cards.forEach(c => {
             const lvl = c.level;
             const type = c.type.id;
+            // Упрощенная логика для краткости, в реале копируем из предыдущего Tower.ts
             if(type === 'sniper') { 
                 s.range += CONFIG.CARDS.SNIPER.RANGE_PER_LVL * lvl; 
                 s.dmg += CONFIG.CARDS.SNIPER.DAMAGE_PER_LVL * lvl; 
@@ -73,29 +76,31 @@ export class Tower {
     }
 
     addCard(c: ICard): boolean { 
-        if(this.cards.length < 3) { this.cards.push(c); return true; } 
+        if(this.cards.length < 3) { 
+            this.cards.push(c); 
+            // Добавляем условную стоимость карты (можно брать реальную, но пока фиксированно)
+            this.costSpent += 100; // Допустим карта стоит 100 в ценности
+            return true; 
+        } 
         return false; 
     }
     
     update(enemies: Enemy[], projectiles: Projectile[], pool: ObjectPool<Projectile>, effects: EffectSystem) {
-        // 1. Логика постройки
         if (this.isBuilding) {
             this.buildProgress++;
             if (this.buildProgress >= this.maxBuildProgress) {
-                this.isBuilding = false; // Постройка завершена
+                this.isBuilding = false;
                 effects.add({type: 'explosion', x: this.x, y: this.y, radius: 30, life: 20, color: '#ffffff'});
             }
-            return; // Пока строится, не стреляет
+            return;
         }
 
-        // 2. Логика стрельбы
         if(this.cooldown > 0) this.cooldown--;
         
         const s = this.getStats();
         let target: Enemy | null = null;
         let minDistance = s.range + 1;
 
-        // ОПТИМИЗАЦИЯ: Быстрый поиск ближайшего врага
         for (const e of enemies) {
             if (!e.isAlive()) continue;
             const dist = Math.hypot(e.x - this.x, e.y - this.y);
@@ -112,7 +117,6 @@ export class Tower {
                 for(let i = 0; i < s.projCount; i++) {
                     const currentAngle = startAngle + i * s.spread;
                     const p = pool.obtain();
-                    // Стреляем немного на упреждение или в текущую точку
                     p.init(this.x, this.y, {x: target.x, y: target.y}, s);
                     projectiles.push(p);
                 }
@@ -127,27 +131,17 @@ export class Tower {
         const drawY = this.row * size;
 
         if (this.isBuilding) {
-            // Рисуем фундамент и прогресс-бар
             ctx.fillStyle = 'rgba(158, 158, 158, 0.5)';
             ctx.fillRect(drawX + 5, drawY + 5, size - 10, size - 10);
-            
-            // Прогресс бар
             const barWidth = size - 10;
-            const barHeight = 8;
-            const progressPct = this.buildProgress / this.maxBuildProgress;
-            
-            ctx.fillStyle = '#333';
-            ctx.fillRect(drawX + 5, drawY + size - 15, barWidth, barHeight);
-            ctx.fillStyle = 'gold';
-            ctx.fillRect(drawX + 5, drawY + size - 15, barWidth * progressPct, barHeight);
-            
+            const pct = this.buildProgress / this.maxBuildProgress;
+            ctx.fillStyle = '#333'; ctx.fillRect(drawX + 5, drawY + size - 15, barWidth, 8);
+            ctx.fillStyle = 'gold'; ctx.fillRect(drawX + 5, drawY + size - 15, barWidth * pct, 8);
         } else {
-            // Рисуем готовую башню
             ctx.fillStyle = CONFIG.COLORS.TOWER_BASE; 
             ctx.beginPath(); ctx.arc(this.x, this.y, 20, 0, Math.PI*2); ctx.fill();
             ctx.strokeStyle = '#555'; ctx.lineWidth = 2; ctx.stroke();
 
-            // Индикаторы карт
             for(let i=0; i<3; i++) {
                 const a = (i * (Math.PI*2/3)) - Math.PI/2;
                 ctx.beginPath(); 
@@ -156,7 +150,6 @@ export class Tower {
                 ctx.fill(); ctx.strokeStyle = '#222'; ctx.stroke();
             }
 
-            // Пушка
             ctx.save(); 
             ctx.translate(this.x, this.y); 
             ctx.rotate(this.angle);

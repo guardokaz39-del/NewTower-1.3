@@ -3,6 +3,7 @@ import { Game } from './Game';
 export class DebugSystem {
     private game: Game;
     private elDebugPanel: HTMLElement;
+    private content: HTMLElement;
     private logs: string[] = [];
     private maxLogs: number = 50;
 
@@ -12,43 +13,6 @@ export class DebugSystem {
         this.log("Debug System Initialized");
     }
 
-    private createUI() {
-        // Кнопка открытия
-        const btn = document.createElement('button');
-        btn.innerText = '🐞';
-        btn.style.position = 'absolute';
-        btn.style.top = '10px';
-        btn.style.right = '10px';
-        btn.style.zIndex = '10000';
-        btn.onclick = () => this.togglePanel();
-        document.body.appendChild(btn);
-
-        // Панель
-        this.elDebugPanel = document.createElement('div');
-        Object.assign(this.elDebugPanel.style, {
-            position: 'absolute', top: '50px', right: '10px',
-            width: '300px', height: '400px', background: 'rgba(0,0,0,0.9)',
-            color: '#0f0', fontFamily: 'monospace', fontSize: '11px',
-            padding: '10px', display: 'none', flexDirection: 'column',
-            overflow: 'hidden', zIndex: '10000', border: '1px solid #0f0'
-        });
-
-        const copyBtn = document.createElement('button');
-        copyBtn.innerText = '📋 COPY REPORT';
-        copyBtn.style.marginBottom = '10px';
-        copyBtn.onclick = () => this.copyReport();
-        this.elDebugPanel.appendChild(copyBtn);
-
-        const content = document.createElement('div');
-        content.id = 'debug-content';
-        content.style.whiteSpace = 'pre-wrap';
-        content.style.overflowY = 'auto';
-        content.style.flex = '1';
-        this.elDebugPanel.appendChild(content);
-
-        document.body.appendChild(this.elDebugPanel);
-    }
-
     public log(msg: string) {
         const time = new Date().toISOString().split('T')[1].split('.')[0];
         const line = `[${time}] ${msg}`;
@@ -56,23 +20,77 @@ export class DebugSystem {
         if (this.logs.length > this.maxLogs) this.logs.shift();
     }
 
+    private createUI() {
+        // 1. Кнопка-иконка (Справа сверху)
+        const btn = document.createElement('div');
+        btn.innerText = '🐞';
+        btn.title = "Debug Info";
+        Object.assign(btn.style, {
+            position: 'absolute', top: '20px', right: '20px',
+            width: '40px', height: '40px', 
+            background: 'rgba(0,0,0,0.8)', color: '#0f0',
+            border: '2px solid #444', borderRadius: '50%',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            fontSize: '20px', cursor: 'pointer', zIndex: '20000',
+            userSelect: 'none', boxShadow: '0 4px 10px rgba(0,0,0,0.5)',
+            transition: 'transform 0.1s'
+        });
+        
+        btn.onmousedown = () => { btn.style.transform = 'scale(0.9)'; };
+        btn.onmouseup = () => { btn.style.transform = 'scale(1)'; };
+        btn.onclick = () => this.togglePanel();
+        
+        document.body.appendChild(btn);
+
+        // 2. Панель (Скрыта по умолчанию)
+        this.elDebugPanel = document.createElement('div');
+        Object.assign(this.elDebugPanel.style, {
+            position: 'absolute', top: '70px', right: '20px',
+            width: '320px', maxHeight: '500px',
+            background: 'rgba(0, 0, 0, 0.95)',
+            border: '1px solid #0f0', borderRadius: '10px',
+            color: '#0f0', fontFamily: 'Consolas, monospace', fontSize: '11px',
+            padding: '10px', display: 'none', flexDirection: 'column', gap: '10px',
+            overflowY: 'auto', zIndex: '20000', boxShadow: '0 5px 20px rgba(0,0,0,0.8)'
+        });
+
+        // Кнопка копирования
+        const copyBtn = document.createElement('button');
+        copyBtn.innerText = '📋 COPY FULL REPORT';
+        Object.assign(copyBtn.style, {
+            background: '#004400', color: '#0f0', border: '1px solid #0f0',
+            padding: '5px', cursor: 'pointer', fontWeight: 'bold'
+        });
+        copyBtn.onclick = () => this.copyReport();
+        this.elDebugPanel.appendChild(copyBtn);
+
+        // Контент (статистика и логи)
+        this.content = document.createElement('div');
+        this.content.style.whiteSpace = 'pre-wrap';
+        this.elDebugPanel.appendChild(this.content);
+
+        document.body.appendChild(this.elDebugPanel);
+    }
+
     public update() {
+        // Обновляем текст только если панель открыта (экономия ресурсов)
         if (this.elDebugPanel.style.display === 'none') return;
 
         const info = [
+            `--- STATS ---`,
             `FPS Frame: ${this.game.frames}`,
-            `Enemies: ${this.game.enemies.length}`,
-            `Towers: ${this.game.towers.length}`,
+            `Enemies:   ${this.game.enemies.length}`,
+            `Towers:    ${this.game.towers.length}`,
             `Projectiles: ${this.game.projectiles.length}`,
-            `Money: ${this.game.money} | Lives: ${this.game.lives}`,
-            `Wave: ${this.game.wave} (Active: ${this.game.waveManager.isWaveActive})`,
-            `Build Mode: ${this.game.getActiveTower() ? 'ON' : 'OFF'}`,
-            `----------------`,
-            ...this.logs.slice().reverse() // Показываем новые сверху
+            `Pool Size: ${this.game.projectilePool['pool'].length} (Free)`, // Доступ к приватному свойству через index signature для дебага
+            `Wave: ${this.game.wave} | Active: ${this.game.waveManager.isWaveActive}`,
+            `Selection: ${this.game.selectedTower ? 'YES' : 'NO'}`,
+            ``,
+            `--- LOGS ---`,
+            ...this.logs.slice().reverse().slice(0, 15) // Показываем последние 15
         ].join('\n');
 
-        const el = document.getElementById('debug-content');
-        if (el) el.innerText = info;
+        this.content.innerText = info;
     }
 
     private togglePanel() {
@@ -95,8 +113,11 @@ export class DebugSystem {
         
         const text = "```json\n" + JSON.stringify(report, null, 2) + "\n```";
         navigator.clipboard.writeText(text).then(() => {
-            this.log("Report copied to clipboard!");
-            alert("Report copied!");
+            this.log("Report copied!");
+            alert("Report copied to clipboard!");
+        }).catch(err => {
+            console.error('Failed to copy', err);
+            alert("Failed to copy. Check console.");
         });
     }
 }

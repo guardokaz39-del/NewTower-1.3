@@ -12,11 +12,11 @@ export class InputSystem {
 
     public isMouseDown: boolean = false;
     
-    // Таймеры постройки
+    // Таймер для различения Клика и Удержания
     private holdTimer: number = 0;
     private holdStartCol: number = -1;
     private holdStartRow: number = -1;
-    private readonly HOLD_THRESHOLD: number = 10;
+    private readonly HOLD_THRESHOLD: number = 15; // Примерно 250мс (при 60fps)
 
     constructor(game: Game) {
         this.game = game;
@@ -24,20 +24,14 @@ export class InputSystem {
         this.initListeners();
     }
 
-    public getHoldTimer() { return this.holdTimer; }
-
-    // Принудительный пересчет координат
     public updateMousePos(clientX: number, clientY: number) {
         const rect = this.canvas.getBoundingClientRect();
-        
-        // Коррекция на масштаб канваса (если CSS размер отличается от реального)
         const scaleX = this.canvas.width / rect.width;
         const scaleY = this.canvas.height / rect.height;
 
         this.mouseX = (clientX - rect.left) * scaleX;
         this.mouseY = (clientY - rect.top) * scaleY;
 
-        // Защита от отрицательных значений
         if (this.mouseX < 0 || this.mouseY < 0 || this.mouseX > this.canvas.width || this.mouseY > this.canvas.height) {
             this.hoverCol = -1;
             this.hoverRow = -1;
@@ -47,7 +41,6 @@ export class InputSystem {
         }
     }
 
-    // СБРОС ВСЕХ СОСТОЯНИЙ (Вызывать при любом глюке)
     public forceReset() {
         this.isMouseDown = false;
         this.holdTimer = 0;
@@ -60,56 +53,59 @@ export class InputSystem {
         window.addEventListener('mousemove', (e) => {
             this.updateMousePos(e.clientX, e.clientY);
             
-            // Если тащим карту - обновляем ее позицию
             if (this.game.cardSys.dragCard) {
                 this.game.cardSys.updateDrag(e.clientX, e.clientY);
             }
         });
 
-        // Слушаем mousedown НА КАНВАСЕ (чтобы UI не триггерил стройку)
         this.canvas.addEventListener('mousedown', (e) => {
-            if (e.button === 0) { // ЛКМ
+            if (e.button === 0) { 
                 this.isMouseDown = true;
                 this.updateMousePos(e.clientX, e.clientY);
                 
-                // Старт таймера постройки
-                if (this.hoverCol >= 0 && this.hoverRow >= 0) {
+                // Начинаем отсчет удержания
+                if (this.hoverCol >= 0) {
                     this.holdStartCol = this.hoverCol;
                     this.holdStartRow = this.hoverRow;
                     this.holdTimer = 0;
                 }
-                
-                this.game.handleGridClick(this.hoverCol, this.hoverRow);
+                // ВАЖНО: Мы НЕ вызываем handleGridClick здесь! 
+                // Мы ждем mouseup, чтобы понять, был это клик или стройка.
             }
         });
 
-        // Слушаем mouseup ВЕЗДЕ (вдруг отпустили за пределами экрана)
         window.addEventListener('mouseup', (e) => {
             this.updateMousePos(e.clientX, e.clientY);
 
-            // 1. Если тащили карту - бросаем её
+            // Если мы тащили карту - это дроп
             if (this.game.cardSys.dragCard) {
                 this.game.cardSys.endDrag(e);
-                // ВАЖНО: После броска карты мы НЕ должны сразу начинать строить
                 this.forceReset();
                 return;
             }
 
-            // 2. Обычный сброс клика
+            // Если мы просто кликнули (быстро отпустили)
+            if (this.isMouseDown && this.holdTimer < this.HOLD_THRESHOLD) {
+                // Это КЛИК -> Выделяем или Сбрасываем
+                this.game.handleGridClick(this.hoverCol, this.hoverRow);
+            }
+
             this.forceReset();
         });
     }
 
     public update() {
-        // Логика постройки (только если не тащим карту)
+        // Логика УДЕРЖАНИЯ (стройка)
         if (this.isMouseDown && !this.game.cardSys.dragCard) {
+            // Если мышь все еще на той же клетке
             if (this.hoverCol === this.holdStartCol && this.hoverRow === this.holdStartRow && this.hoverCol !== -1) {
                 this.holdTimer++;
+                // Если держим долго -> начинаем строить
                 if (this.holdTimer >= this.HOLD_THRESHOLD) {
                     this.game.startBuildingTower(this.hoverCol, this.hoverRow);
                 }
             } else {
-                // Сдвинули мышь с клетки - сброс таймера, но не клика
+                // Сдвинули мышь - сброс
                 this.holdTimer = 0;
                 this.holdStartCol = this.hoverCol;
                 this.holdStartRow = this.hoverRow;

@@ -12,7 +12,6 @@ window.addEventListener('DOMContentLoaded', () => {
         game.start();
 
         console.log("✅ Игра готова. Нажмите ⚔️, чтобы начать волну.");
-        // Мы УБРАЛИ game.startWave() отсюда. Теперь только по кнопке.
         
     } catch (e) {
         console.error("Критическая ошибка:", e);
