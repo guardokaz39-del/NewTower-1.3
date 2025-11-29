@@ -1,4 +1,4 @@
-import { CrashHandler } from './CrashHandler'; // 1. Первым делом
+import { CrashHandler } from './CrashHandler';
 const crashHandler = new CrashHandler();
 
 import { Enemy } from './Enemy';
@@ -18,8 +18,9 @@ import { WaveManager } from './WaveManager';
 import { ForgeSystem } from './ForgeSystem';
 import { CollisionSystem } from './CollisionSystem';
 import { EntityFactory } from './EntityFactory';
-import { InspectorSystem } from './InspectorSystem'; // <-- NEW
-import { BestiarySystem } from './BestiarySystem';   // <-- NEW
+import { InspectorSystem } from './InspectorSystem';
+import { BestiarySystem } from './BestiarySystem';
+import { Assets } from './Assets';
 
 export class Game {
     public canvas: HTMLCanvasElement;
@@ -41,14 +42,14 @@ export class Game {
     public waveManager: WaveManager;
     public forge: ForgeSystem;
     public collision: CollisionSystem;
-    public inspector: InspectorSystem; // <-- NEW
-    public bestiary: BestiarySystem;   // <-- NEW
+    public inspector: InspectorSystem;
+    public bestiary: BestiarySystem;
 
     public money: number = CONFIG.PLAYER.START_MONEY;
     public lives: number = CONFIG.PLAYER.START_LIVES;
     public wave: number = 0;
     
-    public selectedTower: Tower | null = null; // <-- Для кликов
+    public selectedTower: Tower | null = null;
     
     private isRunning: boolean = false;
     public frames: number = 0;
@@ -62,6 +63,8 @@ export class Game {
         this.canvas.width = window.innerWidth;
         this.canvas.height = window.innerHeight;
 
+        Assets.init();
+
         this.events = new EventEmitter();
         this.projectilePool = new ObjectPool<Projectile>(() => new Projectile());
         
@@ -73,8 +76,8 @@ export class Game {
         this.cardSys = new CardSystem(this);
         this.waveManager = new WaveManager(this);
         this.collision = new CollisionSystem(this.effects, this.debug);
-        this.inspector = new InspectorSystem(this); // <-- INIT
-        this.bestiary = new BestiarySystem(this);   // <-- INIT
+        this.inspector = new InspectorSystem(this);
+        this.bestiary = new BestiarySystem(this);
         
         this.input = new InputSystem(this);
         this.ui = new UIManager(this); 
@@ -121,7 +124,6 @@ export class Game {
         this.start(); 
     }
 
-    // --- ЛОГИКА СТРОЙКИ ---
     public startBuildingTower(col: number, row: number) {
         if (this.activeBuildingTower) return; 
 
@@ -160,7 +162,6 @@ export class Game {
         this.ui.update();
     }
 
-    // --- ПРОДАЖА БАШНИ ---
     public sellTower(tower: Tower) {
         const refund = Math.floor(tower.costSpent * CONFIG.ECONOMY.SELL_REFUND);
         this.money += refund;
@@ -194,9 +195,7 @@ export class Game {
         return false;
     }
 
-    // Обработка клика по сетке (ВЫДЕЛЕНИЕ)
     public handleGridClick(col: number, row: number) {
-        // Если строим - не выделяем
         if (this.activeBuildingTower) return;
         
         const clickedTower = this.towers.find(t => t.col === col && t.row === row);
@@ -224,7 +223,6 @@ export class Game {
         try {
             const enemy = EntityFactory.createEnemy(typeKey, this.wave, this.map.path);
             this.enemies.push(enemy);
-            // Открываем врага в бестиарии
             this.bestiary.unlock(typeKey); 
         } catch (e) {
             this.debug.log(`Error spawning enemy: ${e}`);
@@ -244,7 +242,7 @@ export class Game {
         this.effects.update();
         this.debug.update();
         this.waveManager.update();
-        this.inspector.update(); // <-- Обновляем панель инспектора
+        this.inspector.update();
 
         this.towers.forEach(t => t.update(this.enemies, this.projectiles, this.projectilePool, this.effects));
         this.projectiles.forEach(p => p.move());
@@ -264,6 +262,25 @@ export class Game {
             if (!e.isAlive()) {
                 const reward = (e as any).reward || 5;
                 this.money += reward; 
+                
+                // --- VISUAL: Эффект смерти (Debris) ---
+                // Спавним 6 осколков
+                for(let k=0; k<6; k++) {
+                    const conf = (CONFIG.ENEMY_TYPES as any)[e.typeId.toUpperCase()]; // Берем цвет из конфига
+                    this.effects.add({
+                        type: 'debris',
+                        x: e.x, y: e.y,
+                        vx: (Math.random() - 0.5) * 6,
+                        vy: (Math.random() - 0.5) * 6,
+                        life: 40,
+                        color: conf ? conf.color : '#fff',
+                        size: 6,
+                        rotation: Math.random() * Math.PI,
+                        vRot: (Math.random() - 0.5) * 0.3
+                    });
+                }
+                // -------------------------------------
+
                 if (Math.random() < CONFIG.ECONOMY.DROP_CHANCE) {
                     this.giveRandomCard();
                     this.effects.add({type: 'text', text: "CARD GET!", x: e.x, y: e.y, life: 50, color: '#00ffff', vy: -2});
@@ -295,12 +312,10 @@ export class Game {
         this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
         this.map.draw(this.ctx);
 
-        // --- ЛОГИКА ОТРИСОВКИ РАДИУСА И ПРЕДСКАЗАНИЯ ---
         const dragCard = this.cardSys.dragCard;
         const hoverCol = this.input.hoverCol;
         const hoverRow = this.input.hoverRow;
 
-        // 1. Если наводим на башню курсором (без карты) или она выбрана -> рисуем белый радиус
         let targetTower = this.towers.find(t => t.col === hoverCol && t.row === hoverRow);
         if (!targetTower && this.selectedTower) targetTower = this.selectedTower;
 
@@ -315,7 +330,6 @@ export class Game {
             this.ctx.fill();
         }
 
-        // 2. Если тащим карту над башней -> рисуем зеленый радиус
         if (dragCard && hoverCol >= 0) {
             const hx = hoverCol * CONFIG.TILE_SIZE;
             const hy = hoverRow * CONFIG.TILE_SIZE;
@@ -325,7 +339,6 @@ export class Game {
             const towerUnderDrag = this.towers.find(t => t.col === hoverCol && t.row === hoverRow && !t.isBuilding);
 
             if (towerUnderDrag && towerUnderDrag.cards.length < 3) {
-                // Предсказание
                 const futureCards = [...towerUnderDrag.cards, dragCard];
                 const stats = Tower.getPreviewStats(futureCards);
                 
@@ -337,13 +350,11 @@ export class Game {
                 this.ctx.lineWidth = 2;
                 this.ctx.stroke();
             } else {
-                // Красный квадрат (нельзя поставить)
                 this.ctx.fillStyle = 'rgba(255, 0, 0, 0.3)';
                 this.ctx.fillRect(hx, hy, CONFIG.TILE_SIZE, CONFIG.TILE_SIZE);
             }
         }
         
-        // Подсветка курсора
         if (hoverCol >= 0) {
             const hx = hoverCol * CONFIG.TILE_SIZE;
             const hy = hoverRow * CONFIG.TILE_SIZE;
@@ -351,7 +362,6 @@ export class Game {
             this.ctx.lineWidth = 2;
             this.ctx.strokeRect(hx, hy, CONFIG.TILE_SIZE, CONFIG.TILE_SIZE);
             
-            // Если башня выбрана - рисуем рамку выделения
             if (this.selectedTower) {
                  this.ctx.strokeStyle = '#00ffff';
                  this.ctx.lineWidth = 3;
@@ -365,8 +375,8 @@ export class Game {
 
         this.towers.forEach(t => t.draw(this.ctx));
         this.enemies.forEach(e => {
-            this.ctx.fillStyle = e.getColor();
-            this.ctx.beginPath(); this.ctx.arc(e.x, e.y, 16, 0, Math.PI*2); this.ctx.fill();
+            e.draw(this.ctx); 
+            // HP бар
             const barWidth = 32; const barHeight = 5; const barX = e.x - barWidth / 2; const barY = e.y - 28;
             this.ctx.fillStyle = '#000'; this.ctx.fillRect(barX - 1, barY - 1, barWidth + 2, barHeight + 2);
             const pct = e.getHealthPercent();

@@ -5,12 +5,10 @@ import { generateUUID } from './Utils';
 
 export class EntityFactory {
     
-    // Создание врага с учетом волны
     public static createEnemy(typeKey: string, wave: number, path: {x: number, y: number}[]): Enemy {
         const typeConf = (CONFIG.ENEMY_TYPES as any)[typeKey];
         if (!typeConf) throw new Error(`Unknown enemy type: ${typeKey}`);
 
-        // Формула роста HP: База * Модификатор типа * (Множитель ^ (Волна - 1))
         const hp = CONFIG.ENEMY.BASE_HP * typeConf.hpMod * Math.pow(CONFIG.ENEMY.HP_GROWTH, wave - 1);
 
         const enemy = new Enemy({
@@ -20,13 +18,14 @@ export class EntityFactory {
             path: path
         });
         
-        // Сохраняем награду в объект (динамическое свойство)
+        // ВАЖНО: Устанавливаем тип для графики
+        enemy.setType(typeConf.id); 
+        
         (enemy as any).reward = typeConf.reward;
         
         return enemy;
     }
 
-    // Создание башни (пока просто, но готово к расширению)
     public static createTower(col: number, row: number): Tower {
         return new Tower(col, row);
     }

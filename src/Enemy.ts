@@ -1,4 +1,5 @@
 import { CONFIG } from './Config';
+import { Assets } from './Assets';
 
 export interface IEnemyConfig {
     id: string;
@@ -10,18 +11,18 @@ export interface IEnemyConfig {
     path: { x: number, y: number }[];
 }
 
-// Интерфейс для эффекта (например, замедление)
 interface IStatus {
-    type: 'slow';
-    duration: number; // сколько кадров осталось
-    power: number;    // сила эффекта (0.5 = 50% скорости)
+    type: 'slow' | 'burn'; // добавили burn на будущее
+    duration: number; 
+    power: number;   
 }
 
 export class Enemy {
     public id: string;
+    public typeId: string;
     public currentHealth: number;
     public maxHealth: number;
-    public baseSpeed: number; // Исходная скорость
+    public baseSpeed: number;
     public armor: number;
     
     public x: number;
@@ -34,29 +35,28 @@ export class Enemy {
     private offsetX: number = 0;
     private offsetY: number = 0;
 
-    // Список активных эффектов
     public statuses: IStatus[] = [];
 
     constructor(config: IEnemyConfig) {
         this.id = config.id;
+        this.typeId = 'grunt'; 
         this.maxHealth = config.health;
         this.currentHealth = config.health;
         this.baseSpeed = config.speed;
         this.armor = config.armor || 0;
+        
+        this.x = config.x || 0;
+        this.y = config.y || 0;
         this.path = config.path;
 
-        if (config.x !== undefined && config.y !== undefined) {
-            this.x = config.x;
-            this.y = config.y;
-        } else {
+        if (this.path && this.path.length > 0) {
             this.x = this.path[0].x * CONFIG.TILE_SIZE + 32;
             this.y = this.path[0].y * CONFIG.TILE_SIZE + 32;
         }
-
-        const startNode = this.path[0];
-        this.offsetX = this.x - (startNode.x * CONFIG.TILE_SIZE + 32);
-        this.offsetY = this.y - (startNode.y * CONFIG.TILE_SIZE + 32);
-        this.pathIndex = 1; 
+    }
+    
+    public setType(typeId: string) {
+        this.typeId = typeId.toLowerCase();
     }
 
     public takeDamage(amount: number): void {
@@ -65,13 +65,10 @@ export class Enemy {
         if (this.currentHealth < 0) this.currentHealth = 0;
     }
 
-    // Добавить эффект (например, от ледяной башни)
-    public applyStatus(type: 'slow', duration: number, power: number) {
-        // Ищем, есть ли уже такой эффект
+    public applyStatus(type: 'slow' | 'burn', duration: number, power: number) {
         const existing = this.statuses.find(s => s.type === type);
         if (existing) {
-            // Обновляем таймер, но не даем замедлять сильнее, чем уже есть
-            existing.duration = Math.max(existing.duration, duration);
+            existing.duration = duration; 
             existing.power = Math.max(existing.power, power);
         } else {
             this.statuses.push({ type, duration, power });
@@ -79,21 +76,20 @@ export class Enemy {
     }
 
     public move(): void {
-        if (this.finished) return;
+        // Обновление статусов
+        for (let i = this.statuses.length - 1; i >= 0; i--) {
+            this.statuses[i].duration--;
+            if (this.statuses[i].duration <= 0) {
+                this.statuses.splice(i, 1);
+            }
+        }
 
-        // 1. Обновляем статусы
-        this.statuses.forEach(s => s.duration--);
-        this.statuses = this.statuses.filter(s => s.duration > 0);
-
-        // 2. Считаем реальную скорость (База * (1 - сила замедления))
-        // Если замедление 0.4, то скорость будет 0.6 от нормы
         let speedMod = 1;
         const slow = this.statuses.find(s => s.type === 'slow');
         if (slow) speedMod -= slow.power;
         
         const currentSpeed = Math.max(0, this.baseSpeed * speedMod);
 
-        // 3. Стандартная логика движения (но с currentSpeed)
         if (this.pathIndex >= this.path.length) {
             this.finished = true;
             return;
@@ -125,10 +121,66 @@ export class Enemy {
     public getHealthPercent(): number {
         return this.currentHealth / this.maxHealth;
     }
+    
+    public draw(ctx: CanvasRenderingContext2D) {
+        const imgName = `enemy_${this.typeId}`;
+        const img = Assets.get(imgName) || Assets.get('enemy_grunt');
+        
+        // 1. Пульсация (если есть статусы)
+        const hasStatus = this.statuses.length > 0;
+        let scale = 1;
+        
+        ctx.save();
+        ctx.translate(this.x, this.y);
 
-    // Хелпер для отрисовки (синий если заморожен)
-    public getColor(): string {
-        if (this.statuses.some(s => s.type === 'slow')) return '#00bcd4'; // Лед
-        return this.getHealthPercent() > 0.5 ? '#2ecc71' : '#e74c3c'; // Зеленый/Красный
+        if (hasStatus) {
+            // Легкая пульсация размера
+            scale = 1 + Math.sin(Date.now() / 150) * 0.1;
+            ctx.scale(scale, scale);
+        }
+
+        // 2. Отрисовка врага
+        if (img) {
+            ctx.drawImage(img, -24, -24);
+        } else {
+            ctx.fillStyle = 'purple';
+            ctx.beginPath(); ctx.arc(0, 0, 16, 0, Math.PI*2); ctx.fill();
+        }
+
+        // 3. Цветной фильтр статуса (Overlay)
+        if (hasStatus) {
+            const slow = this.statuses.find(s => s.type === 'slow');
+            // const burn = this.statuses.find(s => s.type === 'burn');
+
+            ctx.globalCompositeOperation = 'source-atop'; // Рисуем только поверх врага
+            if (slow) {
+                ctx.fillStyle = 'rgba(0, 200, 255, 0.4)'; // Синий тинт
+                ctx.beginPath(); ctx.arc(0, 0, 18, 0, Math.PI*2); ctx.fill();
+            }
+            // сброс
+            ctx.globalCompositeOperation = 'source-over';
+        }
+
+        ctx.restore();
+
+        // 4. Иконки статусов над головой (вращаются)
+        if (hasStatus) {
+            const time = Date.now() / 500;
+            const orbitR = 25;
+            
+            this.statuses.forEach((s, idx) => {
+                const angle = time + (idx * (Math.PI * 2 / this.statuses.length));
+                const ix = this.x + Math.cos(angle) * orbitR;
+                const iy = this.y + Math.sin(angle) * orbitR * 0.5 - 10; // Эллипс над головой
+
+                ctx.font = '16px Arial';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                if (s.type === 'slow') ctx.fillText('❄️', ix, iy);
+                if (s.type === 'burn') ctx.fillText('🔥', ix, iy);
+            });
+        }
     }
+    
+    public getColor() { return 'transparent'; }
 }

@@ -1,18 +1,18 @@
 import { CONFIG } from './Config';
+import { Assets } from './Assets';
 
-// Описываем, из чего состоит клетка карты
 interface Cell {
-    type: number; // 0=Grass, 1=Path, 2=Decor
+    type: number; 
     x: number;
     y: number;
-    decor?: string | null; // 'tree', 'rock' или null
+    decor?: string | null; 
 }
 
 export class MapManager {
     public cols: number;
     public rows: number;
-    public grid: Cell[][] = []; // Сетка карты
-    public path: {x: number, y: number}[] = []; // Список координат пути
+    public grid: Cell[][] = []; 
+    public path: {x: number, y: number}[] = []; 
 
     constructor(width: number, height: number) {
         this.cols = Math.floor(width / CONFIG.TILE_SIZE);
@@ -21,97 +21,93 @@ export class MapManager {
     }
 
     private initMap() {
-        // 1. Заливаем все декором (Лес)
         for(let y=0; y<this.rows; y++) {
             const row: Cell[] = []; 
             for(let x=0; x<this.cols; x++) {
                 let decorType = 'grass';
                 const r = Math.random();
-                if(r < 0.3) decorType = 'tree';
-                else if(r < 0.4) decorType = 'rock';
+                if(r < 0.2) decorType = 'tree';     
+                else if(r < 0.3) decorType = 'rock'; 
                 
-                // type: 2 = DECOR
                 row.push({type: 2, x, y, decor: decorType});
             }
             this.grid.push(row);
         }
 
-        // 2. Определяем АКТИВНУЮ ЗОНУ (Центр)
-        const activeMarginX = 5; 
-        const activeMarginY = 2; 
+        let cx = 0;
+        let cy = Math.floor(this.rows / 2);
+        this.path = [];
         
-        for(let y=activeMarginY; y<this.rows-activeMarginY; y++) {
-            for(let x=activeMarginX; x<this.cols-activeMarginX; x++) {
-                this.grid[y][x].type = 0; // 0 = Buildable
+        if (cy < 2) cy = 2;
+        if (cy > this.rows - 3) cy = this.rows - 3;
+
+        while(cx < this.cols) {
+            this.grid[cy][cx].type = 1;
+            this.grid[cy][cx].decor = null;
+            this.path.push({x: cx, y: cy});
+
+            cx++;
+            
+            if (cx < this.cols - 1 && Math.random() < 0.5) {
+                const dir = Math.random() > 0.5 ? 1 : -1;
+                const nextY = cy + dir;
+                
+                if (nextY >= 1 && nextY < this.rows - 1) {
+                    this.grid[nextY][cx-1].type = 1; 
+                    this.grid[nextY][cx-1].decor = null;
+                    
+                    this.path.push({x: cx-1, y: nextY}); 
+                    cy = nextY;
+                }
             }
         }
-
-        // 3. Генерация Пути (Ваша логика змейки)
-        let curX = 0;
-        let curY = Math.floor(this.rows / 2);
         
-        const addToPath = (x: number, y: number) => {
-            if(x >= 0 && x < this.cols && y >= 0 && y < this.rows) {
-                this.path.push({x,y});
-                this.grid[y][x].type = 1; // 1 = Road
-                this.grid[y][x].decor = null;
-            }
-        };
-
-        addToPath(curX, curY);
-
-        while(curX < activeMarginX) { curX++; addToPath(curX, curY); }
-
-        let goingUp = true;
-        const zigZagWidth = 3;
-        
-        while(curX < this.cols - activeMarginX) {
-            const targetY = goingUp ? activeMarginY + 1 : this.rows - activeMarginY - 2;
-            const dir = goingUp ? -1 : 1;
-            while(curY !== targetY) { curY += dir; addToPath(curX, curY); }
-            for(let i=0; i<zigZagWidth && curX < this.cols - activeMarginX; i++) { curX++; addToPath(curX, curY); }
-            goingUp = !goingUp;
-        }
-
-        while(curX < this.cols) { curX++; addToPath(curX, curY); }
+        this.path.forEach(p => {
+            const dirs = [[0,1], [0,-1], [1,0], [-1,0], [1,1], [1,-1], [-1,1], [-1,-1]];
+            dirs.forEach(d => {
+                const nx = p.x + d[0], ny = p.y + d[1];
+                if(nx >=0 && nx < this.cols && ny >=0 && ny < this.rows) {
+                    if(this.grid[ny][nx].type !== 1) {
+                         this.grid[ny][nx].type = 0; 
+                         this.grid[ny][nx].decor = null;
+                    }
+                }
+            });
+        });
     }
 
     public draw(ctx: CanvasRenderingContext2D) {
-        ctx.lineWidth = 1;
         const TS = CONFIG.TILE_SIZE;
+        const grassImg = Assets.get('grass');
+        const pathImg = Assets.get('path');
+        const treeImg = Assets.get('decor_tree');
+        const rockImg = Assets.get('decor_rock');
 
-        for(let y=0; y<this.rows; y++) for(let x=0; x<this.cols; x++) {
-            const c = this.grid[y][x]; 
-            const px=x*TS, py=y*TS;
-            
-            if (c.type === 2) { // DECOR
-                ctx.fillStyle = CONFIG.COLORS.DECOR_BG;
-                ctx.fillRect(px, py, TS, TS);
-                
-                if(c.decor === 'tree') {
-                    ctx.fillStyle = CONFIG.COLORS.DECOR_TREE;
-                    ctx.beginPath();
-                    ctx.moveTo(px + 32, py + 10);
-                    ctx.lineTo(px + 10, py + 54);
-                    ctx.lineTo(px + 54, py + 54);
-                    ctx.fill();
-                } else if (c.decor === 'rock') {
-                    ctx.fillStyle = CONFIG.COLORS.DECOR_ROCK;
-                    ctx.beginPath();
-                    ctx.ellipse(px + 32, py + 40, 15, 10, 0, 0, Math.PI * 2);
-                    ctx.fill();
+        for(let y=0; y<this.rows; y++) {
+            for(let x=0; x<this.cols; x++) {
+                const c = this.grid[y][x];
+                const px = x * TS;
+                const py = y * TS;
+
+                if (grassImg) ctx.drawImage(grassImg, px, py);
+                else { ctx.fillStyle = CONFIG.COLORS.GRASS; ctx.fillRect(px, py, TS, TS); }
+
+                if (c.type === 1) { 
+                    if (pathImg) ctx.drawImage(pathImg, px, py);
+                    else { ctx.fillStyle = CONFIG.COLORS.PATH; ctx.fillRect(px, py, TS, TS); }
+                } 
+                else if (c.type === 2) { 
+                    if (c.decor === 'tree' && treeImg) ctx.drawImage(treeImg, px, py);
+                    else if (c.decor === 'rock' && rockImg) ctx.drawImage(rockImg, px, py);
                 }
-                ctx.fillStyle = 'rgba(0,0,0,0.1)'; 
-                ctx.fillRect(px, py, TS, TS);
                 
-            } else if (c.type === 1) { // PATH
-                ctx.fillStyle = CONFIG.COLORS.PATH;
-                ctx.fillRect(px, py, TS, TS);
-            } else { // BUILDABLE
-                ctx.fillStyle = CONFIG.COLORS.GRASS;
-                ctx.fillRect(px, py, TS, TS);
-                ctx.strokeStyle = 'rgba(0,0,0,0.05)'; 
-                ctx.beginPath(); ctx.rect(px, py, TS, TS); ctx.stroke();
+                // --- ИСПРАВЛЕНИЕ ТУТ ---
+                if (c.type === 0) { 
+                    ctx.lineWidth = 1; // <--- Гарантируем тонкую линию
+                    ctx.strokeStyle = 'rgba(0,0,0,0.05)'; 
+                    ctx.strokeRect(px, py, TS, TS);
+                }
+                // -----------------------
             }
         }
         
@@ -126,14 +122,15 @@ export class MapManager {
         ctx.fillStyle = '#222';
         ctx.beginPath(); ctx.arc(x, y + 10, 25, Math.PI, 0); ctx.fill();
         ctx.strokeStyle = '#555'; ctx.lineWidth = 4; ctx.stroke();
-        ctx.fillStyle = '#fff'; ctx.font = '20px Arial'; ctx.fillText('☠️', x - 12, y + 15);
+        ctx.fillStyle = '#fff'; ctx.font = '20px Arial'; ctx.textAlign = 'center'; ctx.textBaseline='middle'; ctx.fillText('☠️', x, y);
     }
 
     private drawFortress(ctx: CanvasRenderingContext2D, p: {x:number, y:number}) {
-        const x = p.x * 64;
-        const y = p.y * 64;
-        ctx.fillStyle = '#555'; ctx.fillRect(x + 10, y + 10, 44, 44);
-        ctx.fillStyle = '#3e2723'; ctx.beginPath(); ctx.arc(x + 32, y + 54, 15, Math.PI, 0); ctx.fill();
-        ctx.fillStyle = '#fff'; ctx.font = '20px Arial'; ctx.fillText('🏰', x + 22, y + 40);
+        const x = p.x * 64 + 32;
+        const y = p.y * 64 + 32;
+        ctx.fillStyle = CONFIG.COLORS.BASE;
+        ctx.fillRect(x - 20, y - 20, 40, 40);
+        ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.strokeRect(x - 20, y - 20, 40, 40);
+        ctx.fillStyle = '#fff'; ctx.font = '24px Arial'; ctx.textAlign = 'center'; ctx.textBaseline='middle'; ctx.fillText('🏰', x, y);
     }
 }

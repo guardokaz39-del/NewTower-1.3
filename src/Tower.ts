@@ -3,7 +3,8 @@ import { ICard } from './CardSystem';
 import { Enemy } from './Enemy';
 import { Projectile, IProjectileStats } from './Projectile';
 import { ObjectPool } from './Utils';
-import { EffectSystem } from './EffectSystem'; // Для эффекта взрыва при стройке
+import { EffectSystem } from './EffectSystem';
+import { Assets } from './Assets'; // Импорт
 
 export class Tower {
     public col: number;
@@ -19,7 +20,6 @@ export class Tower {
     public buildProgress: number = 0;
     public maxBuildProgress: number = CONFIG.TOWER.BUILD_TIME;
 
-    // Сколько денег потрачено на эту башню (для возврата)
     public costSpent: number = 0;
 
     constructor(c: number, r: number) {
@@ -27,7 +27,7 @@ export class Tower {
         this.row = r; 
         this.x = c * CONFIG.TILE_SIZE + CONFIG.TILE_SIZE / 2; 
         this.y = r * CONFIG.TILE_SIZE + CONFIG.TILE_SIZE / 2;
-        this.costSpent = CONFIG.ECONOMY.TOWER_COST; // Базовая цена
+        this.costSpent = CONFIG.ECONOMY.TOWER_COST; 
     }
 
     public static getPreviewStats(cards: ICard[]): any {
@@ -47,7 +47,6 @@ export class Tower {
         this.cards.forEach(c => {
             const lvl = c.level;
             const type = c.type.id;
-            // Упрощенная логика для краткости, в реале копируем из предыдущего Tower.ts
             if(type === 'sniper') { 
                 s.range += CONFIG.CARDS.SNIPER.RANGE_PER_LVL * lvl; 
                 s.dmg += CONFIG.CARDS.SNIPER.DAMAGE_PER_LVL * lvl; 
@@ -78,8 +77,7 @@ export class Tower {
     addCard(c: ICard): boolean { 
         if(this.cards.length < 3) { 
             this.cards.push(c); 
-            // Добавляем условную стоимость карты (можно брать реальную, но пока фиксированно)
-            this.costSpent += 100; // Допустим карта стоит 100 в ценности
+            this.costSpent += 100; 
             return true; 
         } 
         return false; 
@@ -131,6 +129,7 @@ export class Tower {
         const drawY = this.row * size;
 
         if (this.isBuilding) {
+            // Стройка (фундамент)
             ctx.fillStyle = 'rgba(158, 158, 158, 0.5)';
             ctx.fillRect(drawX + 5, drawY + 5, size - 10, size - 10);
             const barWidth = size - 10;
@@ -138,23 +137,35 @@ export class Tower {
             ctx.fillStyle = '#333'; ctx.fillRect(drawX + 5, drawY + size - 15, barWidth, 8);
             ctx.fillStyle = 'gold'; ctx.fillRect(drawX + 5, drawY + size - 15, barWidth * pct, 8);
         } else {
-            ctx.fillStyle = CONFIG.COLORS.TOWER_BASE; 
-            ctx.beginPath(); ctx.arc(this.x, this.y, 20, 0, Math.PI*2); ctx.fill();
-            ctx.strokeStyle = '#555'; ctx.lineWidth = 2; ctx.stroke();
+            // 1. Рисуем основание
+            const baseImg = Assets.get('tower_base');
+            if (baseImg) {
+                ctx.drawImage(baseImg, this.x - 32, this.y - 32);
+            } else {
+                ctx.fillStyle = '#9e9e9e'; ctx.beginPath(); ctx.arc(this.x, this.y, 20, 0, Math.PI*2); ctx.fill();
+            }
 
+            // 2. Рисуем индикаторы карт
             for(let i=0; i<3; i++) {
                 const a = (i * (Math.PI*2/3)) - Math.PI/2;
                 ctx.beginPath(); 
-                ctx.arc(this.x + Math.cos(a)*12, this.y + Math.sin(a)*12, 5, 0, Math.PI*2);
-                ctx.fillStyle = this.cards[i] ? this.cards[i].type.color : '#333'; 
-                ctx.fill(); ctx.strokeStyle = '#222'; ctx.stroke();
+                ctx.arc(this.x + Math.cos(a)*15, this.y + Math.sin(a)*15, 6, 0, Math.PI*2);
+                ctx.fillStyle = this.cards[i] ? this.cards[i].type.color : '#222'; 
+                ctx.fill(); ctx.strokeStyle = '#fff'; ctx.lineWidth = 1; ctx.stroke();
             }
 
-            ctx.save(); 
-            ctx.translate(this.x, this.y); 
-            ctx.rotate(this.angle);
-            ctx.fillStyle = '#333'; ctx.fillRect(0, -5, 20, 10);
-            ctx.restore();
+            // 3. Рисуем башню (пушку) с поворотом
+            const gunImg = Assets.get('tower_gun');
+            if (gunImg) {
+                ctx.save(); 
+                ctx.translate(this.x, this.y); 
+                ctx.rotate(this.angle);
+                ctx.drawImage(gunImg, -32, -32);
+                ctx.restore();
+            } else {
+                ctx.save(); ctx.translate(this.x, this.y); ctx.rotate(this.angle);
+                ctx.fillStyle = '#333'; ctx.fillRect(0, -5, 20, 10); ctx.restore();
+            }
         }
     }
 }

@@ -1,2 +1,128 @@
+#############################################
+# Node / NPM
+#############################################
 node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+package-lock.json
+# (если команда хочет фиксировать версии — можно оставить package-lock.json)
+
+#############################################
+# Build / Distribution folders
+#############################################
 dist/
+build/
+out/
+cache/
+.tmp/
+.temp/
+
+# Vite / Webpack / Rollup caches
+.vite/
+.vite/deps/
+webpack-stats.json
+.rspack/
+
+#############################################
+# TypeScript
+#############################################
+*.tsbuildinfo
+tsconfig.tsbuildinfo
+# Backups created by TS server
+*.tscbackup
+
+#############################################
+# Logs / Debug
+#############################################
+logs/
+*.log
+*.log.*
+debug.log
+error.log
+
+#############################################
+# Testing (Jest / Playwright / Vitest)
+#############################################
+coverage/
+.vitest/
+.playwright/
+test-results/
+*.test.js.map
+*.test.ts.map
+jest-cache/
+jest-html-reporters-*/ 
+
+#############################################
+# IDE / Editors
+#############################################
+# VSCode
+.vscode/
+.history/
+*.code-workspace
+
+# JetBrains IDEs
+.idea/
+*.iml
+
+#############################################
+# Cache / Temporary system files
+#############################################
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Windows recycle bin (иногда попадает)
+$RECYCLE.BIN/
+
+#############################################
+# Environment variables
+#############################################
+.env
+.env.*
+!.env.example    # можно оставить пример
+
+#############################################
+# Browser bundles / generated assets
+#############################################
+*.bundle.js
+*.bundle.js.map
+*.min.js
+*.min.css
+*.map
+*.cache
+
+#############################################
+# Compiled assets (если используете TexturePacker/Spine)
+#############################################
+*.atlas
+*.skel.json
+*.json.bak
+
+#############################################
+# Images (если генерируются автоматически)
+#############################################
+*.png.bak
+*.jpg.bak
+*.jpeg.bak
+
+#############################################
+# Runtime data (если что-то генерируется во время игры)
+#############################################
+save_data/
+replays/
+temp_data/
+
+#############################################
+# OS-level files
+#############################################
+ehthumbs.db
+Icon?
+.fseventsd
+.Trashes
+
+#############################################
+# Lockfiles (если не хотите фиксировать версию менеджера)
+#############################################
+*.lock
