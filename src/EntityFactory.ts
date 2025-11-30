@@ -5,10 +5,17 @@ import { generateUUID } from './Utils';
 
 export class EntityFactory {
     
+    // Строго 3 аргумента: Тип, Номер волны, Путь
     public static createEnemy(typeKey: string, wave: number, path: {x: number, y: number}[]): Enemy {
-        const typeConf = (CONFIG.ENEMY_TYPES as any)[typeKey];
-        if (!typeConf) throw new Error(`Unknown enemy type: ${typeKey}`);
+        const safeKey = typeKey || 'GRUNT';
+        
+        let typeConf = (CONFIG.ENEMY_TYPES as any)[safeKey];
+        if (!typeConf) {
+            console.warn(`Unknown enemy type: ${typeKey}, falling back to GRUNT`);
+            typeConf = (CONFIG.ENEMY_TYPES as any)['GRUNT'];
+        }
 
+        // Формула здоровья с учетом волны
         const hp = CONFIG.ENEMY.BASE_HP * typeConf.hpMod * Math.pow(CONFIG.ENEMY.HP_GROWTH, wave - 1);
 
         const enemy = new Enemy({
@@ -18,10 +25,9 @@ export class EntityFactory {
             path: path
         });
         
-        // ВАЖНО: Устанавливаем тип для графики
-        enemy.setType(typeConf.id); 
-        
-        (enemy as any).reward = typeConf.reward;
+        // Установка типа для графики
+        enemy.setType(typeConf.id || safeKey.toLowerCase()); 
+        (enemy as any).reward = typeConf.reward || 5;
         
         return enemy;
     }

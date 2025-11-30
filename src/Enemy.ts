@@ -12,14 +12,15 @@ export interface IEnemyConfig {
 }
 
 interface IStatus {
-    type: 'slow' | 'burn'; // добавили burn на будущее
+    type: 'slow' | 'burn'; 
     duration: number; 
     power: number;   
 }
 
 export class Enemy {
     public id: string;
-    public typeId: string;
+    public typeId: string = 'grunt'; 
+    
     public currentHealth: number;
     public maxHealth: number;
     public baseSpeed: number;
@@ -32,62 +33,56 @@ export class Enemy {
     private pathIndex: number = 0;
     public finished: boolean = false;
     
-    private offsetX: number = 0;
-    private offsetY: number = 0;
-
     public statuses: IStatus[] = [];
 
     constructor(config: IEnemyConfig) {
         this.id = config.id;
-        this.typeId = 'grunt'; 
         this.maxHealth = config.health;
         this.currentHealth = config.health;
         this.baseSpeed = config.speed;
         this.armor = config.armor || 0;
         
-        this.x = config.x || 0;
-        this.y = config.y || 0;
+        this.x = config.x || (config.path[0] ? config.path[0].x * CONFIG.TILE_SIZE + 32 : 0);
+        this.y = config.y || (config.path[0] ? config.path[0].y * CONFIG.TILE_SIZE + 32 : 0);
         this.path = config.path;
-
-        if (this.path && this.path.length > 0) {
-            this.x = this.path[0].x * CONFIG.TILE_SIZE + 32;
-            this.y = this.path[0].y * CONFIG.TILE_SIZE + 32;
-        }
     }
     
     public setType(typeId: string) {
-        this.typeId = typeId.toLowerCase();
+        this.typeId = typeId;
     }
 
-    public takeDamage(amount: number): void {
-        const actualDamage = Math.max(1, amount - this.armor);
-        this.currentHealth -= actualDamage;
-        if (this.currentHealth < 0) this.currentHealth = 0;
+    public takeDamage(amount: number) {
+        const dmg = Math.max(1, amount - this.armor);
+        this.currentHealth -= dmg;
     }
 
     public applyStatus(type: 'slow' | 'burn', duration: number, power: number) {
         const existing = this.statuses.find(s => s.type === type);
         if (existing) {
-            existing.duration = duration; 
-            existing.power = Math.max(existing.power, power);
+            existing.duration = duration; // Обновляем время
         } else {
             this.statuses.push({ type, duration, power });
         }
     }
 
-    public move(): void {
-        // Обновление статусов
+    // ВАЖНО: Метод update, который искал GameScene
+    public update() {
+        // Обновляем статусы
         for (let i = this.statuses.length - 1; i >= 0; i--) {
             this.statuses[i].duration--;
             if (this.statuses[i].duration <= 0) {
                 this.statuses.splice(i, 1);
             }
         }
+        
+        this.move();
+    }
 
+    private move() {
         let speedMod = 1;
         const slow = this.statuses.find(s => s.type === 'slow');
         if (slow) speedMod -= slow.power;
-        
+
         const currentSpeed = Math.max(0, this.baseSpeed * speedMod);
 
         if (this.pathIndex >= this.path.length) {
@@ -96,8 +91,9 @@ export class Enemy {
         }
 
         const node = this.path[this.pathIndex];
-        const targetX = node.x * CONFIG.TILE_SIZE + 32 + this.offsetX;
-        const targetY = node.y * CONFIG.TILE_SIZE + 32 + this.offsetY;
+        // Целевая точка (центр тайла)
+        const targetX = node.x * CONFIG.TILE_SIZE + 32;
+        const targetY = node.y * CONFIG.TILE_SIZE + 32;
 
         const dx = targetX - this.x;
         const dy = targetY - this.y;
@@ -123,64 +119,27 @@ export class Enemy {
     }
     
     public draw(ctx: CanvasRenderingContext2D) {
-        const imgName = `enemy_${this.typeId}`;
-        const img = Assets.get(imgName) || Assets.get('enemy_grunt');
-        
-        // 1. Пульсация (если есть статусы)
-        const hasStatus = this.statuses.length > 0;
-        let scale = 1;
-        
+        const safeType = this.typeId ? this.typeId.toUpperCase() : 'GRUNT';
+        const conf = (CONFIG.ENEMY_TYPES as any)[safeType] || (CONFIG.ENEMY_TYPES as any)['GRUNT'];
+
         ctx.save();
         ctx.translate(this.x, this.y);
 
-        if (hasStatus) {
-            // Легкая пульсация размера
-            scale = 1 + Math.sin(Date.now() / 150) * 0.1;
-            ctx.scale(scale, scale);
-        }
-
-        // 2. Отрисовка врага
+        const img = Assets.get(`enemy_${this.typeId}`);
         if (img) {
-            ctx.drawImage(img, -24, -24);
+            ctx.drawImage(img, -24, -24, 48, 48);
         } else {
-            ctx.fillStyle = 'purple';
+            ctx.fillStyle = conf.color;
             ctx.beginPath(); ctx.arc(0, 0, 16, 0, Math.PI*2); ctx.fill();
         }
-
-        // 3. Цветной фильтр статуса (Overlay)
-        if (hasStatus) {
-            const slow = this.statuses.find(s => s.type === 'slow');
-            // const burn = this.statuses.find(s => s.type === 'burn');
-
-            ctx.globalCompositeOperation = 'source-atop'; // Рисуем только поверх врага
-            if (slow) {
-                ctx.fillStyle = 'rgba(0, 200, 255, 0.4)'; // Синий тинт
-                ctx.beginPath(); ctx.arc(0, 0, 18, 0, Math.PI*2); ctx.fill();
-            }
-            // сброс
-            ctx.globalCompositeOperation = 'source-over';
-        }
-
+        
         ctx.restore();
-
-        // 4. Иконки статусов над головой (вращаются)
-        if (hasStatus) {
-            const time = Date.now() / 500;
-            const orbitR = 25;
-            
-            this.statuses.forEach((s, idx) => {
-                const angle = time + (idx * (Math.PI * 2 / this.statuses.length));
-                const ix = this.x + Math.cos(angle) * orbitR;
-                const iy = this.y + Math.sin(angle) * orbitR * 0.5 - 10; // Эллипс над головой
-
-                ctx.font = '16px Arial';
-                ctx.textAlign = 'center';
-                ctx.textBaseline = 'middle';
-                if (s.type === 'slow') ctx.fillText('❄️', ix, iy);
-                if (s.type === 'burn') ctx.fillText('🔥', ix, iy);
-            });
-        }
     }
     
-    public getColor() { return 'transparent'; }
+    // Геттер цвета для Game.ts (если используется там)
+    public getColor(): string {
+         const safeType = this.typeId ? this.typeId.toUpperCase() : 'GRUNT';
+         const conf = (CONFIG.ENEMY_TYPES as any)[safeType] || (CONFIG.ENEMY_TYPES as any)['GRUNT'];
+         return conf.color;
+    }
 }

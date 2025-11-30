@@ -1,15 +1,16 @@
-import { CrashHandler } from './CrashHandler';
-const crashHandler = new CrashHandler();
-
 import { Assets } from './Assets';
 import { Scene } from './Scene';
-import { GameScene } from './scenes/GameScene';
+import { MenuScene } from './scenes/MenuScene';
+import { InputSystem } from './InputSystem';
 
 export class Game {
     public canvas: HTMLCanvasElement;
     public ctx: CanvasRenderingContext2D;
     
-    private currentScene: Scene | null = null;
+    // InputSystem теперь живет здесь
+    public input: InputSystem;
+    
+    public currentScene: Scene | null = null;
     private lastTime: number = 0;
 
     constructor(canvasId: string) {
@@ -20,15 +21,17 @@ export class Game {
         this.canvas.width = window.innerWidth;
         this.canvas.height = window.innerHeight;
 
-        // Инициализация глобальных ассетов
         Assets.init();
+        
+        // Создаем InputSystem один раз
+        this.input = new InputSystem(this);
         
         this.loop = this.loop.bind(this);
     }
 
     public start() {
-        // Запускаем игровую сцену
-        this.changeScene(new GameScene(this));
+        // Стартуем сразу с Меню (чтобы не потерять навигацию)
+        this.changeScene(new MenuScene(this));
         this.loop(0);
     }
 
@@ -41,9 +44,13 @@ export class Game {
     }
 
     private loop(timestamp: number) {
-        // const dt = timestamp - this.lastTime; // Можно использовать для дельта-тайма
+        // const dt = timestamp - this.lastTime;
         this.lastTime = timestamp;
 
+        // Обновляем ввод (клики, мышь)
+        this.input.update();
+
+        // Обновляем текущую сцену
         if (this.currentScene) {
             this.currentScene.update();
             this.currentScene.draw(this.ctx);

@@ -1,10 +1,9 @@
 import { CONFIG } from './Config';
-import { GameScene } from './scenes/GameScene'; // Изменили импорт
+import { GameScene } from './scenes/GameScene';
 import { ShopSystem } from './ShopSystem';
 
 export class UIManager {
-    private scene: GameScene; // Заменили game на scene
-    
+    private scene: GameScene;
     public shop: ShopSystem;
     
     private elMoney: HTMLElement;
@@ -17,9 +16,12 @@ export class UIManager {
     private elFinalWave: HTMLElement;
     private elRestartBtn: HTMLButtonElement;
 
+    // Ссылки на контейнеры для скрытия/показа
+    private elHandContainer: HTMLElement;
+    private elUiLayer: HTMLElement;
+
     constructor(scene: GameScene) {
         this.scene = scene;
-        
         this.shop = new ShopSystem(scene);
         
         this.elMoney = document.getElementById('money')!;
@@ -32,13 +34,34 @@ export class UIManager {
         this.elFinalWave = document.getElementById('final-wave')!;
         this.elRestartBtn = document.getElementById('restart-btn') as HTMLButtonElement;
 
-        // Используем this.scene
+        // Контейнеры
+        this.elHandContainer = document.getElementById('hand-container')!;
+        this.elUiLayer = document.getElementById('ui-layer')!;
+
         this.elStartBtn.addEventListener('click', () => this.scene.waveManager.startWave());
         this.elRestartBtn.addEventListener('click', () => {
             this.scene.restart();
             this.hideGameOver();
         });
     }
+
+    // --- НОВЫЕ МЕТОДЫ УПРАВЛЕНИЯ ВИДИМОСТЬЮ ---
+    public show() {
+        // Показываем игровые элементы
+        this.elUiLayer.style.display = 'block';
+        this.elHandContainer.style.display = 'block';
+        // Убедимся, что Game Over скрыт при старте
+        this.elGameOver.style.display = 'none';
+        this.update();
+    }
+
+    public hide() {
+        // Прячем всё при выходе в меню или редактор
+        this.elUiLayer.style.display = 'none';
+        this.elHandContainer.style.display = 'none';
+        this.elGameOver.style.display = 'none';
+    }
+    // ------------------------------------------
 
     public showGameOver(wave: number) {
         this.elFinalWave.innerText = wave.toString();
@@ -50,7 +73,8 @@ export class UIManager {
     }
 
     public update() {
-        // Данные берем из сцены
+        if (!this.scene) return;
+
         this.elMoney.innerText = this.scene.money.toString();
         this.elLives.innerText = this.scene.lives.toString();
         this.elWave.innerText = this.scene.wave + "/" + CONFIG.WAVES.length;
@@ -70,15 +94,14 @@ export class UIManager {
             else if (!hasMoney) this.elForgeBtn.innerHTML = `<span>⚒️</span> ${forgeCost}💰`;
         }
 
-        // Кнопка волны
         if (this.scene.waveManager.isWaveActive) {
              this.elStartBtn.innerText = '⏳';
              this.elStartBtn.disabled = true;
-             this.elStartBtn.style.background = '#555';
+             this.elStartBtn.style.opacity = '0.5';
         } else {
              this.elStartBtn.innerText = '⚔️';
              this.elStartBtn.disabled = false;
-             this.elStartBtn.style.background = '#d32f2f';
+             this.elStartBtn.style.opacity = '1';
         }
 
         this.shop.update();
