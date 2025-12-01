@@ -5,7 +5,7 @@ import { generateUUID } from './Utils';
 
 export class EntityFactory {
     
-    // Исправлено: 3 аргумента. Убрали offset или лишние параметры.
+    // ИСПРАВЛЕНИЕ: Убрали лишние аргументы, теперь ровно 3
     public static createEnemy(typeKey: string, wave: number, path: {x: number, y: number}[]): Enemy {
         const safeKey = typeKey || 'GRUNT';
         
@@ -15,7 +15,6 @@ export class EntityFactory {
             typeConf = (CONFIG.ENEMY_TYPES as any)['GRUNT'];
         }
 
-        // Расчет здоровья от волны
         const hp = CONFIG.ENEMY.BASE_HP * typeConf.hpMod * Math.pow(CONFIG.ENEMY.HP_GROWTH, wave - 1);
 
         const enemy = new Enemy({

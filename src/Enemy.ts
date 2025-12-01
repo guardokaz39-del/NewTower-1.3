@@ -12,7 +12,7 @@ export interface IEnemyConfig {
 }
 
 interface IStatus {
-    type: 'slow' | 'burn'; 
+    type: 'slow' | 'burn';
     duration: number; 
     power: number;   
 }
@@ -42,47 +42,27 @@ export class Enemy {
         this.baseSpeed = config.speed;
         this.armor = config.armor || 0;
         
-        this.x = config.x || (config.path[0] ? config.path[0].x * CONFIG.TILE_SIZE + 32 : 0);
-        this.y = config.y || (config.path[0] ? config.path[0].y * CONFIG.TILE_SIZE + 32 : 0);
+        this.x = config.x || 0;
+        this.y = config.y || 0;
         this.path = config.path;
     }
-    
-    public setType(typeId: string) {
-        this.typeId = typeId;
+
+    public setType(id: string) {
+        this.typeId = id;
     }
 
-    public takeDamage(amount: number) {
-        const dmg = Math.max(1, amount - this.armor);
-        this.currentHealth -= dmg;
+    public takeDamage(amount: number): void {
+        const actualDamage = Math.max(1, amount - this.armor);
+        this.currentHealth -= actualDamage;
+        if (this.currentHealth < 0) this.currentHealth = 0;
     }
 
-    public applyStatus(type: 'slow' | 'burn', duration: number, power: number) {
-        const existing = this.statuses.find(s => s.type === type);
-        if (existing) {
-            existing.duration = duration; // Обновляем время
-        } else {
-            this.statuses.push({ type, duration, power });
-        }
-    }
-
-    // ВАЖНО: Метод update, который искал GameScene
-    public update() {
-        // Обновляем статусы
-        for (let i = this.statuses.length - 1; i >= 0; i--) {
-            this.statuses[i].duration--;
-            if (this.statuses[i].duration <= 0) {
-                this.statuses.splice(i, 1);
-            }
-        }
-        
-        this.move();
-    }
-
-    private move() {
+    // ИСПРАВЛЕНИЕ: метод стал public
+    public move(): void {
         let speedMod = 1;
         const slow = this.statuses.find(s => s.type === 'slow');
         if (slow) speedMod -= slow.power;
-
+        
         const currentSpeed = Math.max(0, this.baseSpeed * speedMod);
 
         if (this.pathIndex >= this.path.length) {
@@ -91,7 +71,6 @@ export class Enemy {
         }
 
         const node = this.path[this.pathIndex];
-        // Целевая точка (центр тайла)
         const targetX = node.x * CONFIG.TILE_SIZE + 32;
         const targetY = node.y * CONFIG.TILE_SIZE + 32;
 
@@ -117,29 +96,38 @@ export class Enemy {
     public getHealthPercent(): number {
         return this.currentHealth / this.maxHealth;
     }
-    
+
+    public applyStatus(type: 'slow' | 'burn', duration: number, power: number) {
+        const existing = this.statuses.find(s => s.type === type);
+        if (existing) {
+            existing.duration = duration;
+            existing.power = power;
+        } else {
+            this.statuses.push({ type, duration, power });
+        }
+    }
+
     public draw(ctx: CanvasRenderingContext2D) {
-        const safeType = this.typeId ? this.typeId.toUpperCase() : 'GRUNT';
-        const conf = (CONFIG.ENEMY_TYPES as any)[safeType] || (CONFIG.ENEMY_TYPES as any)['GRUNT'];
+        const safeType = this.typeId ? this.typeId.toLowerCase() : 'grunt';
+        const typeConf = (CONFIG.ENEMY_TYPES as any)[safeType.toUpperCase()] || (CONFIG.ENEMY_TYPES as any)['GRUNT'];
 
         ctx.save();
         ctx.translate(this.x, this.y);
 
-        const img = Assets.get(`enemy_${this.typeId}`);
+        const img = Assets.get(`enemy_${safeType}`);
         if (img) {
-            ctx.drawImage(img, -24, -24, 48, 48);
+            ctx.drawImage(img as any, -24, -24, 48, 48);
         } else {
-            ctx.fillStyle = conf.color;
+            ctx.fillStyle = typeConf ? typeConf.color : '#f00';
             ctx.beginPath(); ctx.arc(0, 0, 16, 0, Math.PI*2); ctx.fill();
         }
         
+        // Статусы
+        if (this.statuses.some(s => s.type === 'slow')) {
+            ctx.fillStyle = 'rgba(0, 200, 255, 0.4)'; 
+            ctx.beginPath(); ctx.arc(0, 0, 18, 0, Math.PI*2); ctx.fill();
+        }
+
         ctx.restore();
-    }
-    
-    // Геттер цвета для Game.ts (если используется там)
-    public getColor(): string {
-         const safeType = this.typeId ? this.typeId.toUpperCase() : 'GRUNT';
-         const conf = (CONFIG.ENEMY_TYPES as any)[safeType] || (CONFIG.ENEMY_TYPES as any)['GRUNT'];
-         return conf.color;
     }
 }

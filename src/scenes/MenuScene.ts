@@ -1,8 +1,7 @@
 import { Scene } from '../Scene';
 import { Game } from '../Game';
-import { GameScene } from './GameScene';
-import { EditorScene } from './EditorScene';
 import { DEMO_MAP } from '../MapData';
+import { validateMap } from '../Utils'; // Импорт валидатора
 
 export class MenuScene implements Scene {
     private game: Game;
@@ -15,7 +14,6 @@ export class MenuScene implements Scene {
 
     public onEnter() {
         this.container.style.display = 'flex';
-        // Скрываем игровые интерфейсы на всякий случай
         const uiLayer = document.getElementById('ui-layer');
         if (uiLayer) uiLayer.style.display = 'none';
         const hand = document.getElementById('hand-container');
@@ -26,29 +24,26 @@ export class MenuScene implements Scene {
         this.container.style.display = 'none';
     }
 
-    public update() {}
+    public update() { }
 
     public draw(ctx: CanvasRenderingContext2D) {
-        // Отрисовка фона
         ctx.fillStyle = '#111';
         ctx.fillRect(0, 0, this.game.canvas.width, this.game.canvas.height);
-        
-        // Сетка
+
         ctx.strokeStyle = '#222';
         ctx.lineWidth = 2;
         const s = 64;
-        for(let x=0; x<this.game.canvas.width; x+=s) {
-            ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x, this.game.canvas.height); ctx.stroke();
+        for (let x = 0; x < this.game.canvas.width; x += s) {
+            ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, this.game.canvas.height); ctx.stroke();
         }
-        for(let y=0; y<this.game.canvas.height; y+=s) {
-            ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(this.game.canvas.width, y); ctx.stroke();
+        for (let y = 0; y < this.game.canvas.height; y += s) {
+            ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(this.game.canvas.width, y); ctx.stroke();
         }
 
-        // Текст
         ctx.fillStyle = '#fff';
         ctx.font = 'bold 60px Segoe UI';
         ctx.textAlign = 'center';
-        ctx.fillText("NEW TOWER", this.game.canvas.width/2, 150);
+        ctx.fillText("NEW TOWER", this.game.canvas.width / 2, 150);
     }
 
     private createUI() {
@@ -60,40 +55,36 @@ export class MenuScene implements Scene {
             gap: '20px', pointerEvents: 'none'
         });
 
-        // Кнопка: DEMO
         this.createBtn("▶ PLAY DEMO", () => {
-            this.game.changeScene(new GameScene(this.game, DEMO_MAP));
+            this.game.toGame(DEMO_MAP);
         });
 
-        // Кнопка: CUSTOM MAP (Исправленная логика)
         this.createBtn("📂 LOAD CUSTOM MAP", () => {
             try {
-                // ЧИТАЕМ ТОЛЬКО ЗДЕСЬ, В МОМЕНТ КЛИКА
                 const savedJson = localStorage.getItem('NEWTOWER_MAP');
-                
+
                 if (savedJson) {
-                    console.log("Loading map...");
+                    console.log("Reading map data...");
                     const data = JSON.parse(savedJson);
-                    
-                    // Минимальная проверка
-                    if (!data.tiles || !data.waypoints) {
-                        alert("Файл сохранения поврежден.");
-                        return;
+
+                    // --- ВАЛИДАЦИЯ ---
+                    if (validateMap(data)) {
+                        console.log("Map valid! Starting...");
+                        this.game.toGame(data);
+                    } else {
+                        alert("Ошибка: Карта повреждена или не имеет пути!\nПопробуйте пересохранить её в редакторе.");
                     }
-                    
-                    this.game.changeScene(new GameScene(this.game, data));
                 } else {
                     alert("Нет сохраненной карты. Создайте её в редакторе!");
                 }
             } catch (e) {
                 console.error(e);
-                alert("Ошибка чтения сохранения.");
+                alert("Ошибка чтения файла сохранения. Данные повреждены.");
             }
         });
 
-        // Кнопка: EDITOR
         this.createBtn("🛠 EDITOR", () => {
-            this.game.changeScene(new EditorScene(this.game));
+            this.game.toEditor();
         });
 
         document.body.appendChild(this.container);

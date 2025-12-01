@@ -1,7 +1,5 @@
 import { Scene } from '../Scene';
 import { Game } from '../Game';
-import { GameScene } from './GameScene';
-import { MenuScene } from './MenuScene'; 
 import { MapManager } from '../Map';
 import { CONFIG } from '../Config';
 import { IMapData } from '../MapData';
@@ -11,23 +9,23 @@ export class EditorScene implements Scene {
     private game: Game;
     private map: MapManager;
     private container: HTMLElement;
-    
-    private mode: 'paint' | 'path' | 'eraser' = 'paint'; 
+
+    private mode: 'paint' | 'path' | 'eraser' = 'paint';
     private selectedTile: number = 1;
 
     constructor(game: Game) {
         this.game = game;
-        
+
         // Создаем пустую сетку
         const cols = Math.ceil(game.canvas.width / CONFIG.TILE_SIZE);
         const rows = Math.ceil(game.canvas.height / CONFIG.TILE_SIZE);
         const emptyTiles = Array(rows).fill(0).map(() => Array(cols).fill(0));
-        
+
         const emptyData: IMapData = {
             width: cols, height: rows,
             tiles: emptyTiles, waypoints: [], objects: []
         };
-        
+
         this.map = new MapManager(emptyData);
         this.createUI();
     }
@@ -57,7 +55,7 @@ export class EditorScene implements Scene {
         if (this.mode === 'paint') {
             this.map.grid[row][col].type = this.selectedTile;
             if (this.selectedTile === 1) this.map.grid[row][col].decor = null;
-        } 
+        }
         else if (this.mode === 'eraser') {
             this.map.grid[row][col].type = 0; // Grass
         }
@@ -75,7 +73,7 @@ export class EditorScene implements Scene {
         ctx.fillStyle = '#222';
         ctx.fillRect(0, 0, this.game.canvas.width, this.game.canvas.height);
         this.map.draw(ctx);
-        
+
         const input = this.game.input;
         if (input.hoverCol >= 0) {
             const x = input.hoverCol * CONFIG.TILE_SIZE;
@@ -87,14 +85,14 @@ export class EditorScene implements Scene {
     }
 
     private saveMap() {
-        if (this.map.waypoints.length < 2) { 
-            alert("Нужно минимум 2 точки пути (Start/End)!"); 
-            return; 
+        if (this.map.waypoints.length < 2) {
+            alert("Нужно минимум 2 точки пути (Start/End)!");
+            return;
         }
 
         // ИСПОЛЬЗУЕМ НОВУЮ ФУНКЦИЮ
         const data = serializeMap(this.map);
-        
+
         try {
             const json = JSON.stringify(data);
             localStorage.setItem('NEWTOWER_MAP', json);
@@ -128,14 +126,14 @@ export class EditorScene implements Scene {
         addBtn("🌲 Paint Grass", () => { this.mode = 'paint'; this.selectedTile = 0; });
         addBtn("🟫 Paint Path", () => { this.mode = 'paint'; this.selectedTile = 1; });
         addBtn("📍 Waypoint", () => { this.mode = 'path'; }, '#e91e63');
-        
+
         const sep = document.createElement('div');
         sep.style.width = '2px'; sep.style.background = '#666';
         this.container.appendChild(sep);
 
         addBtn("💾 SAVE", () => this.saveMap(), '#1976d2');
-        addBtn("🚪 MENU", () => this.game.changeScene(new MenuScene(this.game)), '#d32f2f');
-        
+        addBtn("🚪 MENU", () => this.game.toMenu(), '#d32f2f');
+
         document.body.appendChild(this.container);
     }
 }

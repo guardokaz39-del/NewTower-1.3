@@ -1,13 +1,32 @@
 import { CONFIG } from './Config';
 
 export class Assets {
-    private static images: Record<string, HTMLCanvasElement> = {};
+    // Хранилище изображений
+    private static images: Record<string, HTMLCanvasElement | HTMLImageElement> = {};
 
-    public static init() {
-        // Тайлы окружения
+    // ГЛАВНЫЙ МЕТОД ЗАГРУЗКИ
+    public static async loadAll(): Promise<void> {
+        console.log("Assets: Start loading...");
+
+        // Здесь можно добавить загрузку внешних картинок: 
+        // await this.loadImage('hero', 'hero.png');
+        
+        // Пока генерируем процедурные текстуры (синхронно, но быстро)
+        this.generateAllTextures();
+
+        console.log("Assets: Loading complete!");
+        return Promise.resolve();
+    }
+
+    public static get(name: string): HTMLCanvasElement | HTMLImageElement | undefined {
+        return this.images[name];
+    }
+
+    // --- ГЕНЕРАЦИЯ ТЕКСТУР (Как и было, но собрано в один метод) ---
+    private static generateAllTextures() {
+        // Окружение
         this.generateTexture('grass', CONFIG.TILE_SIZE, (ctx, w, h) => {
             ctx.fillStyle = '#4caf50'; ctx.fillRect(0, 0, w, h);
-            // Добавляем "шум" травы
             for(let i=0; i<20; i++) {
                 ctx.fillStyle = Math.random() > 0.5 ? '#66bb6a' : '#388e3c';
                 ctx.fillRect(Math.random()*w, Math.random()*h, 4, 4);
@@ -16,7 +35,6 @@ export class Assets {
 
         this.generateTexture('path', CONFIG.TILE_SIZE, (ctx, w, h) => {
             ctx.fillStyle = '#d7ccc8'; ctx.fillRect(0, 0, w, h);
-            // Камушки
             for(let i=0; i<15; i++) {
                 ctx.fillStyle = '#a1887f';
                 ctx.beginPath(); ctx.arc(Math.random()*w, Math.random()*h, 3, 0, Math.PI*2); ctx.fill();
@@ -24,55 +42,39 @@ export class Assets {
         });
 
         this.generateTexture('decor_tree', CONFIG.TILE_SIZE, (ctx, w, h) => {
-            ctx.fillStyle = '#4caf50'; ctx.fillRect(0, 0, w, h); // Фон травы
-            // Дерево
-            ctx.fillStyle = '#5d4037'; ctx.fillRect(w/2-4, h/2, 8, h/2);
+            ctx.fillStyle = '#4caf50'; ctx.fillRect(0,0,w,h); // Фон травы
             ctx.fillStyle = '#2e7d32'; 
-            ctx.beginPath(); ctx.arc(w/2, h/2-10, 15, 0, Math.PI*2); ctx.fill();
-            ctx.beginPath(); ctx.arc(w/2-10, h/2, 12, 0, Math.PI*2); ctx.fill();
-            ctx.beginPath(); ctx.arc(w/2+10, h/2, 12, 0, Math.PI*2); ctx.fill();
+            ctx.beginPath(); ctx.arc(w/2, h/2, 16, 0, Math.PI*2); ctx.fill();
+            ctx.fillStyle = '#1b5e20'; 
+            ctx.beginPath(); ctx.arc(w/2 - 5, h/2 - 5, 8, 0, Math.PI*2); ctx.fill();
         });
 
         this.generateTexture('decor_rock', CONFIG.TILE_SIZE, (ctx, w, h) => {
-            ctx.fillStyle = '#4caf50'; ctx.fillRect(0, 0, w, h); // Фон травы
-            // Камень
-            ctx.fillStyle = '#9e9e9e';
-            ctx.beginPath(); 
-            ctx.moveTo(10, h-10); ctx.lineTo(20, 20); ctx.lineTo(50, 25); ctx.lineTo(60, h-5); 
-            ctx.fill();
-            ctx.strokeStyle = '#616161'; ctx.lineWidth = 2; ctx.stroke();
+            ctx.fillStyle = '#4caf50'; ctx.fillRect(0,0,w,h);
+            ctx.fillStyle = '#78909c'; 
+            ctx.beginPath(); ctx.moveTo(10, h-10); ctx.lineTo(w/2, 10); ctx.lineTo(w-10, h-10); ctx.fill();
         });
 
-        // Башня (Основание)
+        // Башни
         this.generateTexture('tower_base', 64, (ctx, w, h) => {
-            // Каменная плита
-            ctx.fillStyle = '#78909c';
-            ctx.beginPath(); ctx.arc(w/2, h/2, 28, 0, Math.PI*2); ctx.fill();
-            ctx.strokeStyle = '#546e7a'; ctx.lineWidth = 3; ctx.stroke();
-            // Заклепки
-            ctx.fillStyle = '#37474f';
-            for(let i=0; i<4; i++) {
-                const a = i * Math.PI/2;
-                ctx.beginPath(); ctx.arc(w/2 + Math.cos(a)*20, h/2 + Math.sin(a)*20, 3, 0, Math.PI*2); ctx.fill();
-            }
+            ctx.fillStyle = '#9e9e9e'; 
+            ctx.beginPath(); ctx.arc(32, 32, 24, 0, Math.PI*2); ctx.fill();
+            ctx.strokeStyle = '#616161'; ctx.lineWidth = 4; ctx.stroke();
         });
 
-        // Башня (Пушка)
         this.generateTexture('tower_gun', 64, (ctx, w, h) => {
-            ctx.translate(w/2, h/2);
-            // Ствол
-            ctx.fillStyle = '#263238'; ctx.fillRect(0, -6, 26, 12);
-            ctx.fillStyle = '#455a64'; ctx.fillRect(0, -4, 20, 8);
-            // Башня
-            ctx.fillStyle = '#37474f'; ctx.beginPath(); ctx.arc(0, 0, 14, 0, Math.PI*2); ctx.fill();
-            ctx.fillStyle = '#eceff1'; ctx.beginPath(); ctx.arc(0, 0, 6, 0, Math.PI*2); ctx.fill();
+            ctx.fillStyle = '#424242'; 
+            ctx.fillRect(28, 10, 8, 34); // Ствол
+            ctx.beginPath(); ctx.arc(32, 32, 14, 0, Math.PI*2); ctx.fill(); // Башня
+            ctx.fillStyle = '#eceff1'; ctx.beginPath(); ctx.arc(32, 32, 6, 0, Math.PI*2); ctx.fill();
         });
 
         // Враги
-        this.generateEnemyTexture('grunt', '#9c27b0', '👾');
-        this.generateEnemyTexture('scout', '#ffeb3b', '🦇');
-        this.generateEnemyTexture('tank', '#795548', '🐗');
-        this.generateEnemyTexture('boss', '#d32f2f', '👹');
+        const enemies = CONFIG.ENEMY_TYPES as any;
+        for (const key in enemies) {
+            const e = enemies[key];
+            this.generateEnemyTexture(e.id, e.color);
+        }
     }
 
     private static generateTexture(name: string, size: number, drawFn: (ctx: CanvasRenderingContext2D, w: number, h: number) => void) {
@@ -84,21 +86,18 @@ export class Assets {
         this.images[name] = canvas;
     }
 
-    private static generateEnemyTexture(name: string, color: string, icon: string) {
+    private static generateEnemyTexture(name: string, color: string) {
         this.generateTexture(`enemy_${name}`, 48, (ctx, w, h) => {
-            // Тело
             ctx.fillStyle = color;
             ctx.beginPath(); ctx.arc(w/2, h/2, 18, 0, Math.PI*2); ctx.fill();
             ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.stroke();
-            // Глаза/Иконка
-            ctx.font = '24px Arial';
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'middle';
-            ctx.fillText(icon, w/2, h/2 + 2);
+            // Глаза
+            ctx.fillStyle = '#fff';
+            ctx.beginPath(); ctx.arc(w/2 - 6, h/2 - 5, 4, 0, Math.PI*2); ctx.fill();
+            ctx.beginPath(); ctx.arc(w/2 + 6, h/2 - 5, 4, 0, Math.PI*2); ctx.fill();
+            ctx.fillStyle = '#000';
+            ctx.beginPath(); ctx.arc(w/2 - 6, h/2 - 5, 1.5, 0, Math.PI*2); ctx.fill();
+            ctx.beginPath(); ctx.arc(w/2 + 6, h/2 - 5, 1.5, 0, Math.PI*2); ctx.fill();
         });
-    }
-
-    public static get(name: string): HTMLCanvasElement | null {
-        return this.images[name] || null;
     }
 }
