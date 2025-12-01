@@ -5,7 +5,7 @@ import { generateUUID } from './Utils';
 
 export class EntityFactory {
     
-    // Строго 3 аргумента: Тип, Номер волны, Путь
+    // Исправлено: 3 аргумента. Убрали offset или лишние параметры.
     public static createEnemy(typeKey: string, wave: number, path: {x: number, y: number}[]): Enemy {
         const safeKey = typeKey || 'GRUNT';
         
@@ -15,7 +15,7 @@ export class EntityFactory {
             typeConf = (CONFIG.ENEMY_TYPES as any)['GRUNT'];
         }
 
-        // Формула здоровья с учетом волны
+        // Расчет здоровья от волны
         const hp = CONFIG.ENEMY.BASE_HP * typeConf.hpMod * Math.pow(CONFIG.ENEMY.HP_GROWTH, wave - 1);
 
         const enemy = new Enemy({
@@ -25,7 +25,6 @@ export class EntityFactory {
             path: path
         });
         
-        // Установка типа для графики
         enemy.setType(typeConf.id || safeKey.toLowerCase()); 
         (enemy as any).reward = typeConf.reward || 5;
         
