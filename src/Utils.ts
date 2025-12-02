@@ -3,7 +3,7 @@ import { IMapData, IWaveConfig } from './MapData';
 import { CONFIG } from './Config';
 
 export function generateUUID(): string {
-    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
         var r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8);
         return v.toString(16);
     });
@@ -48,15 +48,14 @@ export function serializeMap(map: MapManager): IMapData {
         width: map.cols,
         height: map.rows,
         tiles: simpleTiles,
-        waypoints: map.waypoints.map(wp => ({ x: wp.x, y: wp.y })), 
-        objects: [], 
-        waves: generateDefaultWaves(15), 
+        waypoints: map.waypoints.map(wp => ({ x: wp.x, y: wp.y })),
+        objects: [],
+        waves: generateDefaultWaves(15),
         startingMoney: CONFIG.PLAYER.START_MONEY,
         startingLives: CONFIG.PLAYER.START_LIVES
     };
 }
 
-// --- НОВАЯ ВАЛИДАЦИЯ ---
 export function validateMap(data: any): boolean {
     if (!data) return false;
     if (!data.tiles || !Array.isArray(data.tiles) || data.tiles.length === 0) {
@@ -67,10 +66,40 @@ export function validateMap(data: any): boolean {
         console.error("Map Validation Failed: No waypoints array");
         return false;
     }
-    // Путь должен иметь хотя бы 2 точки (Старт и Финиш)
     if (data.waypoints.length < 2) {
         console.error("Map Validation Failed: Path too short (<2 waypoints)");
         return false;
     }
     return true;
+}
+
+// --- STORAGE UTILS ---
+
+export function getSavedMaps(): Record<string, IMapData> {
+    try {
+        const raw = localStorage.getItem('NEWTOWER_MAPS');
+        if (!raw) return {};
+        return JSON.parse(raw);
+    } catch (e) {
+        console.error("Failed to load maps", e);
+        return {};
+    }
+}
+
+export function saveMapToStorage(name: string, data: IMapData): boolean {
+    try {
+        const maps = getSavedMaps();
+        maps[name] = data;
+        localStorage.setItem('NEWTOWER_MAPS', JSON.stringify(maps));
+        return true;
+    } catch (e) {
+        console.error("Failed to save map", e);
+        return false;
+    }
+}
+
+export function deleteMapFromStorage(name: string): void {
+    const maps = getSavedMaps();
+    delete maps[name];
+    localStorage.setItem('NEWTOWER_MAPS', JSON.stringify(maps));
 }

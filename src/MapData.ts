@@ -10,15 +10,17 @@ export interface IMapData {
     tiles: number[][];
     waypoints: { x: number, y: number }[];
     objects: any[];
-    
+
     // Новые поля (сценарий)
-    waves?: IWaveConfig[]; 
+    waves?: IWaveConfig[];
     startingMoney?: number;
     startingLives?: number;
 }
 
 // Заглушка (чтобы старый код не ломался, если где-то используется)
 export const DEMO_MAP: IMapData = {
-    width: 10, height: 10, tiles: [], waypoints: [], objects: [],
+    width: 10, height: 10,
+    tiles: Array(10).fill(0).map(() => Array(10).fill(0)), // 10x10 Grass
+    waypoints: [], objects: [],
     waves: [], startingMoney: 100, startingLives: 20
 };

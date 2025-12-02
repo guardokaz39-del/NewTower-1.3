@@ -6,18 +6,17 @@ export interface Cell {
     type: number; // 0=Grass, 1=Path, 2=Decor
     x: number;
     y: number;
-    decor?: string | null; 
+    decor?: string | null;
 }
 
 export class MapManager {
     public cols: number;
     public rows: number;
-    
-    // ИСПРАВЛЕНИЕ: Добавляем grid
-    public grid: Cell[][] = []; 
-    
-    public tiles: number[][] = []; 
-    public waypoints: {x: number, y: number}[] = [];
+
+    public grid: Cell[][] = [];
+
+    public tiles: number[][] = [];
+    public waypoints: { x: number, y: number }[] = [];
 
     constructor(data: IMapData) {
         this.loadMap(data);
@@ -31,9 +30,9 @@ export class MapManager {
 
         // Генерация объекта grid для совместимости с редактором
         this.grid = [];
-        for(let y=0; y<this.rows; y++) {
+        for (let y = 0; y < this.rows; y++) {
             const row: Cell[] = [];
-            for(let x=0; x<this.cols; x++) {
+            for (let x = 0; x < this.cols; x++) {
                 const type = this.tiles[y][x];
                 let decor = null;
                 // Восстанавливаем декор визуально
@@ -61,16 +60,15 @@ export class MapManager {
                 // Рисуем тайл
                 if (type === 1) { // PATH
                     this.drawTile(ctx, 'path', px, py);
-                } 
+                }
                 else if (type === 2) { // DECOR
                     this.drawTile(ctx, 'grass', px, py);
-                    // Пробуем взять декор из grid, если есть, или рандомно
                     const cellDecor = this.grid[y] && this.grid[y][x] ? this.grid[y][x].decor : 'tree';
                     const decorKey = cellDecor === 'rock' ? 'decor_rock' : 'decor_tree';
-                    
+
                     const decorImg = Assets.get(decorKey);
                     if (decorImg) ctx.drawImage(decorImg as any, px, py);
-                } 
+                }
                 else { // GRASS (0)
                     this.drawTile(ctx, 'grass', px, py);
                     // Сетка
@@ -80,7 +78,7 @@ export class MapManager {
                 }
             }
         }
-        
+
         if (this.waypoints.length > 0) {
             const start = this.waypoints[0];
             const end = this.waypoints[this.waypoints.length - 1];
@@ -106,5 +104,9 @@ export class MapManager {
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
         ctx.fillText(icon, x, y);
+    }
+
+    public validatePath(start: { x: number, y: number }, end: { x: number, y: number }): { x: number, y: number }[] {
+        return [];
     }
 }
