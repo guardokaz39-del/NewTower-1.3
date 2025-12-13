@@ -10,7 +10,7 @@ export class CrashHandler {
         };
 
         window.addEventListener('unhandledrejection', (event) => {
-            this.showBSOD(event.reason, "Promise", 0, null);
+            this.showBSOD(event.reason, 'Promise', 0, null);
         });
     }
 
@@ -25,9 +25,19 @@ export class CrashHandler {
         // Создаем экран смерти
         const bsod = document.createElement('div');
         Object.assign(bsod.style, {
-            position: 'fixed', top: '0', left: '0', width: '100%', height: '100%',
-            background: '#800000', color: '#fff', fontFamily: 'monospace',
-            padding: '40px', zIndex: '999999', overflow: 'auto', display: 'flex', flexDirection: 'column'
+            position: 'fixed',
+            top: '0',
+            left: '0',
+            width: '100%',
+            height: '100%',
+            background: '#800000',
+            color: '#fff',
+            fontFamily: 'monospace',
+            padding: '40px',
+            zIndex: '999999',
+            overflow: 'auto',
+            display: 'flex',
+            flexDirection: 'column',
         });
 
         bsod.innerHTML = `
@@ -51,7 +61,7 @@ export class CrashHandler {
 
         document.getElementById('copy-crash-btn')!.onclick = () => {
             const report = `CRASH REPORT:\nError: ${msg}\nLoc: ${source}:${line}\nStack:\n${error?.stack || ''}\nUA: ${navigator.userAgent}`;
-            navigator.clipboard.writeText(report).then(() => alert("Copied!"));
+            navigator.clipboard.writeText(report).then(() => alert('Copied!'));
         };
     }
 }

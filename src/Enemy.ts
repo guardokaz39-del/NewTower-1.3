@@ -1,4 +1,4 @@
-import { CONFIG } from './Config';
+import { CONFIG, getEnemyType } from './Config';
 import { Assets } from './Assets';
 
 export interface IEnemyConfig {
@@ -6,34 +6,38 @@ export interface IEnemyConfig {
     health: number;
     speed: number;
     armor?: number;
-    x?: number; 
+    x?: number;
     y?: number;
-    path: { x: number, y: number }[];
+    path: { x: number; y: number }[];
 }
 
 interface IStatus {
     type: 'slow' | 'burn';
-    duration: number; 
-    power: number;   
+    duration: number;
+    power: number;
 }
 
 export class Enemy {
     public id: string;
-    public typeId: string = 'grunt'; 
-    
+    public typeId: string = 'grunt';
+
     public currentHealth: number;
     public maxHealth: number;
     public baseSpeed: number;
     public armor: number;
-    
+    public reward: number = 5; // Reward for killing this enemy
+
     public x: number;
     public y: number;
 
-    private path: { x: number, y: number }[];
-    private pathIndex: number = 0;
+    private path: { x: number; y: number }[];
+    public pathIndex: number = 0;
     public finished: boolean = false;
-    
+
     public statuses: IStatus[] = [];
+    public damageModifier: number = 1.0;     // Damage multiplier (e.g., 1.2 = +20% damage)
+    public killedByProjectile: any = null;   // Track what projectile killed this enemy
+    public hitFlashTimer: number = 0;        // Timer for white flash on hit
 
     constructor(config: IEnemyConfig) {
         this.id = config.id;
@@ -41,7 +45,7 @@ export class Enemy {
         this.currentHealth = config.health;
         this.baseSpeed = config.speed;
         this.armor = config.armor || 0;
-        
+
         this.x = config.x || 0;
         this.y = config.y || 0;
         this.path = config.path;
@@ -51,18 +55,28 @@ export class Enemy {
         this.typeId = id;
     }
 
-    public takeDamage(amount: number): void {
-        const actualDamage = Math.max(1, amount - this.armor);
+    public takeDamage(amount: number, projectile?: any): void {
+        // Apply damage modifier (from slow effects, etc.)
+        const modifiedAmount = amount * this.damageModifier;
+        const actualDamage = Math.max(1, modifiedAmount - this.armor);
         this.currentHealth -= actualDamage;
         if (this.currentHealth < 0) this.currentHealth = 0;
+
+        // Visual Feedback: Hit Flash
+        this.hitFlashTimer = 5; // 5 frames ~ 80ms
+
+        // Track what killed this enemy
+        if (!this.isAlive() && projectile) {
+            this.killedByProjectile = projectile;
+        }
     }
 
     // ИСПРАВЛЕНИЕ: метод стал public
     public move(): void {
         let speedMod = 1;
-        const slow = this.statuses.find(s => s.type === 'slow');
+        const slow = this.statuses.find((s) => s.type === 'slow');
         if (slow) speedMod -= slow.power;
-        
+
         const currentSpeed = Math.max(0, this.baseSpeed * speedMod);
 
         if (this.pathIndex >= this.path.length) {
@@ -71,8 +85,8 @@ export class Enemy {
         }
 
         const node = this.path[this.pathIndex];
-        const targetX = node.x * CONFIG.TILE_SIZE + 32;
-        const targetY = node.y * CONFIG.TILE_SIZE + 32;
+        const targetX = node.x * CONFIG.TILE_SIZE + CONFIG.TILE_SIZE / 2;
+        const targetY = node.y * CONFIG.TILE_SIZE + CONFIG.TILE_SIZE / 2;
 
         const dx = targetX - this.x;
         const dy = targetY - this.y;
@@ -97,35 +111,152 @@ export class Enemy {
         return this.currentHealth / this.maxHealth;
     }
 
-    public applyStatus(type: 'slow' | 'burn', duration: number, power: number) {
-        const existing = this.statuses.find(s => s.type === type);
+    public applyStatus(type: 'slow' | 'burn', duration: number, power: number, damageBonus?: number) {
+        const existing = this.statuses.find((s) => s.type === type);
         if (existing) {
             existing.duration = duration;
             existing.power = power;
         } else {
             this.statuses.push({ type, duration, power });
         }
+
+        // Apply damage modifier for slowed enemies (Ice level 2+)
+        if (type === 'slow' && damageBonus) {
+            this.damageModifier = damageBonus;
+        }
+    }
+
+    public update(): void {
+        // Update status durations
+        this.statuses = this.statuses.filter((s) => {
+            s.duration--;
+            return s.duration > 0;
+        });
+
+        // Reset damage modifier if no slow status
+        if (!this.statuses.some(s => s.type === 'slow')) {
+            this.damageModifier = 1.0;
+        }
+
+        // Update flash timer
+        if (this.hitFlashTimer > 0) this.hitFlashTimer--;
     }
 
     public draw(ctx: CanvasRenderingContext2D) {
         const safeType = this.typeId ? this.typeId.toLowerCase() : 'grunt';
-        const typeConf = (CONFIG.ENEMY_TYPES as any)[safeType.toUpperCase()] || (CONFIG.ENEMY_TYPES as any)['GRUNT'];
+        const typeConf = getEnemyType(safeType.toUpperCase()) || getEnemyType('GRUNT');
+
+        // Defaults
+        const scale = typeConf?.scale || 1.0;
+        const archetype = typeConf?.archetype || 'SKELETON';
+        const props = typeConf?.props || [];
+        const baseColor = typeConf?.color || '#fff';
+        const tint = typeConf?.tint;
 
         ctx.save();
         ctx.translate(this.x, this.y);
 
-        const img = Assets.get(`enemy_${safeType}`);
-        if (img) {
-            ctx.drawImage(img as any, -24, -24, 48, 48);
+        // -- VISUAL STACK --
+
+        // 1. Shadow Layer
+        ctx.fillStyle = 'rgba(0,0,0,0.3)';
+        ctx.beginPath();
+        const shadowW = 16 * scale;
+        const shadowH = 8 * scale;
+        ctx.ellipse(0, 10 * scale, shadowW, shadowH, 0, 0, Math.PI * 2);
+        ctx.fill();
+
+        // 2. Body Layer
+        const bodyImgName = `enemy_${archetype.toLowerCase()}`;
+        const bodyImg = Assets.get(bodyImgName);
+
+        if (bodyImg) {
+            const size = 48 * scale;
+            const half = size / 2;
+
+            // Draw Body
+            ctx.drawImage(bodyImg, -half, -half, size, size);
+
+            // Apply Tint (if defined)
+            if (tint) {
+                ctx.save();
+                ctx.globalCompositeOperation = 'source-atop'; // Draw only on existing pixels
+                ctx.fillStyle = tint;
+                ctx.globalAlpha = 0.5; // Tint strength
+                ctx.fillRect(-half, -half, size, size);
+                ctx.restore();
+            }
+
+            // Apply Hit Flash (White)
+            if (this.hitFlashTimer > 0) {
+                ctx.save();
+                ctx.globalCompositeOperation = 'source-atop';
+                ctx.fillStyle = '#ffffff';
+                ctx.globalAlpha = 0.8;
+                ctx.fillRect(-half, -half, size, size);
+                ctx.restore();
+            }
+
+            // Apply Status Tints (Ice/Burn)
+            // Ice
+            if (this.statuses.some(s => s.type === 'slow')) {
+                ctx.save();
+                ctx.globalCompositeOperation = 'source-atop';
+                ctx.fillStyle = '#00e5ff'; // Cyan
+                ctx.globalAlpha = 0.4;
+                ctx.fillRect(-half, -half, size, size);
+                ctx.restore();
+            }
+            // Burn
+            if (this.statuses.some(s => s.type === 'burn')) {
+                ctx.save();
+                ctx.globalCompositeOperation = 'source-atop';
+                ctx.fillStyle = '#ff3d00'; // Orange
+                ctx.globalAlpha = 0.4;
+                ctx.fillRect(-half, -half, size, size);
+                ctx.restore();
+            }
+
         } else {
-            ctx.fillStyle = typeConf ? typeConf.color : '#f00';
-            ctx.beginPath(); ctx.arc(0, 0, 16, 0, Math.PI*2); ctx.fill();
+            // Fallback
+            ctx.fillStyle = baseColor;
+            ctx.beginPath();
+            ctx.arc(0, 0, 16 * scale, 0, Math.PI * 2);
+            ctx.fill();
         }
-        
-        // Статусы
-        if (this.statuses.some(s => s.type === 'slow')) {
-            ctx.fillStyle = 'rgba(0, 200, 255, 0.4)'; 
-            ctx.beginPath(); ctx.arc(0, 0, 18, 0, Math.PI*2); ctx.fill();
+
+        // 3. Props Layer (Equipmnent)
+        if (props.length > 0) {
+            props.forEach(propId => {
+                const propImg = Assets.get(propId);
+                if (propImg) {
+                    // Prop specific offsets? For now center them
+                    const pSize = 32 * scale;
+                    const pHalf = pSize / 2;
+                    ctx.drawImage(propImg, -pHalf, -pHalf, pSize, pSize);
+                }
+            });
+        }
+
+        // 4. UI Layer (HP Bar)
+        // Only show if damaged
+        if (this.currentHealth < this.maxHealth) {
+            const barWidth = CONFIG.UI.HP_BAR_WIDTH;
+            const barHeight = CONFIG.UI.HP_BAR_HEIGHT;
+            const barY = -30 * scale; // Adjust height based on scale
+
+            // Background
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+            ctx.fillRect(-barWidth / 2, barY, barWidth, barHeight);
+
+            // Health bar
+            const hpPercent = this.currentHealth / this.maxHealth;
+            let hpColor = '#4caf50'; // green
+            if (hpPercent < 0.3) hpColor = '#f44336'; // red
+            else if (hpPercent < 0.6) hpColor = '#ff9800'; // orange
+
+            ctx.fillStyle = hpColor;
+            ctx.fillRect(-barWidth / 2, barY, barWidth * hpPercent, barHeight);
         }
 
         ctx.restore();

@@ -16,7 +16,7 @@ export class MapManager {
     public grid: Cell[][] = [];
 
     public tiles: number[][] = [];
-    public waypoints: { x: number, y: number }[] = [];
+    public waypoints: { x: number; y: number }[] = [];
 
     constructor(data: IMapData) {
         this.loadMap(data);
@@ -41,6 +41,15 @@ export class MapManager {
             }
             this.grid.push(row);
         }
+
+        // If waypoints only contain start and end, expand to full path
+        if (this.waypoints.length === 2) {
+            const { Pathfinder } = require('./Pathfinder');
+            const fullPath = Pathfinder.findPath(this.grid, this.waypoints[0], this.waypoints[1]);
+            if (fullPath.length > 0) {
+                this.waypoints = fullPath;
+            }
+        }
     }
 
     public isBuildable(col: number, row: number): boolean {
@@ -58,18 +67,19 @@ export class MapManager {
                 const py = y * TS;
 
                 // Рисуем тайл
-                if (type === 1) { // PATH
+                if (type === 1) {
+                    // PATH
                     this.drawTile(ctx, 'path', px, py);
-                }
-                else if (type === 2) { // DECOR
+                } else if (type === 2) {
+                    // DECOR
                     this.drawTile(ctx, 'grass', px, py);
                     const cellDecor = this.grid[y] && this.grid[y][x] ? this.grid[y][x].decor : 'tree';
                     const decorKey = cellDecor === 'rock' ? 'decor_rock' : 'decor_tree';
 
                     const decorImg = Assets.get(decorKey);
-                    if (decorImg) ctx.drawImage(decorImg as any, px, py);
-                }
-                else { // GRASS (0)
+                    if (decorImg) ctx.drawImage(decorImg, px, py);
+                } else {
+                    // GRASS (0)
                     this.drawTile(ctx, 'grass', px, py);
                     // Сетка
                     ctx.strokeStyle = 'rgba(0,0,0,0.05)';
@@ -90,7 +100,7 @@ export class MapManager {
     private drawTile(ctx: CanvasRenderingContext2D, key: string, x: number, y: number) {
         const img = Assets.get(key);
         if (img) {
-            ctx.drawImage(img as any, x, y);
+            ctx.drawImage(img, x, y);
         } else {
             ctx.fillStyle = key === 'path' ? '#ded29e' : '#8bc34a';
             ctx.fillRect(x, y, CONFIG.TILE_SIZE, CONFIG.TILE_SIZE);
@@ -98,15 +108,16 @@ export class MapManager {
     }
 
     private drawIcon(ctx: CanvasRenderingContext2D, icon: string, col: number, row: number) {
-        const x = col * CONFIG.TILE_SIZE + 32;
-        const y = row * CONFIG.TILE_SIZE + 32;
+        const halfTile = CONFIG.TILE_SIZE / 2;
+        const x = col * CONFIG.TILE_SIZE + halfTile;
+        const y = row * CONFIG.TILE_SIZE + halfTile;
         ctx.font = '30px Arial';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
         ctx.fillText(icon, x, y);
     }
 
-    public validatePath(start: { x: number, y: number }, end: { x: number, y: number }): { x: number, y: number }[] {
+    public validatePath(_start: { x: number; y: number }, _end: { x: number; y: number }): { x: number; y: number }[] {
         return [];
     }
 }

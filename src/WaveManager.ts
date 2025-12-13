@@ -1,30 +1,57 @@
-import type { GameScene } from './scenes/GameScene';
+import { IGameScene } from './scenes/IGameScene';
 import { CONFIG } from './Config';
 import { IWaveConfig } from './MapData';
 
+/**
+ * Manages wave logic, spawning enemies, and tracking wave progress.
+ */
 export class WaveManager {
-    private scene: GameScene;
+    private scene: IGameScene;
     public isWaveActive: boolean = false;
     private enemiesToSpawn: string[] = [];
     private spawnTimer: number = 0;
 
-    constructor(scene: any) {
+    constructor(scene: IGameScene) {
         this.scene = scene;
     }
 
+    /**
+     * Starts the next wave. If already active, adds bonus.
+     */
     public startWave() {
-        if (this.isWaveActive) return;
+        // ALLOW EARLY WAVE START
+        // If wave is active, we just increment and add more enemies to the queue
 
         this.scene.wave++;
-        this.isWaveActive = true;
+
+        // If not active, activate. If active, we just continue.
+        if (!this.isWaveActive) {
+            this.isWaveActive = true;
+        } else {
+            // Early wave bonus!
+            this.scene.money += CONFIG.ECONOMY.EARLY_WAVE_BONUS;
+            this.scene.metrics.trackMoneyEarned(CONFIG.ECONOMY.EARLY_WAVE_BONUS);
+            this.scene.showFloatingText('EARLY START!', this.scene.game.canvas.width / 2, 300, 'gold');
+        }
 
         this.generateWave(this.scene.wave);
+        this.scene.metrics.trackWaveReached(this.scene.wave);
+
+        // === WAVE START SCREEN FLASH ===
+        this.scene.effects.add({
+            type: 'screen_flash',
+            x: 0,
+            y: 0,
+            life: 20,
+            flashColor: 'rgba(255, 50, 50, ',
+        });
+        // === END WAVE START FLASH ===
 
         this.scene.showFloatingText(
             `WAVE ${this.scene.wave}`,
             this.scene.game.canvas.width / 2,
             this.scene.game.canvas.height / 2,
-            '#fff'
+            '#fff',
         );
 
         this.scene.ui.update();
@@ -52,7 +79,7 @@ export class WaveManager {
 
     private endWave() {
         this.isWaveActive = false;
-        this.scene.showFloatingText("WAVE CLEARED!", this.scene.game.canvas.width / 2, 200, 'gold');
+        this.scene.showFloatingText('WAVE CLEARED!', this.scene.game.canvas.width / 2, 200, 'gold');
 
         // Награда
         this.scene.money += CONFIG.ECONOMY.WAVE_CLEAR_REWARD * 10 + CONFIG.ECONOMY.EARLY_WAVE_BONUS;
@@ -81,19 +108,19 @@ export class WaveManager {
             const idx = Math.min(waveNum - 1, CONFIG.WAVES.length - 1);
             const rawData = CONFIG.WAVES[idx];
 
-            // --- ИСПРАВЛЕНИЕ ОШИБКИ TS2741 ---
             // Проверяем: если rawData это массив, то оборачиваем его вручную
             if (Array.isArray(rawData)) {
-                waveConfig = { enemies: rawData as any };
+                // @ts-ignore - TS thinks rawData is readonly array which works for us
+                waveConfig = { enemies: rawData };
             } else {
                 // Иначе считаем, что это уже правильный объект
-                waveConfig = rawData as IWaveConfig;
+                waveConfig = rawData as unknown as IWaveConfig;
             }
         }
 
         // Разбор конфига и заполнение очереди
         if (waveConfig && waveConfig.enemies) {
-            waveConfig.enemies.forEach(entry => {
+            waveConfig.enemies.forEach((entry) => {
                 for (let i = 0; i < entry.count; i++) {
                     this.enemiesToSpawn.push(entry.type);
                 }

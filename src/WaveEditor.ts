@@ -18,11 +18,23 @@ export class WaveEditor {
     private createUI() {
         this.container = document.createElement('div');
         Object.assign(this.container.style, {
-            position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)',
-            width: '400px', maxHeight: '80vh', overflowY: 'auto',
-            background: '#222', border: '2px solid #444', borderRadius: '8px',
-            padding: '20px', color: '#fff', display: 'flex', flexDirection: 'column', gap: '10px',
-            zIndex: '2000', boxShadow: '0 0 20px rgba(0,0,0,0.5)'
+            position: 'absolute',
+            top: '50%',
+            left: '50%',
+            transform: 'translate(-50%, -50%)',
+            width: '400px',
+            maxHeight: '80vh',
+            overflowY: 'auto',
+            background: '#222',
+            border: '2px solid #444',
+            borderRadius: '8px',
+            padding: '20px',
+            color: '#fff',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '10px',
+            zIndex: '2000',
+            boxShadow: '0 0 20px rgba(0,0,0,0.5)',
         });
 
         const title = document.createElement('h2');
@@ -84,7 +96,10 @@ export class WaveEditor {
         this.waves.forEach((wave, index) => {
             const waveDiv = document.createElement('div');
             Object.assign(waveDiv.style, {
-                background: '#333', padding: '10px', borderRadius: '4px', border: '1px solid #555'
+                background: '#333',
+                padding: '10px',
+                borderRadius: '4px',
+                border: '1px solid #555',
             });
 
             const header = document.createElement('div');
@@ -118,7 +133,7 @@ export class WaveEditor {
 
                 const typeSelect = document.createElement('select');
                 const types = Object.keys(CONFIG.ENEMY_TYPES);
-                types.forEach(t => {
+                types.forEach((t) => {
                     const opt = document.createElement('option');
                     opt.value = t;
                     opt.innerText = t;
@@ -172,8 +187,12 @@ export class WaveEditor {
 
     private styleBtn(btn: HTMLElement, color: string) {
         Object.assign(btn.style, {
-            background: color, color: '#fff', border: 'none', padding: '5px 10px',
-            cursor: 'pointer', borderRadius: '4px'
+            background: color,
+            color: '#fff',
+            border: 'none',
+            padding: '5px 10px',
+            cursor: 'pointer',
+            borderRadius: '4px',
         });
     }
 

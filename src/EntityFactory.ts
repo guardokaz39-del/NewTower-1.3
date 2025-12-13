@@ -1,32 +1,36 @@
 import { Enemy } from './Enemy';
 import { Tower } from './Tower';
-import { CONFIG } from './Config';
+import { CONFIG, getEnemyType } from './Config';
 import { generateUUID } from './Utils';
 
 export class EntityFactory {
-    
     // ИСПРАВЛЕНИЕ: Убрали лишние аргументы, теперь ровно 3
-    public static createEnemy(typeKey: string, wave: number, path: {x: number, y: number}[]): Enemy {
+    public static createEnemy(typeKey: string, wave: number, path: { x: number; y: number }[]): Enemy {
         const safeKey = typeKey || 'GRUNT';
-        
-        let typeConf = (CONFIG.ENEMY_TYPES as any)[safeKey];
-        if (!typeConf) {
+
+        const typeConf = getEnemyType(safeKey) || getEnemyType('GRUNT')!;
+        if (!getEnemyType(safeKey)) {
             console.warn(`Unknown enemy type: ${typeKey}, falling back to GRUNT`);
-            typeConf = (CONFIG.ENEMY_TYPES as any)['GRUNT'];
         }
 
         const hp = CONFIG.ENEMY.BASE_HP * typeConf.hpMod * Math.pow(CONFIG.ENEMY.HP_GROWTH, wave - 1);
+
+        // FIX: Spawn enemy at the first waypoint
+        const startX = path.length > 0 ? path[0].x * CONFIG.TILE_SIZE + CONFIG.TILE_SIZE / 2 : 0;
+        const startY = path.length > 0 ? path[0].y * CONFIG.TILE_SIZE + CONFIG.TILE_SIZE / 2 : 0;
 
         const enemy = new Enemy({
             id: `e_${generateUUID()}`,
             health: hp,
             speed: typeConf.speed,
-            path: path
+            path: path,
+            x: startX,
+            y: startY,
         });
-        
-        enemy.setType(typeConf.id || safeKey.toLowerCase()); 
-        (enemy as any).reward = typeConf.reward || 5;
-        
+
+        enemy.setType(typeConf.id || safeKey.toLowerCase());
+        enemy.reward = typeConf.reward || 5;
+
         return enemy;
     }
 

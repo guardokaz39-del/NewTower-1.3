@@ -19,12 +19,12 @@ export class EventEmitter {
     // Отписаться
     public off(event: string, listener: Listener): void {
         if (!this.events[event]) return;
-        this.events[event] = this.events[event].filter(l => l !== listener);
+        this.events[event] = this.events[event].filter((l) => l !== listener);
     }
 
     // Крикнуть на всю игру: "Произошло событие!"
     public emit(event: string, data?: any): void {
         if (!this.events[event]) return;
-        this.events[event].forEach(listener => listener(data));
+        this.events[event].forEach((listener) => listener(data));
     }
 }

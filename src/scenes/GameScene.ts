@@ -1,9 +1,10 @@
 import { Game } from '../Game';
-import { Scene } from '../Scene';
+import { BaseScene } from '../BaseScene';
+import { IGameScene } from './IGameScene';
 import { Enemy } from '../Enemy';
 import { MapManager } from '../Map';
 import { UIManager } from '../UIManager';
-import { CONFIG } from '../Config';
+import { CONFIG, getEnemyType } from '../Config';
 import { CardSystem, ICard } from '../CardSystem';
 import { EventEmitter } from '../Events';
 import { InputSystem } from '../InputSystem';
@@ -20,12 +21,19 @@ import { EntityFactory } from '../EntityFactory';
 import { InspectorSystem } from '../InspectorSystem';
 import { BestiarySystem } from '../BestiarySystem';
 import { IMapData, DEMO_MAP } from '../MapData';
-import { generateUUID } from '../Utils';
+import { MetricsSystem } from '../MetricsSystem';
+import { WeaponSystem } from '../WeaponSystem';
+import { FogSystem } from '../FogSystem';
 
-export class GameScene implements Scene {
+/**
+ * Main game scene where gameplay takes place.
+ * Implements IGameScene interface to decouple systems.
+ */
+export class GameScene extends BaseScene implements IGameScene {
     public game: Game;
     public map: MapManager;
     public mapData: IMapData; // ИСПРАВЛЕНИЕ: Добавлено поле mapData
+    public fog: FogSystem;
 
     public ui: UIManager;
     public cardSys: CardSystem;
@@ -38,6 +46,8 @@ export class GameScene implements Scene {
     public collision: CollisionSystem;
     public inspector: InspectorSystem;
     public bestiary: BestiarySystem;
+    public metrics: MetricsSystem;
+    public weaponSystem: WeaponSystem;
 
     public enemies: Enemy[] = [];
     public towers: Tower[] = [];
@@ -53,21 +63,29 @@ export class GameScene implements Scene {
     public frames: number = 0;
 
     constructor(game: Game, mapData: IMapData) {
+        super();
         this.game = game;
         this.mapData = mapData || DEMO_MAP;
         this.map = new MapManager(this.mapData);
+        this.fog = new FogSystem(this.mapData);
 
         this.events = new EventEmitter();
         this.effects = new EffectSystem(game.ctx);
-        this.ui = new UIManager(this as any);
-        this.cardSys = new CardSystem(this as any);
         this.input = game.input;
-        this.forge = new ForgeSystem(this as any);
-        this.debug = new DebugSystem(this as any);
+
+        // CRITICAL: waveManager must be created BEFORE ui and cardSys
+        // because CardSystem.constructor calls ui.update() which accesses waveManager
+        this.waveManager = new WaveManager(this);
+        this.weaponSystem = new WeaponSystem();
+
+        this.ui = new UIManager(this);
+        this.cardSys = new CardSystem(this);
+        this.forge = new ForgeSystem(this);
+        this.debug = new DebugSystem(this);
         this.collision = new CollisionSystem(this.effects, this.debug);
-        this.inspector = new InspectorSystem(this as any);
-        this.bestiary = new BestiarySystem(this as any);
-        this.waveManager = new WaveManager(this as any);
+        this.inspector = new InspectorSystem(this);
+        this.bestiary = new BestiarySystem(this);
+        this.metrics = new MetricsSystem();
 
         this.projectilePool = new ObjectPool(() => new Projectile());
     }
@@ -91,21 +109,91 @@ export class GameScene implements Scene {
         this.frames++;
 
         this.waveManager.update();
+        this.fog.update();
 
-        this.towers.forEach(t => t.update(this.enemies, this.projectiles, this.projectilePool, this.effects));
+        // FIX: Update projectiles BEFORE spawning new ones to prevent visual gaps (jump forward)
+        for (let i = this.projectiles.length - 1; i >= 0; i--) {
+            const p = this.projectiles[i];
+            p.update();
+            if (!p.alive) {
+                this.projectiles.splice(i, 1);
+                this.projectilePool.free(p);
+            }
+        }
+
+        // Use WeaponSystem for tower logic
+        this.weaponSystem.update(this.towers, this.enemies, this.projectiles, this.projectilePool, this.effects);
+
+        // Update tower visual states (building progress)
+        this.towers.forEach((t) => t.updateBuilding(this.effects));
+
+
+
         this.collision.update(this.projectiles, this.enemies);
 
         for (let i = this.enemies.length - 1; i >= 0; i--) {
             const e = this.enemies[i];
             e.move(); // Теперь move public, ошибки нет
+            e.update(); // Update status effects and damage modifiers
 
             if (!e.isAlive()) {
-                this.money += (e as any).reward || 5;
-                this.effects.add({ type: 'text', text: `+${(e as any).reward}G`, x: e.x, y: e.y, life: 30, color: 'gold', vy: -1 });
+                const reward = e.reward || 5;
+                this.money += reward;
+                this.metrics.trackEnemyKilled();
+                this.metrics.trackMoneyEarned(reward);
+
+                // Floating text with emoji
+                this.effects.add({
+                    type: 'text',
+                    text: `+${reward}💰`,
+                    x: e.x,
+                    y: e.y,
+                    life: 40,
+                    color: 'gold',
+                    vy: -1.5,
+                });
+
+                // Coin particle burst animation
+                const particleCount = Math.min(3 + Math.floor(reward / 5), 8);
+                for (let p = 0; p < particleCount; p++) {
+                    this.effects.add({
+                        type: 'particle',
+                        x: e.x + (Math.random() - 0.5) * 20,
+                        y: e.y + (Math.random() - 0.5) * 20,
+                        vx: (Math.random() - 0.5) * 6,
+                        vy: -(Math.random() * 4 + 2),
+                        life: 25 + Math.floor(Math.random() * 15),
+                        radius: 3 + Math.random() * 2,
+                        color: Math.random() > 0.3 ? '#ffd700' : '#ffeb3b', // Gold/Yellow coins
+                    });
+                }
+
+                // === DEATH DEBRIS EFFECT ===
+                const enemyTypeConf = getEnemyType(e.typeId.toUpperCase());
+                const debrisColor = enemyTypeConf?.color || '#888';
+                const debrisCount = 6 + Math.floor(Math.random() * 3); // 6-8 pieces
+                for (let d = 0; d < debrisCount; d++) {
+                    this.effects.add({
+                        type: 'debris',
+                        x: e.x,
+                        y: e.y,
+                        vx: (Math.random() - 0.5) * 8,
+                        vy: -(Math.random() * 4 + 1),
+                        life: 30 + Math.floor(Math.random() * 15),
+                        size: 3 + Math.random() * 4,
+                        color: debrisColor,
+                        rotation: Math.random() * Math.PI * 2,
+                        vRot: (Math.random() - 0.5) * 0.4,
+                        gravity: 0.3,
+                    });
+                }
+                // === END DEATH DEBRIS ===
+
                 this.enemies.splice(i, 1);
                 this.ui.update();
             } else if (e.finished) {
                 this.lives--;
+                this.metrics.trackLifeLost();
                 this.enemies.splice(i, 1);
                 this.ui.update();
                 if (this.lives <= 0) this.gameOver();
@@ -120,6 +208,7 @@ export class GameScene implements Scene {
         ctx.fillRect(0, 0, this.game.canvas.width, this.game.canvas.height);
 
         this.map.draw(ctx);
+        this.fog.draw(ctx);
 
         if (this.input.hoverCol >= 0) {
             const hx = this.input.hoverCol * CONFIG.TILE_SIZE;
@@ -129,9 +218,22 @@ export class GameScene implements Scene {
             ctx.strokeRect(hx, hy, CONFIG.TILE_SIZE, CONFIG.TILE_SIZE);
         }
 
-        this.towers.forEach(t => t.draw(ctx));
-        this.enemies.forEach(e => e.draw(ctx));
-        this.projectiles.forEach(p => p.draw(ctx));
+        this.towers.forEach((t) => t.draw(ctx));
+
+        // FEATURE: Show range circle for selected tower
+        if (this.selectedTower) {
+            const stats = this.selectedTower.getStats();
+            ctx.strokeStyle = 'rgba(0, 255, 255, 0.4)';
+            ctx.fillStyle = 'rgba(0, 255, 255, 0.1)';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.arc(this.selectedTower.x, this.selectedTower.y, stats.range, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.stroke();
+        }
+
+        this.enemies.forEach((e) => e.draw(ctx));
+        this.projectiles.forEach((p) => p.draw(ctx));
         this.effects.draw();
     }
 
@@ -145,15 +247,47 @@ export class GameScene implements Scene {
     }
 
     public startBuildingTower(col: number, row: number) {
+        const screenX = col * CONFIG.TILE_SIZE + CONFIG.TILE_SIZE / 2;
+        const screenY = row * CONFIG.TILE_SIZE + CONFIG.TILE_SIZE / 2;
+
         if (!this.map.isBuildable(col, row)) {
-            this.showFloatingText("Can't build here!", col * 64, row * 64, 'red');
+            this.showFloatingText("Can't build here!", screenX, screenY, 'red');
             return;
         }
-        // Логика постройки через карты (handleCardDrop)
+
+        // Prevent building in fog
+        const idx = row * this.mapData.width + col;
+        if (this.mapData.fogData && this.mapData.fogData[idx] === 1) {
+            this.showFloatingText("Too foggy!", screenX, screenY, 'gray');
+            return;
+        }
+
+        // Check if a tower already exists at this location
+        const existingTower = this.towers.find((t) => t.col === col && t.row === row);
+        if (existingTower) {
+            this.showFloatingText('Tower already here!', screenX, screenY, 'orange');
+            return;
+        }
+
+        // Check if player has enough money
+        if (this.money < CONFIG.ECONOMY.TOWER_COST) {
+            this.showFloatingText('Not enough money!', screenX, screenY, 'red');
+            return;
+        }
+
+        // Build the tower with progress
+        this.money -= CONFIG.ECONOMY.TOWER_COST;
+        this.metrics.trackMoneySpent(CONFIG.ECONOMY.TOWER_COST);
+        const tower = EntityFactory.createTower(col, row);
+        tower.isBuilding = true;
+        tower.buildProgress = 0;
+        this.towers.push(tower);
+        this.metrics.trackTowerBuilt();
+        this.ui.update();
     }
 
     public handleGridClick(col: number, row: number) {
-        const tower = this.towers.find(t => t.col === col && t.row === row);
+        const tower = this.towers.find((t) => t.col === col && t.row === row);
         if (tower) {
             this.selectedTower = tower;
             this.inspector.selectTower(tower);
@@ -172,15 +306,20 @@ export class GameScene implements Scene {
         const col = Math.floor(x / CONFIG.TILE_SIZE);
         const row = Math.floor(y / CONFIG.TILE_SIZE);
 
-        if (card.type.id === 'fire' || card.type.id === 'ice' || card.type.id === 'sniper' || card.type.id === 'multi') {
+        if (
+            card.type.id === 'fire' ||
+            card.type.id === 'ice' ||
+            card.type.id === 'sniper' ||
+            card.type.id === 'multi'
+        ) {
             // Это карта-башня или модификатор
             if (this.money < CONFIG.ECONOMY.TOWER_COST) {
-                this.showFloatingText("Not enough money!", x, y, 'red');
+                this.showFloatingText('Not enough money!', x, y, 'red');
                 return false;
             }
 
             // Если там пусто -> строим
-            let tower = this.towers.find(t => t.col === col && t.row === row);
+            let tower = this.towers.find((t) => t.col === col && t.row === row);
             if (!tower) {
                 if (!this.map.isBuildable(col, row)) {
                     this.showFloatingText("Can't build here", x, y, 'red');
@@ -194,11 +333,13 @@ export class GameScene implements Scene {
             // Добавляем карту в башню
             if (tower.cards.length < 3) {
                 tower.cards.push(card);
-                this.showFloatingText("Card installed!", x, y, 'lime');
+                this.cardSys.removeCardFromHand(card); // FIX: Remove card from hand
+                this.metrics.trackCardUsed(card.type.id);
+                this.showFloatingText('Card installed!', x, y, 'lime');
                 this.ui.update();
                 return true; // Успех, карта тратится
             } else {
-                this.showFloatingText("Tower full!", x, y, 'orange');
+                this.showFloatingText('Tower full!', x, y, 'orange');
                 return false;
             }
         }
@@ -220,10 +361,25 @@ export class GameScene implements Scene {
             this.towers.splice(idx, 1);
             const refund = Math.floor(CONFIG.ECONOMY.TOWER_COST * CONFIG.ECONOMY.SELL_REFUND);
             this.money += refund;
-            this.showFloatingText(`+${refund}G`, tower.x, tower.y, 'gold');
+            this.showFloatingText(`+${refund}💰`, tower.x, tower.y, 'gold');
             this.selectedTower = null;
             this.inspector.hide();
             this.ui.update();
+        }
+    }
+
+    // Sell a card from a tower for gold
+    public sellCardFromTower(tower: Tower, cardIndex: number) {
+        const card = tower.removeCard(cardIndex);
+        if (card) {
+            const prices = CONFIG.ECONOMY.CARD_SELL_PRICES;
+            const price = prices[card.level] || 5;
+            this.money += price;
+            this.showFloatingText(`+${price}💰`, tower.x, tower.y - 30, 'gold');
+            this.metrics.trackMoneyEarned(price);
+            this.ui.update();
+            // Refresh inspector to show updated card slots
+            this.inspector.selectTower(tower);
         }
     }
 
@@ -234,6 +390,7 @@ export class GameScene implements Scene {
 
     private gameOver() {
         this.isRunning = false;
+        this.metrics.endGame(false);
         this.ui.showGameOver(this.wave);
     }
 }

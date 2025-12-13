@@ -3,22 +3,26 @@ import { Cell } from './Map';
 export class Pathfinder {
     // Находит путь от start до end, используя только тайлы типа 1 (Path)
     // Возвращает массив координат {x, y} или пустой массив, если пути нет
-    public static findPath(grid: Cell[][], start: {x: number, y: number}, end: {x: number, y: number}): {x: number, y: number}[] {
+    public static findPath(
+        grid: Cell[][],
+        start: { x: number; y: number },
+        end: { x: number; y: number },
+    ): { x: number; y: number }[] {
         const rows = grid.length;
         const cols = grid[0].length;
-        
+
         // Очередь для BFS: [ {x, y}, [path_so_far] ]
-        const queue: {pos: {x: number, y: number}, path: {x: number, y: number}[]}[] = [];
+        const queue: { pos: { x: number; y: number }; path: { x: number; y: number }[] }[] = [];
         queue.push({ pos: start, path: [start] });
 
         const visited = new Set<string>();
         visited.add(`${start.x},${start.y}`);
 
         const directions = [
-            {dx: 0, dy: -1}, // Up
-            {dx: 1, dy: 0},  // Right
-            {dx: 0, dy: 1},  // Down
-            {dx: -1, dy: 0}  // Left
+            { dx: 0, dy: -1 }, // Up
+            { dx: 1, dy: 0 }, // Right
+            { dx: 0, dy: 1 }, // Down
+            { dx: -1, dy: 0 }, // Left
         ];
 
         while (queue.length > 0) {
@@ -39,7 +43,7 @@ export class Pathfinder {
                     const cell = grid[ny][nx];
                     if (cell.type === 1) {
                         visited.add(key);
-                        queue.push({ pos: {x: nx, y: ny}, path: [...path, {x: nx, y: ny}] });
+                        queue.push({ pos: { x: nx, y: ny }, path: [...path, { x: nx, y: ny }] });
                     }
                 }
             }

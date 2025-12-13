@@ -1,6 +1,6 @@
 export enum CardType {
     TOWER = 'tower',
-    SPELL = 'spell'
+    SPELL = 'spell',
 }
 
 export interface ICardConfig {

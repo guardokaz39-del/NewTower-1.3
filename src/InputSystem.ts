@@ -1,5 +1,6 @@
 import { Game } from './Game';
 import { GameScene } from './scenes/GameScene';
+import { CONFIG } from './Config';
 
 export class InputSystem {
     private game: Game;
@@ -14,7 +15,7 @@ export class InputSystem {
     private holdTimer: number = 0;
     private holdStartCol: number = -1;
     private holdStartRow: number = -1;
-    private readonly HOLD_THRESHOLD: number = 12; 
+    private readonly HOLD_THRESHOLD: number = 12;
 
     constructor(game: Game) {
         this.game = game;
@@ -31,8 +32,8 @@ export class InputSystem {
             this.mouseX = (e.clientX - rect.left) * scaleX;
             this.mouseY = (e.clientY - rect.top) * scaleY;
 
-            this.hoverCol = Math.floor(this.mouseX / 64);
-            this.hoverRow = Math.floor(this.mouseY / 64);
+            this.hoverCol = Math.floor(this.mouseX / CONFIG.TILE_SIZE);
+            this.hoverRow = Math.floor(this.mouseY / CONFIG.TILE_SIZE);
 
             const scene = this.game.currentScene;
             if (scene instanceof GameScene) {
@@ -53,7 +54,7 @@ export class InputSystem {
 
         window.addEventListener('mouseup', (e) => {
             this.isMouseDown = false;
-            
+
             const scene = this.game.currentScene;
             if (scene instanceof GameScene) {
                 // Если тащили карту
@@ -61,10 +62,21 @@ export class InputSystem {
                     scene.cardSys.endDrag(e);
                     return;
                 }
-                
+
+                // CRITICAL FIX: Only process grid clicks if click was on the canvas
+                // Otherwise UI clicks (sell button, cards) will trigger grid click and deselect tower
+                const clickTarget = e.target as HTMLElement;
+                const clickedOnCanvas = clickTarget === this.canvas;
+
+                if (!clickedOnCanvas) {
+                    // Click was on a UI element, don't process as grid click
+                    this.holdTimer = 0;
+                    return;
+                }
+
                 // Если это был клик (не удержание)
                 if (this.holdTimer < this.HOLD_THRESHOLD) {
-                    // Вызов метода GameScene (убедитесь, что он есть в GameScene)
+                    // Вызов метода GameScene
                     scene.handleGridClick(this.hoverCol, this.hoverRow);
                 }
             }
@@ -75,10 +87,14 @@ export class InputSystem {
 
     public update() {
         const scene = this.game.currentScene;
-        
+
         if (this.isMouseDown && scene instanceof GameScene) {
             if (!scene.cardSys.dragCard) {
-                if (this.hoverCol === this.holdStartCol && this.hoverRow === this.holdStartRow && this.hoverCol !== -1) {
+                if (
+                    this.hoverCol === this.holdStartCol &&
+                    this.hoverRow === this.holdStartRow &&
+                    this.hoverCol !== -1
+                ) {
                     this.holdTimer++;
                     if (this.holdTimer >= this.HOLD_THRESHOLD) {
                         // Вызов строительства
