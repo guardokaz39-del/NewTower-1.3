@@ -5,9 +5,9 @@ export class BestiarySystem {
     private scene: GameScene;
     private unlockedEnemies: Set<string> = new Set();
 
-    private btn: HTMLElement;
-    private panel: HTMLElement;
-    private listContainer: HTMLElement;
+    private btn!: HTMLElement;
+    private panel!: HTMLElement;
+    private listContainer!: HTMLElement;
     private isVisible: boolean = false;
 
     constructor(scene: GameScene) {

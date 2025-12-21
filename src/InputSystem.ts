@@ -1,6 +1,7 @@
 import { Game } from './Game';
 import { GameScene } from './scenes/GameScene';
 import { CONFIG } from './Config';
+import { SoundManager } from './SoundManager';
 
 export class InputSystem {
     private game: Game;
@@ -24,7 +25,10 @@ export class InputSystem {
     }
 
     private initListeners() {
-        this.canvas.addEventListener('mousemove', (e) => {
+        // Prevent default touch actions (scrolling) on canvas
+        this.canvas.style.touchAction = 'none';
+
+        this.canvas.addEventListener('pointermove', (e) => {
             const rect = this.canvas.getBoundingClientRect();
             const scaleX = this.canvas.width / rect.width;
             const scaleY = this.canvas.height / rect.height;
@@ -43,17 +47,25 @@ export class InputSystem {
             }
         });
 
-        this.canvas.addEventListener('mousedown', (e) => {
-            if (e.button === 0) {
+        this.canvas.addEventListener('pointerdown', (e) => {
+            SoundManager.resume();
+            if (e.isPrimary && e.button === 0) {
                 this.isMouseDown = true;
                 this.holdStartCol = this.hoverCol;
                 this.holdStartRow = this.hoverRow;
                 this.holdTimer = 0;
+
+                // Allow dragging outside canvas to be tracked if needed, 
+                // but for now relying on window.pointerup is fine.
+                // this.canvas.setPointerCapture(e.pointerId);
             }
         });
 
-        window.addEventListener('mouseup', (e) => {
-            this.isMouseDown = false;
+        window.addEventListener('pointerup', (e) => {
+            if (this.isMouseDown) {
+                this.isMouseDown = false;
+                // this.canvas.releasePointerCapture(e.pointerId);
+            }
 
             const scene = this.game.currentScene;
             if (scene instanceof GameScene) {

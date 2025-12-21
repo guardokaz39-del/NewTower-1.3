@@ -35,7 +35,7 @@ export class CardSystem {
         this.addCard('SNIPER', 1);
     }
 
-    public startDrag(card: ICard, e: MouseEvent) {
+    public startDrag(card: ICard, e: PointerEvent) {
         if (this.isForging) return;
         this.dragCard = card;
         card.isDragging = true;
@@ -53,7 +53,7 @@ export class CardSystem {
         this.ghostEl.style.top = `${y}px`;
     }
 
-    public endDrag(e: MouseEvent) {
+    public endDrag(e: PointerEvent) {
         if (!this.dragCard) return;
 
         // FIX: Check forge slots FIRST before canvas
@@ -228,7 +228,7 @@ export class CardSystem {
         this.handContainer.innerHTML = '';
         this.hand.forEach((card) => {
             const el = this.createCardElement(card);
-            el.onmousedown = (e) => this.startDrag(card, e);
+            el.onpointerdown = (e) => this.startDrag(card, e);
             if (card.isDragging) el.classList.add('dragging-placeholder');
             this.handContainer.appendChild(el);
         });

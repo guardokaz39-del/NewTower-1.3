@@ -4,6 +4,7 @@ import { Projectile } from './Projectile';
 import { ObjectPool } from './Utils';
 import { CONFIG } from './Config';
 import { EffectSystem } from './EffectSystem';
+import { SoundManager, SoundPriority } from './SoundManager';
 
 export class WeaponSystem {
 
@@ -155,5 +156,12 @@ export class WeaponSystem {
             p.init(muzzleX, muzzleY, target, stats);
             projectiles.push(p);
         }
+
+        // Play Sound
+        const isSniper = stats.projectileType === 'sniper';
+        const soundKey = isSniper ? 'shoot_sniper' : 'shoot_basic';
+        const priority = isSniper ? SoundPriority.HIGH : SoundPriority.LOW;
+
+        SoundManager.play(soundKey, priority);
     }
 }

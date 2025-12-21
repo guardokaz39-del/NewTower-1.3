@@ -1,10 +1,12 @@
 
+import { ICardEffect } from './cards';
+import { Assets } from './Assets';
 
 export interface IProjectileStats {
     dmg: number;
     speed: number;
     color: string;
-    effects: any[];
+    effects: ICardEffect[];
     pierce: number;
     critChance?: number;           // Critical hit chance (0-1)
     isCrit?: boolean;               // Is this projectile a crit
@@ -25,7 +27,7 @@ export class Projectile {
     public damage: number = 0;
     public life: number = 0;
     public color: string = '#fff';
-    public effects: any[] = [];
+    public effects: ICardEffect[] = [];
     public pierce: number = 0;
     public hitList: string[] = [];
     public isCrit: boolean = false;           // Is this a critical hit
@@ -95,8 +97,7 @@ export class Projectile {
 
         // Enhanced visual for critical hits
         if (this.isCrit) {
-            // Bright yellow glow
-            // SUPER BRIGHT Critical Shot
+            // Enhanced visual for critical hits (kept dynamic for glow intensity)
             ctx.save();
             // Outer glow
             ctx.shadowBlur = 20;
@@ -121,39 +122,39 @@ export class Projectile {
             ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
             ctx.fill();
         } else {
-            // --- Custom Projectile Visuals ---
-            ctx.fillStyle = this.color;
-            ctx.beginPath();
+            // --- BAKED PROJECTILES ---
+            const type = this.projectileType || 'standard';
+            const img = Assets.get(`projectile_${type}`);
 
-            if (this.projectileType === 'ice') {
-                // Ice Spike
-                ctx.moveTo(this.x + this.vx * 2, this.y + this.vy * 2); // Tip forward
-                ctx.lineTo(this.x - this.vy, this.y + this.vx); // Side
-                ctx.lineTo(this.x - this.vx, this.y - this.vy); // Back
-                ctx.lineTo(this.x + this.vy, this.y - this.vx); // Side
-                ctx.fill();
-            } else if (this.projectileType === 'fire') {
-                // Fireball
-                ctx.arc(this.x, this.y, this.radius + 2, 0, Math.PI * 2);
-                ctx.fill();
-                // Trail hint
-                ctx.fillStyle = 'rgba(255, 87, 34, 0.5)';
-                ctx.beginPath();
-                ctx.arc(this.x - this.vx, this.y - this.vy, this.radius, 0, Math.PI * 2);
-                ctx.fill();
-            } else if (this.projectileType === 'sniper') {
-                // Sniper Bullet / Tracer
-                ctx.lineWidth = 2;
-                ctx.strokeStyle = this.color;
-                ctx.moveTo(this.x, this.y);
-                ctx.lineTo(this.x - this.vx * 3, this.y - this.vy * 3); // Loooong trail
-                ctx.stroke();
-            } else if (this.projectileType === 'split') {
-                // Small pellet
-                ctx.arc(this.x, this.y, 3, 0, Math.PI * 2);
-                ctx.fill();
+            if (img) {
+                const size = 16;
+                ctx.save();
+                ctx.translate(this.x, this.y);
+
+                // Rotate if needed
+                if (type === 'ice' || type === 'sniper') {
+                    const angle = Math.atan2(this.vy, this.vx);
+                    ctx.rotate(angle);
+                }
+
+                ctx.drawImage(img, -size / 2, -size / 2);
+
+                // Sniper Trail (still dynamic, cheap line)
+                if (type === 'sniper') {
+                    ctx.lineWidth = 2;
+                    ctx.strokeStyle = this.color;
+                    // Draw line relative to rotated context (backing up)
+                    ctx.beginPath();
+                    ctx.moveTo(0, 0);
+                    ctx.lineTo(-size * 1.5, 0);
+                    ctx.stroke();
+                }
+
+                ctx.restore();
             } else {
-                // Standard
+                // Fallback
+                ctx.fillStyle = this.color;
+                ctx.beginPath();
                 ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
                 ctx.fill();
             }

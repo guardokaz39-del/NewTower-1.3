@@ -4,11 +4,12 @@ import { DEMO_MAP, IMapData } from '../MapData';
 import { validateMap, getSavedMaps } from '../Utils';
 import { MapManager } from '../Map';
 import { CONFIG } from '../Config';
+import { UIUtils } from '../UIUtils';
 
 export class MenuScene extends BaseScene {
     private game: Game;
-    private container: HTMLElement;
-    private mapSelectionContainer: HTMLElement;
+    private container!: HTMLElement;
+    private mapSelectionContainer!: HTMLElement;
 
     constructor(game: Game) {
         super();
@@ -61,9 +62,7 @@ export class MenuScene extends BaseScene {
     }
 
     private createUI() {
-        this.container = document.createElement('div');
-        this.container.className = 'menu-container';
-        Object.assign(this.container.style, {
+        this.container = UIUtils.createContainer({
             position: 'absolute',
             top: '0',
             left: '0',
@@ -74,23 +73,22 @@ export class MenuScene extends BaseScene {
             alignItems: 'center',
             justifyContent: 'center',
             gap: '20px',
-            pointerEvents: 'none',
+            pointerEvents: 'none'
         });
 
-        this.createBtn(this.container, '▶ START GAME', () => {
+        UIUtils.createButton(this.container, '▶ START GAME', () => {
             this.showMapSelection();
-        });
+        }, { width: '300px', fontSize: '24px', padding: '15px 40px' });
 
-        this.createBtn(this.container, '🛠 EDITOR', () => {
+        UIUtils.createButton(this.container, '🛠 EDITOR', () => {
             this.game.toEditor();
-        });
+        }, { width: '300px', fontSize: '24px', padding: '15px 40px' });
 
         document.body.appendChild(this.container);
     }
 
     private createMapSelectionUI() {
-        this.mapSelectionContainer = document.createElement('div');
-        Object.assign(this.mapSelectionContainer.style, {
+        this.mapSelectionContainer = UIUtils.createContainer({
             position: 'absolute',
             top: '0',
             left: '0',
@@ -102,7 +100,7 @@ export class MenuScene extends BaseScene {
             justifyContent: 'center',
             background: 'rgba(0,0,0,0.9)',
             zIndex: '2000',
-            color: '#fff',
+            color: '#fff'
         });
 
         const title = document.createElement('h2');
@@ -137,23 +135,16 @@ export class MenuScene extends BaseScene {
             }
         };
 
-        const backBtn = document.createElement('button');
-        backBtn.innerText = 'BACK';
-        Object.assign(backBtn.style, {
-            marginTop: '20px',
-            padding: '10px 30px',
-            background: '#d32f2f',
-            color: '#fff',
-            border: 'none',
-            borderRadius: '4px',
-            cursor: 'pointer',
-            fontSize: '18px',
-        });
-        backBtn.onclick = () => {
+        UIUtils.createButton(this.mapSelectionContainer, 'BACK', () => {
             this.mapSelectionContainer.style.display = 'none';
             this.container.style.display = 'flex';
-        };
-        this.mapSelectionContainer.appendChild(backBtn);
+        }, {
+            background: '#d32f2f',
+            fontSize: '18px',
+            padding: '10px 30px',
+            border: 'none',
+            width: 'auto' // override default if needed
+        });
 
         document.body.appendChild(this.mapSelectionContainer);
     }
@@ -239,24 +230,5 @@ export class MenuScene extends BaseScene {
         }
     }
 
-    private createBtn(parent: HTMLElement, text: string, onClick: () => void) {
-        const btn = document.createElement('button');
-        btn.innerText = text;
-        Object.assign(btn.style, {
-            pointerEvents: 'auto',
-            padding: '15px 40px',
-            fontSize: '24px',
-            cursor: 'pointer',
-            background: '#333',
-            color: '#fff',
-            border: '2px solid #555',
-            borderRadius: '8px',
-            width: '300px',
-            fontFamily: 'Segoe UI',
-        });
-        btn.onclick = onClick;
-        btn.onmouseover = () => (btn.style.background = '#444');
-        btn.onmouseout = () => (btn.style.background = '#333');
-        parent.appendChild(btn);
-    }
+    // createBtn removed - replaced by UIUtils.createButton
 }

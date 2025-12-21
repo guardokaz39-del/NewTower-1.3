@@ -1,4 +1,5 @@
 import { CONFIG } from './Config';
+import { VISUALS } from './VisualConfig';
 
 export class Assets {
     // Хранилище изображений
@@ -26,19 +27,19 @@ export class Assets {
     private static generateAllTextures() {
         // Окружение
         this.generateTexture('grass', CONFIG.TILE_SIZE, (ctx, w, h) => {
-            ctx.fillStyle = '#4caf50';
+            ctx.fillStyle = VISUALS.ENVIRONMENT.GRASS.MAIN;
             ctx.fillRect(0, 0, w, h);
             for (let i = 0; i < 20; i++) {
-                ctx.fillStyle = Math.random() > 0.5 ? '#66bb6a' : '#388e3c';
+                ctx.fillStyle = Math.random() > 0.5 ? VISUALS.ENVIRONMENT.GRASS.VAR_1 : VISUALS.ENVIRONMENT.GRASS.VAR_2;
                 ctx.fillRect(Math.random() * w, Math.random() * h, 4, 4);
             }
         });
 
         this.generateTexture('path', CONFIG.TILE_SIZE, (ctx, w, h) => {
-            ctx.fillStyle = '#d7ccc8';
+            ctx.fillStyle = VISUALS.ENVIRONMENT.PATH.MAIN;
             ctx.fillRect(0, 0, w, h);
             for (let i = 0; i < 15; i++) {
-                ctx.fillStyle = '#a1887f';
+                ctx.fillStyle = VISUALS.ENVIRONMENT.PATH.DETAIL;
                 ctx.beginPath();
                 ctx.arc(Math.random() * w, Math.random() * h, 3, 0, Math.PI * 2);
                 ctx.fill();
@@ -46,22 +47,22 @@ export class Assets {
         });
 
         this.generateTexture('decor_tree', CONFIG.TILE_SIZE, (ctx, w, h) => {
-            ctx.fillStyle = '#4caf50';
+            ctx.fillStyle = VISUALS.ENVIRONMENT.DECOR.TREE.BASE;
             ctx.fillRect(0, 0, w, h); // Фон травы
-            ctx.fillStyle = '#2e7d32';
+            ctx.fillStyle = VISUALS.ENVIRONMENT.DECOR.TREE.FOLIAGE_LIGHT;
             ctx.beginPath();
             ctx.arc(w / 2, h / 2, 16, 0, Math.PI * 2);
             ctx.fill();
-            ctx.fillStyle = '#1b5e20';
+            ctx.fillStyle = VISUALS.ENVIRONMENT.DECOR.TREE.FOLIAGE_DARK;
             ctx.beginPath();
             ctx.arc(w / 2 - 5, h / 2 - 5, 8, 0, Math.PI * 2);
             ctx.fill();
         });
 
         this.generateTexture('decor_rock', CONFIG.TILE_SIZE, (ctx, w, h) => {
-            ctx.fillStyle = '#4caf50';
+            ctx.fillStyle = VISUALS.ENVIRONMENT.DECOR.ROCK.BASE;
             ctx.fillRect(0, 0, w, h);
-            ctx.fillStyle = '#78909c';
+            ctx.fillStyle = VISUALS.ENVIRONMENT.DECOR.ROCK.STONE;
             ctx.beginPath();
             ctx.moveTo(10, h - 10);
             ctx.lineTo(w / 2, 10);
@@ -72,11 +73,11 @@ export class Assets {
         // Башни
         this.generateTexture('tower_base', CONFIG.TILE_SIZE, (ctx, w, h) => {
             const center = w / 2;
-            ctx.fillStyle = '#9e9e9e';
+            ctx.fillStyle = VISUALS.TOWER.BASE.PLATFORM;
             ctx.beginPath();
             ctx.arc(center, center, w * 0.375, 0, Math.PI * 2); // 24/64 = 0.375
             ctx.fill();
-            ctx.strokeStyle = '#616161';
+            ctx.strokeStyle = VISUALS.TOWER.BASE.RIM;
             ctx.lineWidth = 4;
             ctx.stroke();
         });
@@ -87,7 +88,7 @@ export class Assets {
             const barrelLength = w * 0.53;  // 34/64 ~= 0.53
             const barrelStart = w * 0.31;   // 20/64 ~= 0.31
 
-            ctx.fillStyle = '#424242';
+            ctx.fillStyle = VISUALS.TOWER.BASE.RIVETS; // Using rivets color for gun? Original was #424242 which matches rivets
             // Draw barrel horizontally pointing RIGHT (East)
             ctx.fillRect(barrelStart, center - barrelWidth / 2, barrelLength, barrelWidth);
             ctx.beginPath();
@@ -110,6 +111,10 @@ export class Assets {
 
         // --- NEW MODULAR TOWER ASSETS ---
         this.generateTowerParts();
+
+        // --- PROJECTILES & EFFECTS ---
+        this.generateProjectiles();
+        this.generateMisc();
     }
 
     private static generateTexture(
@@ -163,7 +168,7 @@ export class Assets {
                 const SOUTH = (i & 8) !== 0;
 
                 // Base fog color (Dark)
-                ctx.fillStyle = '#263238'; // Dark Blue Grey
+                ctx.fillStyle = VISUALS.ENVIRONMENT.FOG.BASE; // Dark Blue Grey
 
                 // Draw main body based on connections
                 // We draw a center rect and extend to connected sides
@@ -191,7 +196,7 @@ export class Assets {
                 // '0' (connected to none, i.e., isolated fog) is a dark circle or blob.
 
                 ctx.clearRect(0, 0, w, h); // Start fresh
-                ctx.fillStyle = '#263238';
+                ctx.fillStyle = VISUALS.ENVIRONMENT.FOG.BASE;
 
                 // Dynamic dimensions based on tile size (25% margins, 50% center)
                 const cX = Math.floor(w / 4);      // Left margin
@@ -287,12 +292,12 @@ export class Assets {
             const cy = h / 2;
             ctx.translate(cx, cy);
             // Simple gun
-            ctx.fillStyle = '#616161';
+            ctx.fillStyle = VISUALS.TOWER.TURRET.STANDARD.BARREL;
             ctx.fillRect(0, -6, 20, 12); // Barrel
             ctx.beginPath();
             ctx.arc(0, 0, 12, 0, Math.PI * 2); // Body
             ctx.fill();
-            ctx.strokeStyle = '#212121';
+            ctx.strokeStyle = VISUALS.TOWER.TURRET.STANDARD.STROKE;
             ctx.lineWidth = 2;
             ctx.stroke();
         });
@@ -304,7 +309,7 @@ export class Assets {
             ctx.translate(cx, cy);
 
             // Barrel - Crystal spike
-            ctx.fillStyle = '#4dd0e1'; // Cyan 300
+            ctx.fillStyle = VISUALS.TOWER.TURRET.ICE.SPIKE; // Cyan 300
             ctx.beginPath();
             ctx.moveTo(0, -4);
             ctx.lineTo(24, 0);
@@ -312,7 +317,7 @@ export class Assets {
             ctx.fill();
 
             // Body - Hexagon
-            ctx.fillStyle = '#00acc1'; // Cyan 600
+            ctx.fillStyle = VISUALS.TOWER.TURRET.ICE.MAIN; // Cyan 600
             ctx.beginPath();
             for (let i = 0; i < 6; i++) {
                 const a = i * (Math.PI / 3);
@@ -321,7 +326,7 @@ export class Assets {
             }
             ctx.closePath();
             ctx.fill();
-            ctx.strokeStyle = '#e0f7fa';
+            ctx.strokeStyle = VISUALS.TOWER.TURRET.ICE.STROKE;
             ctx.lineWidth = 2;
             ctx.stroke();
         });
@@ -333,18 +338,18 @@ export class Assets {
             ctx.translate(cx, cy);
 
             // Barrel - Wide, short
-            ctx.fillStyle = '#ff7043'; // Deep Orange 400
+            ctx.fillStyle = VISUALS.TOWER.TURRET.FIRE.BARREL; // Deep Orange 400
             ctx.fillRect(0, -10, 18, 20);
             // Barrel Tip (charred)
-            ctx.fillStyle = '#bf360c';
+            ctx.fillStyle = VISUALS.TOWER.TURRET.FIRE.TIP;
             ctx.fillRect(14, -10, 4, 20);
 
             // Body - Round, massive
-            ctx.fillStyle = '#f4511e'; // Deep Orange 600
+            ctx.fillStyle = VISUALS.TOWER.TURRET.FIRE.MAIN; // Deep Orange 600
             ctx.beginPath();
             ctx.arc(0, 0, 15, 0, Math.PI * 2);
             ctx.fill();
-            ctx.strokeStyle = '#ffccbc';
+            ctx.strokeStyle = VISUALS.TOWER.TURRET.FIRE.STROKE;
             ctx.lineWidth = 2;
             ctx.stroke();
         });
@@ -356,14 +361,14 @@ export class Assets {
             ctx.translate(cx, cy);
 
             // Barrel - Long, thin
-            ctx.fillStyle = '#1b5e20'; // Green 900
+            ctx.fillStyle = VISUALS.TOWER.TURRET.SNIPER.BARREL; // Green 900
             ctx.fillRect(0, -3, 30, 6);
             // Muzzle brake
-            ctx.fillStyle = '#4caf50';
+            ctx.fillStyle = VISUALS.TOWER.TURRET.SNIPER.MUZZLE;
             ctx.fillRect(28, -5, 4, 10);
 
             // Body - Sleek, angular
-            ctx.fillStyle = '#2e7d32'; // Green 800
+            ctx.fillStyle = VISUALS.TOWER.TURRET.SNIPER.MAIN; // Green 800
             ctx.beginPath();
             ctx.moveTo(-10, -8);
             ctx.lineTo(10, -5);
@@ -380,7 +385,7 @@ export class Assets {
             ctx.translate(cx, cy);
 
             // Barrels - Three spread out
-            ctx.fillStyle = '#fbc02d'; // Yellow 700
+            ctx.fillStyle = VISUALS.TOWER.TURRET.SPLIT.BARREL; // Yellow 700
             const spread = 0.3;
             // 1
             ctx.save(); ctx.rotate(-spread); ctx.fillRect(0, -3, 20, 6); ctx.restore();
@@ -390,7 +395,7 @@ export class Assets {
             ctx.save(); ctx.rotate(spread); ctx.fillRect(0, -3, 20, 6); ctx.restore();
 
             // Body - Wide
-            ctx.fillStyle = '#f57f17'; // Yellow 900
+            ctx.fillStyle = VISUALS.TOWER.TURRET.SPLIT.MAIN; // Yellow 900
             ctx.beginPath();
             ctx.arc(0, 0, 14, 0, Math.PI * 2);
             ctx.fill();
@@ -402,33 +407,33 @@ export class Assets {
         // Mod Ice (Cooling tank - Blue canister)
         this.generateTexture('mod_ice', 24, (ctx, w, h) => {
             // Anchor point is roughly center relative to mounting point
-            ctx.fillStyle = '#0277bd'; // Light Blue 800
+            ctx.fillStyle = VISUALS.TOWER.MODULES.ICE.BODY; // Light Blue 800
             ctx.fillRect(4, 4, 16, 10);
-            ctx.fillStyle = '#4fc3f7'; // Light Blue 300 (liquid level)
+            ctx.fillStyle = VISUALS.TOWER.MODULES.ICE.LIQUID; // Light Blue 300 (liquid level)
             ctx.fillRect(6, 6, 12, 6);
             // Cap
-            ctx.fillStyle = '#eceff1';
+            ctx.fillStyle = VISUALS.TOWER.MODULES.ICE.CAP;
             ctx.fillRect(18, 6, 4, 6);
         });
 
         // Mod Fire (Fuel tank - Red canister)
         this.generateTexture('mod_fire', 24, (ctx, w, h) => {
-            ctx.fillStyle = '#c62828'; // Red 800
+            ctx.fillStyle = VISUALS.TOWER.MODULES.FIRE.BODY; // Red 800
             ctx.beginPath();
             ctx.rect(6, 4, 12, 16);
             ctx.fill();
             // Symbol
-            ctx.fillStyle = '#ffeb3b';
+            ctx.fillStyle = VISUALS.TOWER.MODULES.FIRE.SYMBOL;
             ctx.font = '10px Arial';
             ctx.fillText('⚡', 8, 16);
         });
 
         // Mod Sniper (Scope - Lens)
         this.generateTexture('mod_sniper', 24, (ctx, w, h) => {
-            ctx.fillStyle = '#212121'; // Black body
+            ctx.fillStyle = VISUALS.TOWER.MODULES.SNIPER.BODY; // Black body
             ctx.fillRect(2, 8, 20, 8);
             // Lens
-            ctx.fillStyle = '#00e5ff'; // Cyan accent
+            ctx.fillStyle = VISUALS.TOWER.MODULES.SNIPER.LENS; // Cyan accent
             ctx.beginPath();
             ctx.arc(22, 12, 3, 0, Math.PI * 2);
             ctx.fill();
@@ -436,10 +441,10 @@ export class Assets {
 
         // Mod Split (Ammo box / Extra barrel)
         this.generateTexture('mod_split', 24, (ctx, w, h) => {
-            ctx.fillStyle = '#ff6f00'; // Amber 900
+            ctx.fillStyle = VISUALS.TOWER.MODULES.SPLIT.BODY; // Amber 900
             ctx.fillRect(4, 4, 16, 16);
             // Bullets hint
-            ctx.fillStyle = '#ffd54f';
+            ctx.fillStyle = VISUALS.TOWER.MODULES.SPLIT.ACCENT;
             ctx.fillRect(6, 6, 4, 12);
             ctx.fillRect(14, 6, 4, 12);
         });
@@ -457,7 +462,7 @@ export class Assets {
             const cy = h / 2;
 
             // Bones (White/Grey)
-            ctx.fillStyle = '#e0e0e0';
+            ctx.fillStyle = VISUALS.ENEMY.SKELETON.BONE;
 
             // Skull
             ctx.beginPath();
@@ -474,7 +479,7 @@ export class Assets {
             ctx.fillRect(cx - 6, cy + 16, 12, 4);
 
             // Eyes (Hollow)
-            ctx.fillStyle = '#212121';
+            ctx.fillStyle = VISUALS.ENEMY.SKELETON.EYES;
             ctx.beginPath();
             ctx.arc(cx - 3, cy - 5, 2, 0, Math.PI * 2);
             ctx.arc(cx + 3, cy - 5, 2, 0, Math.PI * 2);
@@ -487,7 +492,7 @@ export class Assets {
             const cy = h / 2;
 
             // Body (Elongated) - Grey/Brown
-            ctx.fillStyle = '#5d4037'; // Brownish grey
+            ctx.fillStyle = VISUALS.ENEMY.WOLF.BODY; // Brownish grey
 
             ctx.beginPath();
             ctx.ellipse(cx, cy + 2, 8, 14, 0, 0, Math.PI * 2);
@@ -512,7 +517,7 @@ export class Assets {
             ctx.fill();
 
             // Tail
-            ctx.strokeStyle = '#5d4037';
+            ctx.strokeStyle = VISUALS.ENEMY.WOLF.BODY;
             ctx.lineWidth = 4;
             ctx.beginPath();
             ctx.moveTo(cx, cy + 14);
@@ -520,7 +525,7 @@ export class Assets {
             ctx.stroke();
 
             // Eyes (Red glow)
-            ctx.fillStyle = '#ff1744';
+            ctx.fillStyle = VISUALS.ENEMY.WOLF.EYES;
             ctx.beginPath();
             ctx.arc(cx - 3, cy - 10, 1.5, 0, Math.PI * 2);
             ctx.arc(cx + 3, cy - 10, 1.5, 0, Math.PI * 2);
@@ -533,7 +538,7 @@ export class Assets {
             const cy = h / 2;
 
             // Body (Massive) - Green skin
-            ctx.fillStyle = '#558b2f';
+            ctx.fillStyle = VISUALS.ENEMY.TROLL.SKIN;
 
             ctx.beginPath();
             ctx.arc(cx, cy, 18, 0, Math.PI * 2);
@@ -551,7 +556,7 @@ export class Assets {
             ctx.fill();
 
             // Angry brow
-            ctx.fillStyle = '#33691e';
+            ctx.fillStyle = VISUALS.ENEMY.TROLL.FEATURE;
             ctx.beginPath();
             ctx.arc(cx, cy - 12, 10, 0.2, Math.PI - 0.2, true);
             ctx.fill();
@@ -563,19 +568,19 @@ export class Assets {
             const cy = h / 2;
 
             // Abdomen (Large rear) - Black/Dark Purple
-            ctx.fillStyle = '#311b92';
+            ctx.fillStyle = VISUALS.ENEMY.SPIDER.BODY;
             ctx.beginPath();
             ctx.ellipse(cx, cy + 8, 12, 16, 0, 0, Math.PI * 2);
             ctx.fill();
 
             // Cephalothorax (Head/Chest)
-            ctx.fillStyle = '#4527a0';
+            ctx.fillStyle = VISUALS.ENEMY.SPIDER.HEAD;
             ctx.beginPath();
             ctx.arc(cx, cy - 8, 10, 0, Math.PI * 2);
             ctx.fill();
 
             // Legs
-            ctx.strokeStyle = '#311b92';
+            ctx.strokeStyle = VISUALS.ENEMY.SPIDER.BODY;
             ctx.lineWidth = 2;
             for (let i = 0; i < 4; i++) {
                 // Right legs
@@ -592,7 +597,7 @@ export class Assets {
             }
 
             // Many eyes
-            ctx.fillStyle = '#d50000';
+            ctx.fillStyle = VISUALS.ENEMY.SPIDER.EYES;
             ctx.beginPath();
             ctx.arc(cx - 3, cy - 10, 1.5, 0, Math.PI * 2);
             ctx.arc(cx + 3, cy - 10, 1.5, 0, Math.PI * 2);
@@ -610,16 +615,16 @@ export class Assets {
             const cy = h / 2;
 
             // Wood texture
-            ctx.fillStyle = '#8d6e63';
+            ctx.fillStyle = VISUALS.ENEMY.PROPS.SHIELD.WOOD;
             ctx.beginPath();
             ctx.arc(cx, cy, 12, 0, Math.PI * 2);
             ctx.fill();
             // Metal rim
-            ctx.strokeStyle = '#bdbdbd';
+            ctx.strokeStyle = VISUALS.ENEMY.PROPS.SHIELD.METAL;
             ctx.lineWidth = 3;
             ctx.stroke();
             // Center boss
-            ctx.fillStyle = '#bdbdbd';
+            ctx.fillStyle = VISUALS.ENEMY.PROPS.SHIELD.METAL;
             ctx.beginPath();
             ctx.arc(cx, cy, 4, 0, Math.PI * 2);
             ctx.fill();
@@ -631,7 +636,7 @@ export class Assets {
             const cy = h / 2;
 
             // Gold
-            ctx.fillStyle = '#ffd700';
+            ctx.fillStyle = VISUALS.ENEMY.PROPS.HELMET.GOLD;
             ctx.beginPath();
             ctx.moveTo(cx - 10, cy + 5);
             ctx.lineTo(cx + 10, cy + 5);
@@ -642,7 +647,7 @@ export class Assets {
             ctx.fill();
 
             // Horns
-            ctx.strokeStyle = '#e0e0e0';
+            ctx.strokeStyle = VISUALS.ENEMY.PROPS.HELMET.HORN;
             ctx.lineWidth = 2;
             ctx.beginPath();
             ctx.moveTo(cx - 10, cy - 2);
@@ -660,13 +665,13 @@ export class Assets {
             const cy = h / 2;
 
             // Semi-transparent sphere
-            ctx.fillStyle = 'rgba(100, 255, 218, 0.4)';
+            ctx.fillStyle = VISUALS.ENEMY.PROPS.BARRIER.FILL;
             ctx.beginPath();
             ctx.arc(cx, cy, 14, 0, Math.PI * 2);
             ctx.fill();
 
             // Runes
-            ctx.strokeStyle = 'rgba(255, 255, 255, 0.8)';
+            ctx.strokeStyle = VISUALS.ENEMY.PROPS.BARRIER.STROKE;
             ctx.lineWidth = 1;
             ctx.beginPath();
             ctx.arc(cx, cy, 12, 0, Math.PI * 2);
@@ -682,21 +687,99 @@ export class Assets {
             ctx.rotate(Math.PI / 4); // Diagonal
 
             // Handle
-            ctx.fillStyle = '#5d4037';
+            ctx.fillStyle = VISUALS.ENEMY.PROPS.WEAPON.HANDLE;
             ctx.fillRect(-2, 4, 4, 10);
 
             // Guard
-            ctx.fillStyle = '#ffd700';
+            ctx.fillStyle = VISUALS.ENEMY.PROPS.WEAPON.GUARD;
             ctx.fillRect(-6, 2, 12, 2);
 
             // Blade
-            ctx.fillStyle = '#cfd8dc';
+            ctx.fillStyle = VISUALS.ENEMY.PROPS.WEAPON.BLADE;
             ctx.fillRect(-3, -14, 6, 16);
             // Tip
             ctx.beginPath();
             ctx.moveTo(-3, -14);
             ctx.lineTo(3, -14);
             ctx.lineTo(0, -18);
+            ctx.fill();
+        });
+    }
+    private static generateProjectiles() {
+        const size = 16;
+        const cx = size / 2;
+        const cy = size / 2;
+
+        // 1. Standard (White Ball)
+        this.generateTexture('projectile_standard', size, (ctx, w, h) => {
+            ctx.fillStyle = '#fff';
+            ctx.beginPath();
+            ctx.arc(cx, cy, 4, 0, Math.PI * 2);
+            ctx.fill();
+        });
+
+        // 2. Ice (Spike)
+        this.generateTexture('projectile_ice', size, (ctx, w, h) => {
+            ctx.fillStyle = VISUALS.TOWER.TURRET.ICE.SPIKE;
+            ctx.beginPath();
+            ctx.moveTo(cx + 6, cy);
+            ctx.lineTo(cx - 2, cy + 4);
+            ctx.lineTo(cx - 4, cy);
+            ctx.lineTo(cx - 2, cy - 4);
+            ctx.fill();
+        });
+
+        // 3. Fire (Fireball)
+        this.generateTexture('projectile_fire', size, (ctx, w, h) => {
+            // Core
+            ctx.fillStyle = VISUALS.TOWER.TURRET.FIRE.MAIN;
+            ctx.beginPath();
+            ctx.arc(cx, cy, 5, 0, Math.PI * 2);
+            ctx.fill();
+            // Outer glow (simulated)
+            ctx.fillStyle = 'rgba(255, 87, 34, 0.5)';
+            ctx.beginPath();
+            ctx.arc(cx, cy, 7, 0, Math.PI * 2);
+            ctx.fill();
+        });
+
+        // 4. Sniper (Bullet Head) - Trail is drawn dynamically
+        this.generateTexture('projectile_sniper', size, (ctx, w, h) => {
+            ctx.fillStyle = VISUALS.TOWER.TURRET.SNIPER.BARREL;
+            ctx.fillRect(cx - 4, cy - 1.5, 8, 3);
+        });
+
+        // 5. Split (Small Pellet)
+        this.generateTexture('projectile_split', size, (ctx, w, h) => {
+            ctx.fillStyle = VISUALS.TOWER.TURRET.SPLIT.BARREL;
+            ctx.beginPath();
+            ctx.arc(cx, cy, 3, 0, Math.PI * 2);
+            ctx.fill();
+        });
+    }
+
+    private static generateMisc() {
+        // Shadow (Generic)
+        this.generateTexture('shadow_small', 32, (ctx, w, h) => {
+            const cx = w / 2;
+            const cy = h / 2;
+            ctx.fillStyle = 'rgba(0,0,0,0.3)';
+            ctx.beginPath();
+            ctx.ellipse(cx, cy, 12, 6, 0, 0, Math.PI * 2);
+            ctx.fill();
+        });
+
+        // Muzzle Flash
+        this.generateTexture('effect_muzzle_flash', 32, (ctx, w, h) => {
+            const cx = w / 2;
+            const cy = h / 2;
+            const gradient = ctx.createRadialGradient(cx, cy, 0, cx, cy, 12);
+            gradient.addColorStop(0, 'rgba(255, 255, 200, 0.9)');
+            gradient.addColorStop(0.5, 'rgba(255, 200, 100, 0.5)');
+            gradient.addColorStop(1, 'rgba(255, 100, 0, 0)');
+            ctx.fillStyle = gradient;
+            ctx.beginPath();
+            ctx.arc(cx, cy, 12, 0, Math.PI * 2);
             ctx.fill();
         });
     }

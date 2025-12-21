@@ -1,5 +1,6 @@
 import { CONFIG, getEnemyType } from './Config';
 import { Assets } from './Assets';
+import { Projectile } from './Projectile';
 
 export interface IEnemyConfig {
     id: string;
@@ -36,10 +37,16 @@ export class Enemy {
 
     public statuses: IStatus[] = [];
     public damageModifier: number = 1.0;     // Damage multiplier (e.g., 1.2 = +20% damage)
-    public killedByProjectile: any = null;   // Track what projectile killed this enemy
+    public killedByProjectile: Projectile | null = null;   // Track what projectile killed this enemy
     public hitFlashTimer: number = 0;        // Timer for white flash on hit
 
-    constructor(config: IEnemyConfig) {
+    constructor(config?: IEnemyConfig) {
+        if (config) {
+            this.init(config);
+        }
+    }
+
+    public init(config: IEnemyConfig) {
         this.id = config.id;
         this.maxHealth = config.health;
         this.currentHealth = config.health;
@@ -49,13 +56,29 @@ export class Enemy {
         this.x = config.x || 0;
         this.y = config.y || 0;
         this.path = config.path;
+        this.pathIndex = 0;
+        this.finished = false;
+
+        this.damageModifier = 1.0;
+        this.killedByProjectile = null;
+    }
+
+    public reset() {
+        this.statuses = [];
+        this.hitFlashTimer = 0;
+        this.pathIndex = 0;
+        this.finished = false;
+        this.damageModifier = 1.0;
+        this.killedByProjectile = null;
+        this.x = -1000; // Move offscreen
+        this.y = -1000;
     }
 
     public setType(id: string) {
         this.typeId = id;
     }
 
-    public takeDamage(amount: number, projectile?: any): void {
+    public takeDamage(amount: number, projectile?: Projectile): void {
         // Apply damage modifier (from slow effects, etc.)
         const modifiedAmount = amount * this.damageModifier;
         const actualDamage = Math.max(1, modifiedAmount - this.armor);
@@ -159,12 +182,20 @@ export class Enemy {
         // -- VISUAL STACK --
 
         // 1. Shadow Layer
-        ctx.fillStyle = 'rgba(0,0,0,0.3)';
-        ctx.beginPath();
-        const shadowW = 16 * scale;
-        const shadowH = 8 * scale;
-        ctx.ellipse(0, 10 * scale, shadowW, shadowH, 0, 0, Math.PI * 2);
-        ctx.fill();
+        const shadowImg = Assets.get('shadow_small');
+        if (shadowImg) {
+            const shadowW = 32 * scale; // Native size 32x16
+            const shadowH = 16 * scale;
+            ctx.drawImage(shadowImg, -shadowW / 2, -shadowH / 2 + 10 * scale, shadowW, shadowH);
+        } else {
+            // Fallback
+            ctx.fillStyle = 'rgba(0,0,0,0.3)';
+            ctx.beginPath();
+            const shadowW = 16 * scale;
+            const shadowH = 8 * scale;
+            ctx.ellipse(0, 10 * scale, shadowW, shadowH, 0, 0, Math.PI * 2);
+            ctx.fill();
+        }
 
         // 2. Body Layer
         const bodyImgName = `enemy_${archetype.toLowerCase()}`;

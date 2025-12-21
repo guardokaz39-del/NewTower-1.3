@@ -1,10 +1,17 @@
 import { WaveManager } from '../src/WaveManager';
 import { GameScene } from '../src/scenes/GameScene';
+import { Enemy } from '../src/Enemy';
 
-// Mock GameScene
-const mockScene = {
-    wave: 0,
+// Mock GameScene with new refactored structure
+const mockGameState: { enemies: Enemy[]; wave: number } = {
     enemies: [],
+    wave: 0
+};
+
+const mockScene = {
+    get wave() { return mockGameState.wave; },
+    set wave(value: number) { mockGameState.wave = value; },
+    get enemies() { return mockGameState.enemies; },
     money: 100,
     game: { canvas: { width: 800, height: 600 } },
     ui: { update: jest.fn() },
@@ -19,8 +26,8 @@ describe('WaveManager', () => {
 
     beforeEach(() => {
         waveManager = new WaveManager(mockScene);
-        mockScene.wave = 0;
-        mockScene.enemies = [];
+        mockGameState.wave = 0;
+        mockGameState.enemies = [];
         // Reset mocks
         (mockScene.ui.update as jest.Mock).mockClear();
         (mockScene.showFloatingText as jest.Mock).mockClear();

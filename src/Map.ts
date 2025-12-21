@@ -1,17 +1,11 @@
 import { CONFIG } from './Config';
-import { IMapData } from './MapData';
+import { IMapData, Cell } from './MapData';
 import { Assets } from './Assets';
-
-export interface Cell {
-    type: number; // 0=Grass, 1=Path, 2=Decor
-    x: number;
-    y: number;
-    decor?: string | null;
-}
+import { Pathfinder } from './Pathfinder';
 
 export class MapManager {
-    public cols: number;
-    public rows: number;
+    public cols!: number;
+    public rows!: number;
 
     public grid: Cell[][] = [];
 
@@ -44,7 +38,6 @@ export class MapManager {
 
         // If waypoints only contain start and end, expand to full path
         if (this.waypoints.length === 2) {
-            const { Pathfinder } = require('./Pathfinder');
             const fullPath = Pathfinder.findPath(this.grid, this.waypoints[0], this.waypoints[1]);
             if (fullPath.length > 0) {
                 this.waypoints = fullPath;

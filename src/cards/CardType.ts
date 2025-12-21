@@ -31,6 +31,11 @@ export interface ICardEffect {
 
     // Chain slow properties
     chainRadius?: number;
+
+    // Legacy/Generic properties (fixing TS errors)
+    radius?: number;
+    dur?: number;
+    power?: number;
 }
 
 export interface IUpgradeCard {

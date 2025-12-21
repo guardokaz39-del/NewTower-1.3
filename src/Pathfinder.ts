@@ -1,4 +1,4 @@
-import { Cell } from './Map';
+import { Cell } from './MapData';
 
 export class Pathfinder {
     // Находит путь от start до end, используя только тайлы типа 1 (Path)

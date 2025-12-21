@@ -5,8 +5,9 @@
   "main": "index.js",
   "scripts": {
     "test": "jest",
-    "build": "webpack",
-    "watch": "webpack --watch",
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview",
     "lint": "eslint src/**/*.ts",
     "format": "prettier --write src/**/*.ts"
   },
@@ -30,14 +31,12 @@
     "eslint": "^9.39.1",
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-prettier": "^5.5.4",
-    "html-webpack-plugin": "^5.6.5",
     "jest": "^30.2.0",
     "prettier": "^3.7.4",
     "ts-jest": "^29.4.5",
-    "ts-loader": "^9.5.4",
     "ts-node": "^10.9.2",
     "typescript": "^5.9.3",
-    "webpack": "^5.103.0",
-    "webpack-cli": "^6.0.1"
+    "vite": "^7.3.0",
+    "vite-plugin-checker": "^0.12.0"
   }
 }

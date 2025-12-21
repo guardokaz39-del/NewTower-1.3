@@ -1,6 +1,8 @@
 import { IGameScene } from './scenes/IGameScene';
 import { CONFIG } from './Config';
 import { IWaveConfig } from './MapData';
+import { SoundManager, SoundPriority } from './SoundManager';
+import { EventBus, Events } from './EventBus';
 
 /**
  * Manages wave logic, spawning enemies, and tracking wave progress.
@@ -23,13 +25,14 @@ export class WaveManager {
         // If wave is active, we just increment and add more enemies to the queue
 
         this.scene.wave++;
+        EventBus.getInstance().emit(Events.WAVE_STARTED, this.scene.wave);
 
         // If not active, activate. If active, we just continue.
         if (!this.isWaveActive) {
             this.isWaveActive = true;
         } else {
             // Early wave bonus!
-            this.scene.money += CONFIG.ECONOMY.EARLY_WAVE_BONUS;
+            this.scene.addMoney(CONFIG.ECONOMY.EARLY_WAVE_BONUS);
             this.scene.metrics.trackMoneyEarned(CONFIG.ECONOMY.EARLY_WAVE_BONUS);
             this.scene.showFloatingText('EARLY START!', this.scene.game.canvas.width / 2, 300, 'gold');
         }
@@ -54,7 +57,7 @@ export class WaveManager {
             '#fff',
         );
 
-        this.scene.ui.update();
+        // this.scene.ui.update(); // EventBus handles UI
     }
 
     public update() {
@@ -67,6 +70,12 @@ export class WaveManager {
             if (this.spawnTimer >= 40) {
                 const type = this.enemiesToSpawn.shift()!;
                 this.scene.spawnEnemy(type);
+
+                // Sound: Boss Spawn
+                if (type.toUpperCase() === 'SPIDER' || type.toUpperCase() === 'TANK') {
+                    SoundManager.play('boss_spawn', SoundPriority.HIGH);
+                }
+
                 this.spawnTimer = 0;
             }
         } else {
@@ -79,17 +88,19 @@ export class WaveManager {
 
     private endWave() {
         this.isWaveActive = false;
+        EventBus.getInstance().emit(Events.WAVE_COMPLETED, this.scene.wave);
         this.scene.showFloatingText('WAVE CLEARED!', this.scene.game.canvas.width / 2, 200, 'gold');
 
         // Награда
-        this.scene.money += CONFIG.ECONOMY.WAVE_CLEAR_REWARD * 10 + CONFIG.ECONOMY.EARLY_WAVE_BONUS;
+        const reward = CONFIG.ECONOMY.WAVE_CLEAR_REWARD * 10 + CONFIG.ECONOMY.EARLY_WAVE_BONUS;
+        this.scene.addMoney(reward);
 
         // Даем карту (с шансом или гарантированно каждые X волн)
         if (this.scene.wave % 2 === 0) {
             this.scene.giveRandomCard();
         }
 
-        this.scene.ui.update();
+        // this.scene.ui.update(); // EventBus handles UI
     }
 
     private generateWave(waveNum: number) {

@@ -11,6 +11,13 @@ export interface IMapObject {
     properties?: Record<string, any>;
 }
 
+export interface Cell {
+    type: number; // 0=Grass, 1=Path, 2=Decor
+    x: number;
+    y: number;
+    decor?: string | null;
+}
+
 // Полная структура файла сохранения
 export interface IMapData {
     width: number;
@@ -25,6 +32,13 @@ export interface IMapData {
     startingLives?: number;
     manualPath?: boolean; // true if waypoints were manually placed
     fogData?: number[]; // ARRAY: 0=Visible, 1=Fog (Stores logical state, not bitmask index)
+}
+
+export interface Cell {
+    type: number; // 0=Grass, 1=Path, 2=Decor
+    x: number;
+    y: number;
+    decor?: string | null;
 }
 
 // Заглушка (чтобы старый код не ломался, если где-то используется)

@@ -1,3 +1,5 @@
+import { Assets } from './Assets';
+
 export interface IEffect {
     type: 'explosion' | 'text' | 'particle' | 'scan' | 'debris' | 'screen_flash' | 'muzzle_flash';
     x: number;
@@ -91,15 +93,21 @@ export class EffectSystem {
                 const s = e.size || 4;
                 this.ctx.fillRect(-s / 2, -s / 2, s, s);
             } else if (e.type === 'muzzle_flash') {
-                // Вспышка на дуле башни
-                const gradient = this.ctx.createRadialGradient(e.x, e.y, 0, e.x, e.y, e.radius || 12);
-                gradient.addColorStop(0, 'rgba(255, 255, 200, 0.9)');
-                gradient.addColorStop(0.5, 'rgba(255, 200, 100, 0.5)');
-                gradient.addColorStop(1, 'rgba(255, 100, 0, 0)');
-                this.ctx.fillStyle = gradient;
-                this.ctx.beginPath();
-                this.ctx.arc(e.x, e.y, e.radius || 12, 0, Math.PI * 2);
-                this.ctx.fill();
+                // Вспышка на дуле башни - BAKED
+                const img = Assets.get('effect_muzzle_flash');
+                if (img) {
+                    const r = e.radius || 12;
+                    this.ctx.drawImage(img, e.x - r, e.y - r, r * 2, r * 2);
+                } else {
+                    const gradient = this.ctx.createRadialGradient(e.x, e.y, 0, e.x, e.y, e.radius || 12);
+                    gradient.addColorStop(0, 'rgba(255, 255, 200, 0.9)');
+                    gradient.addColorStop(0.5, 'rgba(255, 200, 100, 0.5)');
+                    gradient.addColorStop(1, 'rgba(255, 100, 0, 0)');
+                    this.ctx.fillStyle = gradient;
+                    this.ctx.beginPath();
+                    this.ctx.arc(e.x, e.y, e.radius || 12, 0, Math.PI * 2);
+                    this.ctx.fill();
+                }
             } else if (e.type === 'screen_flash') {
                 // Flash по краям экрана
                 const flashAlpha = progress * 0.4;

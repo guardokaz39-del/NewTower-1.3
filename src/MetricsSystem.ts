@@ -1,3 +1,5 @@
+import { SaveManager } from './SaveManager';
+
 /**
  * Metrics Collection System
  * Collects gameplay statistics for balancing
@@ -119,6 +121,14 @@ export class MetricsSystem {
 
         // Save to localStorage
         this.save();
+
+        // Update Campaign Persistence
+        SaveManager.updateProgress({
+            money: this.currentGameMetrics.moneyEarned,
+            kills: this.currentGameMetrics.enemiesKilled,
+            waves: this.currentGameMetrics.waveReached,
+            maxWave: this.currentGameMetrics.waveReached
+        });
 
         // Log to console for debugging
         console.log('=== GAME METRICS ===');

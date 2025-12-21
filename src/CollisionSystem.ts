@@ -2,6 +2,7 @@ import { Enemy } from './Enemy';
 import { Projectile } from './Projectile';
 import { EffectSystem } from './EffectSystem';
 import { DebugSystem } from './DebugSystem';
+import { SoundManager, SoundPriority } from './SoundManager';
 
 export class CollisionSystem {
     private effects: EffectSystem;
@@ -46,7 +47,11 @@ export class CollisionSystem {
     private handleHit(p: Projectile, target: Enemy, allEnemies: Enemy[]) {
         // Apply damage with projectile reference (for tracking kills)
         const wasSlowed = target.statuses.some(s => s.type === 'slow');
+
         target.takeDamage(p.damage, p);
+
+        // Sound Hit
+        SoundManager.play('hit', SoundPriority.LOW);
 
         // --- ВИЗУАЛ: Искры при попадании (critical hit = more particles) ---
         const particleCount = p.isCrit ? 10 : 5;
@@ -139,6 +144,10 @@ export class CollisionSystem {
     private handleEnemyDeath(enemy: Enemy, killingProjectile: Projectile, allEnemies: Enemy[], wasSlowed: boolean) {
         const deathX = enemy.x;
         const deathY = enemy.y;
+
+        // Sound Death
+        // Boss death sound? (Checking enemy type or size)
+        SoundManager.play('death', SoundPriority.LOW);
 
         // Fire Level 3: Explosion on death
         if (killingProjectile.explodeOnDeath) {

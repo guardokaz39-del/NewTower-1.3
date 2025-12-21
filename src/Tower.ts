@@ -5,6 +5,7 @@ import { Projectile, IProjectileStats } from './Projectile';
 import { ObjectPool } from './Utils';
 import { EffectSystem } from './EffectSystem';
 import { Assets } from './Assets';
+import { VISUALS } from './VisualConfig';
 import { getCardUpgrade, mergeModifiers, mergeEffects, getMultishotConfig, ICardEffect } from './cards';
 
 export class Tower {
@@ -44,7 +45,7 @@ export class Tower {
         let damage = CONFIG.TOWER.BASE_DMG;
         let attackSpeed = CONFIG.TOWER.BASE_CD;
         let speed = 8;
-        let color = '#ffd700';
+        let color = VISUALS.PROJECTILES.STANDARD;
         let critChance = 0;
         let pierce = 0;
         let projectileType = 'standard';
@@ -87,19 +88,19 @@ export class Tower {
         if (mainCard) {
             if (mainCard.type.id === 'ice') {
                 projectileType = 'ice';
-                color = '#00bcd4';
+                color = VISUALS.PROJECTILES.ICE;
                 speed = 10;
             } else if (mainCard.type.id === 'fire') {
                 projectileType = 'fire';
-                color = '#f44336';
+                color = VISUALS.PROJECTILES.FIRE;
                 speed = 6;
             } else if (mainCard.type.id === 'sniper') {
                 projectileType = 'sniper';
-                color = '#4caf50';
+                color = VISUALS.PROJECTILES.SNIPER;
                 speed = 15;
             } else if (mainCard.type.id === 'multi') {
                 projectileType = 'split'; // If split is first
-                color = '#ff9800';
+                color = VISUALS.PROJECTILES.SPLIT;
             }
         }
 
@@ -159,7 +160,7 @@ export class Tower {
             this.buildProgress++;
             if (this.buildProgress >= this.maxBuildProgress) {
                 this.isBuilding = false;
-                effects.add({ type: 'explosion', x: this.x, y: this.y, radius: 30, life: 20, color: '#ffffff' });
+                effects.add({ type: 'explosion', x: this.x, y: this.y, radius: 30, life: 20, color: VISUALS.PROJECTILES.STANDARD });
             }
         }
     }
@@ -171,13 +172,14 @@ export class Tower {
 
         if (this.isBuilding) {
             // Стройка (фундамент)
-            ctx.fillStyle = 'rgba(158, 158, 158, 0.5)';
+
+            ctx.fillStyle = VISUALS.TOWER.BUILDING.BASE;
             ctx.fillRect(drawX + 5, drawY + 5, size - 10, size - 10);
             const barWidth = size - 10;
             const pct = this.buildProgress / this.maxBuildProgress;
-            ctx.fillStyle = '#333';
+            ctx.fillStyle = VISUALS.TOWER.BUILDING.BAR_BG;
             ctx.fillRect(drawX + 5, drawY + size - 15, barWidth, 8);
-            ctx.fillStyle = 'gold';
+            ctx.fillStyle = VISUALS.TOWER.BUILDING.BAR_FILL;
             ctx.fillRect(drawX + 5, drawY + size - 15, barWidth * pct, 8);
         } else {
             // --- MODULAR RENDER SYSTEM ---
@@ -276,7 +278,7 @@ export class Tower {
                     // Draw faint red line
                     const stats = this.getStats();
                     ctx.globalCompositeOperation = 'screen';
-                    ctx.strokeStyle = 'rgba(255, 0, 0, 0.3)';
+                    ctx.strokeStyle = VISUALS.TOWER.LASER;
                     ctx.lineWidth = 1;
                     ctx.beginPath();
                     ctx.moveTo(10, 0); // Start from end of barrel approx

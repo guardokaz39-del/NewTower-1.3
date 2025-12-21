@@ -1,7 +1,9 @@
 import { Assets } from './Assets';
+import { IMapData } from './MapData';
 import { Scene } from './Scene';
 import { MenuScene } from './scenes/MenuScene';
 import { InputSystem } from './InputSystem';
+import { SoundManager } from './SoundManager';
 
 export class Game {
     public canvas: HTMLCanvasElement;
@@ -27,6 +29,15 @@ export class Game {
         this.drawLoadingScreen();
 
         try {
+            await SoundManager.init();
+
+            // Global Audio Resume logic (Deduplicated from UIManager)
+            const resumeAudio = () => {
+                SoundManager.resume();
+            };
+            window.addEventListener('click', resumeAudio, { once: true });
+            window.addEventListener('keydown', resumeAudio, { once: true });
+
             await Assets.loadAll();
             console.log('Game started!');
             this.toMenu();
@@ -60,7 +71,7 @@ export class Game {
         this.changeScene(new MenuScene(this));
     }
 
-    public toGame(mapData?: any) {
+    public toGame(mapData?: IMapData) {
         import('./scenes/GameScene')
             .then(({ GameScene }) => {
                 this.changeScene(new GameScene(this, mapData));

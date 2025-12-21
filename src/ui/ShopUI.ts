@@ -1,7 +1,8 @@
-import { IGameScene } from './scenes/IGameScene';
-import { CONFIG } from './Config';
+import { IGameScene } from '../scenes/IGameScene';
+import { CONFIG } from '../Config';
+import { EventBus, Events } from '../EventBus';
 
-export class ShopSystem {
+export class ShopUI {
     private scene: IGameScene;
 
     private elShopBtn: HTMLButtonElement;
@@ -23,6 +24,10 @@ export class ShopSystem {
 
     private initListeners() {
         this.elShopBtn.addEventListener('click', () => this.buySelectedCard());
+
+        EventBus.getInstance().on(Events.MONEY_CHANGED, () => {
+            this.update();
+        });
     }
 
     public rerollShop() {
@@ -48,7 +53,7 @@ export class ShopSystem {
             this.selectedSlot = index;
         }
         this.render();
-        this.scene.ui.update();
+        this.update();
     }
 
     public buySelectedCard() {
@@ -64,7 +69,10 @@ export class ShopSystem {
             return;
         }
 
-        this.scene.money -= this.cost;
+        if (!this.scene.spendMoney(this.cost)) {
+            this.scene.showFloatingText('Error: Transaction Failed', 800, 800, 'red');
+            return;
+        }
         this.scene.metrics.trackMoneySpent(this.cost);
 
         const cardKey = this.shopCards[this.selectedSlot];
@@ -84,7 +92,7 @@ export class ShopSystem {
         this.selectedSlot = -1;
 
         this.render();
-        this.scene.ui.update();
+        this.update();
     }
 
     public update() {

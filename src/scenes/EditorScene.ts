@@ -3,7 +3,8 @@ import { Game } from '../Game';
 import { MapManager } from '../Map';
 import { CONFIG } from '../Config';
 import { IMapData } from '../MapData';
-import { serializeMap, saveMapToStorage } from '../Utils';
+import { serializeMap, saveMapToStorage, getSavedMaps, deleteMapFromStorage } from '../Utils';
+import { UIUtils } from '../UIUtils';
 import { Pathfinder } from '../Pathfinder';
 import { WaveEditor } from '../WaveEditor';
 import { FogSystem } from '../FogSystem';
@@ -12,7 +13,7 @@ export class EditorScene extends BaseScene {
     private game: Game;
     private map: MapManager;
     private fog: FogSystem;
-    private container: HTMLElement;
+    private container!: HTMLElement;
 
     private mode: 'paint_road' | 'paint_grass' | 'set_start' | 'set_end' | 'place_waypoint' | 'eraser' | 'paint_fog' = 'paint_road';
 
@@ -21,7 +22,7 @@ export class EditorScene extends BaseScene {
     private manualWaypoints: { x: number; y: number }[] = []; // FEATURE: Manual waypoints
 
     // FEATURE: Saved maps panel
-    private mapsPanel: HTMLElement;
+    private mapsPanel!: HTMLElement;
     private mapsPanelExpanded: boolean = false;
 
     constructor(game: Game) {
@@ -239,8 +240,7 @@ export class EditorScene extends BaseScene {
     }
 
     private createUI() {
-        this.container = document.createElement('div');
-        Object.assign(this.container.style, {
+        this.container = UIUtils.createContainer({
             position: 'absolute',
             bottom: '20px',
             left: '50%',
@@ -250,24 +250,18 @@ export class EditorScene extends BaseScene {
             padding: '10px',
             background: 'rgba(0,0,0,0.8)',
             borderRadius: '8px',
-            zIndex: '1000',
+            zIndex: '1000'
         });
 
         const addBtn = (text: string, onClick: () => void, color: string = '#444') => {
-            const btn = document.createElement('button');
-            btn.innerHTML = text;
-            Object.assign(btn.style, {
+            UIUtils.createButton(this.container, text, onClick, {
                 background: color,
-                color: '#fff',
                 border: '1px solid #666',
                 padding: '8px 15px',
-                cursor: 'pointer',
                 borderRadius: '4px',
                 fontSize: '16px',
-                fontWeight: 'bold',
+                fontWeight: 'bold'
             });
-            btn.onclick = onClick;
-            this.container.appendChild(btn);
         };
 
         addBtn(
@@ -351,8 +345,7 @@ export class EditorScene extends BaseScene {
 
     // FEATURE: Create saved maps panel
     private createMapsPanel() {
-        this.mapsPanel = document.createElement('div');
-        Object.assign(this.mapsPanel.style, {
+        this.mapsPanel = UIUtils.createContainer({
             position: 'absolute',
             top: '20px',
             left: '20px',
@@ -363,7 +356,7 @@ export class EditorScene extends BaseScene {
             maxHeight: '80vh',
             overflowY: 'auto',
             display: 'none',
-            zIndex: '2000',
+            zIndex: '2000'
         });
 
         const header = document.createElement('div');
@@ -393,6 +386,9 @@ export class EditorScene extends BaseScene {
     }
 
     private refreshMapsPanel() {
+        console.log('Refreshing Maps Panel. Raw Storage:', localStorage.getItem('NEWTOWER_MAPS'));
+        const maps = getSavedMaps();
+        console.log('Parsed Maps:', maps);
         // Clear current content except header
         while (this.mapsPanel.children.length > 1) {
             this.mapsPanel.removeChild(this.mapsPanel.lastChild!);
@@ -407,7 +403,7 @@ export class EditorScene extends BaseScene {
 
         if (!this.mapsPanelExpanded) return;
 
-        const maps = (window as any).getSavedMaps ? (window as any).getSavedMaps() : {};
+
         const mapNames = Object.keys(maps);
 
         if (mapNames.length === 0) {
@@ -503,10 +499,8 @@ export class EditorScene extends BaseScene {
     private deleteMap(name: string) {
         if (!confirm(`Delete map "${name}"? This cannot be undone.`)) return;
 
-        if ((window as any).deleteMapFromStorage) {
-            (window as any).deleteMapFromStorage(name);
-            this.refreshMapsPanel();
-            alert(`Map "${name}" deleted.`);
-        }
+        deleteMapFromStorage(name);
+        this.refreshMapsPanel();
+        alert(`Map "${name}" deleted.`);
     }
 }

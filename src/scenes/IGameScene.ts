@@ -42,6 +42,12 @@ export interface IGameScene {
     sellTower(tower: Tower): void;
     sellCardFromTower(tower: Tower, cardIndex: number): void;
     restart(): void;
+    togglePause(): void;
+
+    // Helper Methods
+    addMoney(amount: number): void;
+    spendMoney(amount: number): boolean;
+    loseLife(amount?: number): void;
 
     // Need these for some systems (e.g. UIManager accessing shop)
     // shop is in UIManager, but UIManager might access scene's other props

@@ -1,8 +1,9 @@
 import { IWaveConfig } from './MapData';
 import { CONFIG } from './Config';
+import { UIUtils } from './UIUtils';
 
 export class WaveEditor {
-    private container: HTMLElement;
+    private container!: HTMLElement;
     private waves: IWaveConfig[] = [];
     private onSave: (waves: IWaveConfig[]) => void;
     private onClose: () => void;
@@ -16,8 +17,7 @@ export class WaveEditor {
     }
 
     private createUI() {
-        this.container = document.createElement('div');
-        Object.assign(this.container.style, {
+        this.container = UIUtils.createContainer({
             position: 'absolute',
             top: '50%',
             left: '50%',
@@ -34,8 +34,10 @@ export class WaveEditor {
             flexDirection: 'column',
             gap: '10px',
             zIndex: '2000',
-            boxShadow: '0 0 20px rgba(0,0,0,0.5)',
+            // boxShadow not in IContainerOptions but let's assume it's fine or add it if strictly typed (it's not there, so I'll leave it or basic styling is enough)
         });
+        // Manual override for shadow as it wasn't in my interface
+        this.container.style.boxShadow = '0 0 20px rgba(0,0,0,0.5)';
 
         const title = document.createElement('h2');
         title.innerText = 'Wave Configuration';
@@ -52,40 +54,34 @@ export class WaveEditor {
 
         this.renderWaves(wavesList);
 
-        const addWaveBtn = document.createElement('button');
-        addWaveBtn.innerText = '+ Add Wave';
-        this.styleBtn(addWaveBtn, '#1976d2');
-        addWaveBtn.onclick = () => {
+
+
+        UIUtils.createButton(this.container, '+ Add Wave', () => {
             this.waves.push({ enemies: [] });
             this.renderWaves(wavesList);
-        };
-        this.container.appendChild(addWaveBtn);
+        }, { background: '#1976d2', border: 'none', padding: '5px 10px', borderRadius: '4px' });
 
         const buttons = document.createElement('div');
         buttons.style.display = 'flex';
         buttons.style.gap = '10px';
         buttons.style.marginTop = '20px';
 
-        const saveBtn = document.createElement('button');
-        saveBtn.innerText = 'Save & Close';
-        this.styleBtn(saveBtn, '#4caf50');
-        saveBtn.style.flex = '1';
-        saveBtn.onclick = () => {
+
+        // IButtonOptions doesn't have flex. style copying in UIUtils is manual. 
+        // I created UIUtils.createButton to return the button, so I can apply extra styles.
+        // Let's rewrite it slightly.
+        const btnSave = UIUtils.createButton(buttons, 'Save & Close', () => {
             this.onSave(this.waves);
             this.destroy();
-        };
+        }, { background: '#4caf50', border: 'none', padding: '5px 10px', borderRadius: '4px' });
+        btnSave.style.flex = '1';
 
-        const cancelBtn = document.createElement('button');
-        cancelBtn.innerText = 'Cancel';
-        this.styleBtn(cancelBtn, '#f44336');
-        cancelBtn.style.flex = '1';
-        cancelBtn.onclick = () => {
+        const btnCancel = UIUtils.createButton(buttons, 'Cancel', () => {
             this.onClose();
             this.destroy();
-        };
+        }, { background: '#f44336', border: 'none', padding: '5px 10px', borderRadius: '4px' });
+        btnCancel.style.flex = '1';
 
-        buttons.appendChild(saveBtn);
-        buttons.appendChild(cancelBtn);
         this.container.appendChild(buttons);
 
         document.body.appendChild(this.container);
@@ -108,16 +104,16 @@ export class WaveEditor {
             header.style.marginBottom = '5px';
             header.innerHTML = `<strong>Wave ${index + 1}</strong>`;
 
-            const delWaveBtn = document.createElement('button');
-            delWaveBtn.innerText = 'X';
-            this.styleBtn(delWaveBtn, '#d32f2f');
-            delWaveBtn.style.padding = '2px 6px';
-            delWaveBtn.style.fontSize = '12px';
-            delWaveBtn.onclick = () => {
+            UIUtils.createButton(header, 'X', () => {
                 this.waves.splice(index, 1);
                 this.renderWaves(parent);
-            };
-            header.appendChild(delWaveBtn);
+            }, {
+                background: '#d32f2f',
+                padding: '2px 6px',
+                fontSize: '12px',
+                border: 'none',
+                borderRadius: '4px'
+            });
             waveDiv.appendChild(header);
 
             // Enemy groups
@@ -153,48 +149,30 @@ export class WaveEditor {
                     group.count = parseInt((e.target as HTMLInputElement).value) || 1;
                 };
 
-                const delGroupBtn = document.createElement('button');
-                delGroupBtn.innerText = '-';
-                this.styleBtn(delGroupBtn, '#555');
-                delGroupBtn.style.padding = '2px 6px';
-                delGroupBtn.onclick = () => {
+                UIUtils.createButton(groupRow, '-', () => {
                     wave.enemies.splice(gIndex, 1);
                     this.renderWaves(parent);
-                };
+                }, { background: '#555', padding: '2px 6px', border: 'none', borderRadius: '4px' });
 
                 groupRow.appendChild(typeSelect);
                 groupRow.appendChild(document.createTextNode('x'));
                 groupRow.appendChild(countInput);
-                groupRow.appendChild(delGroupBtn);
+
                 groupsDiv.appendChild(groupRow);
             });
 
-            const addGroupBtn = document.createElement('button');
-            addGroupBtn.innerText = '+ Add Enemy';
-            this.styleBtn(addGroupBtn, '#444');
-            addGroupBtn.style.fontSize = '12px';
-            addGroupBtn.style.width = '100%';
-            addGroupBtn.onclick = () => {
+            UIUtils.createButton(waveDiv, '+ Add Enemy', () => {
                 wave.enemies.push({ type: 'GRUNT', count: 1 });
                 this.renderWaves(parent);
-            };
+            }, { background: '#444', fontSize: '12px', width: '100%', border: 'none', borderRadius: '4px', padding: '5px 10px' });
 
             waveDiv.appendChild(groupsDiv);
-            waveDiv.appendChild(addGroupBtn);
+
             parent.appendChild(waveDiv);
         });
     }
 
-    private styleBtn(btn: HTMLElement, color: string) {
-        Object.assign(btn.style, {
-            background: color,
-            color: '#fff',
-            border: 'none',
-            padding: '5px 10px',
-            cursor: 'pointer',
-            borderRadius: '4px',
-        });
-    }
+    // styleBtn removed
 
     public destroy() {
         if (this.container && this.container.parentNode) {
