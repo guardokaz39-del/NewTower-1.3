@@ -4,6 +4,7 @@ import { Scene } from './Scene';
 import { MenuScene } from './scenes/MenuScene';
 import { InputSystem } from './InputSystem';
 import { SoundManager } from './SoundManager';
+import { CardSelectionUI } from './CardSelectionUI';
 
 export class Game {
     public canvas: HTMLCanvasElement;
@@ -12,6 +13,7 @@ export class Game {
     public input: InputSystem;
     public currentScene: Scene | null = null;
     private lastTime: number = 0;
+    private cardSelection: CardSelectionUI;
 
     constructor(canvasId: string) {
         const canvas = document.getElementById(canvasId) as HTMLCanvasElement;
@@ -39,6 +41,13 @@ export class Game {
             window.addEventListener('keydown', resumeAudio, { once: true });
 
             await Assets.loadAll();
+
+            // FIXED: Initialize card selection UI AFTER Assets loaded (DOM is ready)
+            this.cardSelection = new CardSelectionUI((selectedCards) => {
+                // Callback: when selection is complete, load the game with selected cards
+                this.startGameWithCards(selectedCards);
+            });
+
             console.log('Game started!');
             this.toMenu();
             this.loop(0);
@@ -71,10 +80,20 @@ export class Game {
         this.changeScene(new MenuScene(this));
     }
 
+    private pendingMapData?: IMapData;
+
     public toGame(mapData?: IMapData) {
+        // Store map data and show card selection
+        this.pendingMapData = mapData;
+        this.cardSelection.show();
+    }
+
+    private startGameWithCards(selectedCards: string[]) {
         import('./scenes/GameScene')
             .then(({ GameScene }) => {
-                this.changeScene(new GameScene(this, mapData));
+                // Pass selected cards to GameScene via global or constructor
+                (window as any)._STARTING_CARDS = selectedCards;
+                this.changeScene(new GameScene(this, this.pendingMapData));
             })
             .catch((err) => {
                 console.error('Failed to load GameScene:', err);

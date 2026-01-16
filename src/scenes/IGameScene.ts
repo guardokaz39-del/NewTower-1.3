@@ -28,8 +28,8 @@ export interface IGameScene {
 
     // State
     wave: number;
-    money: number;
-    lives: number;
+    readonly money: number;
+    readonly lives: number;
     enemies: Enemy[];
     towers: Tower[];
     projectiles: Projectile[];

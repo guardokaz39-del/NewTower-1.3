@@ -29,6 +29,8 @@ export class GameController {
         private cardSys: any, // CardSystem reference
     ) { }
 
+    private lastErrorTime: number = 0;
+
     // === Tower Building ===
 
     public startBuildingTower(col: number, row: number): void {
@@ -38,7 +40,12 @@ export class GameController {
         const validation = this.entityManager.canBuildTower(col, row, this.mapData, this.isBuildable);
 
         if (!validation.valid) {
-            this.showFloatingText(validation.reason!, screenX, screenY, 'red');
+            // Debounce error text to prevent infinite spam
+            const now = Date.now();
+            if (now - this.lastErrorTime > 500) {
+                this.showFloatingText(validation.reason!, screenX, screenY, 'red');
+                this.lastErrorTime = now;
+            }
             return;
         }
 
@@ -70,7 +77,8 @@ export class GameController {
             card.type.id === 'fire' ||
             card.type.id === 'ice' ||
             card.type.id === 'sniper' ||
-            card.type.id === 'multi'
+            card.type.id === 'multi' ||
+            card.type.id === 'minigun'  // FIXED: Added minigun support
         ) {
             const success = this.entityManager.addCardToTower(card, col, row, this.isBuildable);
 
@@ -138,10 +146,15 @@ export class GameController {
             case 'Space':
                 this.handleSpaceKey();
                 break;
-            case 'KeyS':
                 if (this.state.selectedTower) {
                     this.sellTower(this.state.selectedTower);
                 }
+                break;
+            case 'KeyM':
+                console.log('CHEAT: Give Minigun');
+                this.cardSys.addCard('MINIGUN', 1);
+                this.ui.update();
+                this.showFloatingText('+ MINIGUN', window.innerWidth / 2, window.innerHeight / 2, '#d0f');
                 break;
             case 'Digit1':
             case 'Digit2':

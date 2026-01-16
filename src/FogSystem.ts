@@ -7,9 +7,7 @@ export class FogSystem {
     private ctx: CanvasRenderingContext2D;
     private dirty: boolean = true;
     private mapData: IMapData;
-
-    // For optimization, we can track partial updates, but currently we redraw whole cache if dirty
-    // which is fine for editor usage or infrequent runtime updates.
+    private time: number = 0;
 
     constructor(mapData: IMapData) {
         this.mapData = mapData;
@@ -25,51 +23,65 @@ export class FogSystem {
         if (!this.mapData.fogData) {
             this.mapData.fogData = Array(mapData.width * mapData.height).fill(0);
         } else if (this.mapData.fogData.length !== mapData.width * mapData.height) {
-            // Resize protection (simplistic)
             const newData = Array(mapData.width * mapData.height).fill(0);
-            // Copy old data? Not worrying about complex resize now.
             this.mapData.fogData = newData;
         }
 
         this.dirty = true;
     }
 
-    public update() {
-        if (!this.dirty) return;
+    public update(dt: number = 0) {
+        this.time += dt;
+        // Always redraw for animation
+        this.renderProceduralFog();
+    }
 
+    private renderProceduralFog() {
         this.ctx.clearRect(0, 0, this.cacheCanvas.width, this.cacheCanvas.height);
 
         const width = this.mapData.width;
         const height = this.mapData.height;
         const fog = this.mapData.fogData!;
+        const TS = CONFIG.TILE_SIZE;
+
+        const time = this.time;
 
         for (let y = 0; y < height; y++) {
             for (let x = 0; x < width; x++) {
                 const index = y * width + x;
 
-                // If this tile is not fog, skip drawing (it's transparent/visible)
-                // UNLESS we want "FOG OF WAR" where default is fog.
-                // Plan says: 1 = Fog (Hidden), 0 = Visible.
+                // 1 = Fog (Hidden), 0 = Visible.
                 if (fog[index] === 0) continue;
 
-                // It is fog. Calculate bitmask.
-                const mask = this.calculateBitmask(x, y);
-                const tile = Assets.get(`fog_${mask}`);
+                // Drift / Wobble
+                // Slow random movement: Sine waves based on position + time
+                const driftX = Math.sin(time * 0.3 + y * 0.5) * (TS * 0.15);
+                const driftY = Math.cos(time * 0.2 + x * 0.4) * (TS * 0.15);
 
-                if (tile) {
-                    this.ctx.drawImage(tile, x * CONFIG.TILE_SIZE, y * CONFIG.TILE_SIZE);
-                }
+                const cx = x * TS + TS / 2 + driftX;
+                const cy = y * TS + TS / 2 + driftY;
+
+                // Draw Fog Cloud as Soft Circle
+                // Radius > 0.5 TS to ensure overlap
+                const radius = TS * 0.85;
+
+                const gradient = this.ctx.createRadialGradient(cx, cy, radius * 0.4, cx, cy, radius);
+                gradient.addColorStop(0, 'rgba(200, 215, 230, 0.9)');
+                gradient.addColorStop(1, 'rgba(200, 215, 230, 0)');
+
+                this.ctx.fillStyle = gradient;
+                this.ctx.beginPath();
+                this.ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+                this.ctx.fill();
             }
         }
-
-        this.dirty = false;
     }
 
     public draw(ctx: CanvasRenderingContext2D) {
         // Draw the cached fog layer over the game
-        // We might want to use some transparency if it's "Semi-transparent editor mode"
-        // but for now draw as is.
+        ctx.save();
         ctx.drawImage(this.cacheCanvas, 0, 0);
+        ctx.restore();
     }
 
     public setFog(x: number, y: number, value: number) {
@@ -82,34 +94,15 @@ export class FogSystem {
         }
     }
 
+    public getFogData(): number[] {
+        return this.mapData.fogData || [];
+    }
+
     public toggleFog(col: number, row: number) {
         if (col < 0 || col >= this.mapData.width || row < 0 || row >= this.mapData.height) return;
 
         const index = row * this.mapData.width + col;
         const newVal = this.mapData.fogData![index] === 1 ? 0 : 1;
         this.setFog(col, row, newVal);
-    }
-
-    private calculateBitmask(x: number, y: number): number {
-        const w = this.mapData.width;
-        const h = this.mapData.height;
-        const fog = this.mapData.fogData!;
-
-        // 1 = Fog, 0 = Empty
-        const check = (cx: number, cy: number): number => {
-            if (cx < 0 || cx >= w || cy < 0 || cy >= h) return 1; // Edge of map counts as fog? Or empty?
-            // Usually edge of map acts as connected for aesthetics (so fog continues offscreen)
-            // Let's assume edge is fog (1)
-            const idx = cy * w + cx;
-            return fog[idx] === 1 ? 1 : 0;
-        };
-
-        let mask = 0;
-        if (check(x, y - 1)) mask |= 1; // North
-        if (check(x - 1, y)) mask |= 2; // West
-        if (check(x + 1, y)) mask |= 4; // East
-        if (check(x, y + 1)) mask |= 8; // South
-
-        return mask;
     }
 }

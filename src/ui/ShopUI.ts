@@ -6,16 +6,19 @@ export class ShopUI {
     private scene: IGameScene;
 
     private elShopBtn: HTMLButtonElement;
+    private elRefreshBtn: HTMLButtonElement; // [NEW]
     private elSlotsContainer: HTMLElement;
 
     private shopCards: string[] = [];
     private selectedSlot: number = -1;
 
     public readonly cost: number = 100;
+    public readonly refreshCost: number = 15; // [NEW]
 
     constructor(scene: IGameScene) {
         this.scene = scene;
         this.elShopBtn = document.getElementById('shop-btn') as HTMLButtonElement;
+        this.elRefreshBtn = document.getElementById('shop-refresh-btn') as HTMLButtonElement; // [NEW]
         this.elSlotsContainer = document.getElementById('shop-slots')!;
 
         this.initListeners();
@@ -24,17 +27,40 @@ export class ShopUI {
 
     private initListeners() {
         this.elShopBtn.addEventListener('click', () => this.buySelectedCard());
+        this.elRefreshBtn.addEventListener('click', () => this.rerollWithCost()); // [NEW]
 
         EventBus.getInstance().on(Events.MONEY_CHANGED, () => {
             this.update();
         });
     }
 
+    public rerollWithCost() {
+        if (this.scene.money < this.refreshCost) {
+            this.scene.showFloatingText('Not enough gold!', 800, 800, 'red');
+            return;
+        }
+
+        if (this.scene.spendMoney(this.refreshCost)) {
+            this.scene.metrics.trackMoneySpent(this.refreshCost);
+            this.scene.showFloatingText(`- ${this.refreshCost}💰`, 800, 800, 'gold');
+            this.rerollShop();
+
+            // Anim refresh
+            this.elRefreshBtn.classList.add('shaking');
+            setTimeout(() => this.elRefreshBtn.classList.remove('shaking'), 500);
+        }
+    }
+
     public rerollShop() {
         this.shopCards = [];
+        const allKeys = Object.keys(CONFIG.CARD_TYPES);
+
+        // IMPROVED: Ensure diversity - no duplicates if possible
+        const shuffled = [...allKeys].sort(() => Math.random() - 0.5);
         for (let i = 0; i < 3; i++) {
-            this.shopCards.push(this.getRandomCardKey());
+            this.shopCards.push(shuffled[i % shuffled.length]);
         }
+
         this.selectedSlot = -1;
         this.render();
     }
@@ -109,6 +135,17 @@ export class ShopUI {
             this.elShopBtn.disabled = true;
             this.elShopBtn.style.opacity = '0.5';
             this.elShopBtn.style.cursor = 'not-allowed';
+        }
+
+        // Refresh Btn State
+        if (this.scene.money >= this.refreshCost) {
+            this.elRefreshBtn.disabled = false;
+            this.elRefreshBtn.style.opacity = '1';
+            this.elRefreshBtn.style.cursor = 'pointer';
+        } else {
+            this.elRefreshBtn.disabled = true;
+            this.elRefreshBtn.style.opacity = '0.5';
+            this.elRefreshBtn.style.cursor = 'not-allowed';
         }
     }
 

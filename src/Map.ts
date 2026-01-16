@@ -2,6 +2,7 @@ import { CONFIG } from './Config';
 import { IMapData, Cell } from './MapData';
 import { Assets } from './Assets';
 import { Pathfinder } from './Pathfinder';
+import { LightingSystem } from './systems/LightingSystem';
 
 export class MapManager {
     public cols!: number;
@@ -11,6 +12,8 @@ export class MapManager {
 
     public tiles: number[][] = [];
     public waypoints: { x: number; y: number }[] = [];
+    public waves: any[] = []; // [NEW] Store waves
+    public lighting?: LightingSystem; // [NEW] Link to lighting
 
     constructor(data: IMapData) {
         this.loadMap(data);
@@ -21,6 +24,7 @@ export class MapManager {
         this.rows = data.height;
         this.tiles = data.tiles;
         this.waypoints = data.waypoints;
+        this.waves = data.waves || []; // [NEW] Load waves
 
         // Генерация объекта grid для совместимости с редактором
         this.grid = [];
@@ -87,6 +91,98 @@ export class MapManager {
             const end = this.waypoints[this.waypoints.length - 1];
             this.drawIcon(ctx, '☠️', start.x, start.y);
             this.drawIcon(ctx, '🏰', end.x, end.y);
+        }
+    }
+
+    // [NEW] Draw Torches overlay (called from GameScene after main draw)
+    public drawTorches(ctx: CanvasRenderingContext2D, time: number = 0) {
+        if (!this.lighting) return;
+
+        // Always active, but intensity might vary if we want them to look "on" all the time
+        // User requested: "flame on torches disappeared... fix it"
+        // We removed the ambientLight check so they are always drawn.
+
+        const TS = CONFIG.TILE_SIZE;
+        // Intensity: Always full flame visibility
+        const intensity = 1.0;
+
+        // Light radius: 1.5 tiles
+        const radiusVal = TS * 1.5;
+
+        const checkGrass = (cx: number, cy: number) => {
+            if (cx < 0 || cx >= this.cols || cy < 0 || cy >= this.rows) return true; // Edge is grass-like
+            return this.tiles[cy][cx] !== 1; // 1 is path
+        };
+
+        for (let y = 0; y < this.rows; y++) {
+            for (let x = 0; x < this.cols; x++) {
+                if (this.tiles[y][x] === 1) { // Path
+
+                    // Identify borders with grass
+                    const top = checkGrass(x, y - 1);
+                    const bottom = checkGrass(x, y + 1);
+                    const left = checkGrass(x - 1, y);
+                    const right = checkGrass(x + 1, y);
+
+                    // Place torch if border exists
+                    // Throttle placement (one torch per N valid spots)
+                    // We use distinct hashes for different sides so they don't sync up perfectly
+
+                    const drawTorchAt = (tx: number, ty: number, colorHash: number) => {
+                        // Smooth flicker using Sine waves
+                        // Combine 2 sines for non-repeating feel
+                        const flickerBase = Math.sin(time * 0.1 + colorHash) * 0.05 + Math.sin(time * 0.03 + colorHash * 2) * 0.05;
+                        // Occasional "pop"
+                        const pop = (Math.random() > 0.98) ? (Math.random() * 0.1) : 0;
+
+                        const flickerLocal = 1.0 + flickerBase + pop;
+
+                        // Torch Stick
+                        ctx.fillStyle = '#5d4037';
+                        ctx.fillRect(tx - 2, ty, 4, 6);
+
+                        // Flame
+                        // Always visible now
+                        const size = (8 + flickerBase * 4);
+                        ctx.fillStyle = `rgba(255, 87, 34, ${0.8 + flickerBase})`;
+                        ctx.beginPath();
+                        ctx.arc(tx, ty + 2, size / 2, 0, Math.PI * 2);
+                        ctx.fill();
+
+                        // Inner Flame
+                        ctx.fillStyle = `rgba(255, 235, 59, ${0.8 + flickerBase})`;
+                        ctx.beginPath();
+                        ctx.arc(tx, ty + 2, size / 4, 0, Math.PI * 2);
+                        ctx.fill();
+
+                        // Light
+                        // User: "torch gives a circle of light... bright near torch and fades to edge... radius 1.5 tiles"
+                        // We use the LightingSystem to add the light.
+                        // LightingSystem uses additive blending or 'destination-out' depending on logic.
+                        // Assuming LightingSystem adds light to the dark overlay.
+
+                        const lightRadius = radiusVal + flickerBase * 5;
+
+                        // We want the light to be noticeable. 
+                        this.lighting!.addLight(tx, ty, lightRadius, '#ff9100', 0.8 * flickerLocal);
+                    };
+
+                    const spacing = 4; // Every 4th valid spot roughly
+
+                    if (top && (x + y * 7) % spacing === 0) {
+                        drawTorchAt(x * TS + TS / 2, y * TS + 4, 0);
+                    }
+                    if (bottom && (x + y * 13) % spacing === 0) {
+                        drawTorchAt(x * TS + TS / 2, y * TS + TS - 4, 1);
+                    }
+                    if (left && (y + x * 11) % spacing === 0) {
+                        drawTorchAt(x * TS + 4, y * TS + TS / 2, 2);
+                    }
+                    if (right && (y + x * 17) % spacing === 0) {
+                        drawTorchAt(x * TS + TS - 4, y * TS + TS / 2, 3);
+                    }
+                }
+            }
         }
     }
 

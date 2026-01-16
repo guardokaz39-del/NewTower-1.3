@@ -401,6 +401,38 @@ export class Assets {
             ctx.fill();
         });
 
+        // Minigun Turret (Gatling gun, Purple/Electric)
+        this.generateTexture('turret_minigun', size, (ctx, w, h) => {
+            const cx = w / 2;
+            const cy = h / 2;
+            ctx.translate(cx, cy);
+
+            // Rotating barrel assembly - Multiple thin barrels
+            ctx.fillStyle = '#7b1fa2'; // Purple 700
+            const barrelCount = 6;
+            for (let i = 0; i < barrelCount; i++) {
+                const angle = (i / barrelCount) * Math.PI * 2;
+                const r = 6; // Radius of barrel circle
+                ctx.save();
+                ctx.translate(Math.cos(angle) * r, Math.sin(angle) * r);
+                ctx.fillRect(0, -1.5, 18, 3); // Thin barrel
+                ctx.restore();
+            }
+
+            // Central motor housing
+            ctx.fillStyle = '#9c27b0'; // Purple 500
+            ctx.beginPath();
+            ctx.arc(0, 0, 10, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Electric coil detail
+            ctx.strokeStyle = '#e1bee7'; // Purple 100  (light accent)
+            ctx.lineWidth = 1.5;
+            ctx.beginPath();
+            ctx.arc(0, 0, 6, 0, Math.PI * 2);
+            ctx.stroke();
+        });
+
 
         // -- 3. Modules (Overlay attachments) --
 
@@ -447,6 +479,25 @@ export class Assets {
             ctx.fillStyle = VISUALS.TOWER.MODULES.SPLIT.ACCENT;
             ctx.fillRect(6, 6, 4, 12);
             ctx.fillRect(14, 6, 4, 12);
+        });
+
+        // Mod Minigun (Ammo belt / Power cell)
+        this.generateTexture('mod_minigun', 24, (ctx, w, h) => {
+            // Purple ammunition belt with electric coils
+            ctx.fillStyle = '#6a1b9a'; // Purple 800
+            ctx.fillRect(4, 6, 16, 12);
+
+            // Belt links
+            ctx.fillStyle = '#ce93d8'; // Purple 200 (light)
+            for (let i = 0; i < 4; i++) {
+                ctx.fillRect(6 + i * 4, 8, 2, 8);
+            }
+
+            // Energy cell accent
+            ctx.fillStyle = '#ba68c8'; // Purple 300
+            ctx.beginPath();
+            ctx.arc(12, 12, 3, 0, Math.PI * 2);
+            ctx.fill();
         });
 
         this.generateEnemyArchetypes();
@@ -755,6 +806,17 @@ export class Assets {
             ctx.beginPath();
             ctx.arc(cx, cy, 3, 0, Math.PI * 2);
             ctx.fill();
+        });
+
+        // 6. Minigun (Tracer round)
+        this.generateTexture('projectile_minigun', size, (ctx, w, h) => {
+            // Small fast tracer with purple/electric glow
+            ctx.fillStyle = '#ba68c8'; // Purple 300
+            ctx.fillRect(cx - 2, cy - 1, 5, 2);
+
+            // Core
+            ctx.fillStyle = '#e1bee7'; // Purple 100 (bright center)
+            ctx.fillRect(cx, cy - 0.5, 3, 1);
         });
     }
 

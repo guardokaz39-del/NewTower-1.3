@@ -95,16 +95,10 @@ export class EntityManager {
     public addCardToTower(card: ICard, col: number, row: number, isBuildable: (c: number, r: number) => boolean): boolean {
         let tower = this.state.towers.find((t) => t.col === col && t.row === row);
 
-        // If no tower exists, try to build one
+        // If no tower exists, we do NOT build one automatically on drop
+        // User requested: "if card is carried not to tower base but to empty cell... it should return to hand"
         if (!tower) {
-            if (!isBuildable(col, row)) {
-                return false;
-            }
-            if (this.state.money < CONFIG.ECONOMY.TOWER_COST) {
-                return false;
-            }
-
-            tower = this.buildTower(col, row);
+            return false;
         }
 
         // Add card to tower

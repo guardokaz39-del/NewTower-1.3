@@ -104,6 +104,27 @@
             transform: scale(0.95);
         }
 
+        #pause-btn {
+            background: rgba(255, 255, 255, 0.1);
+            border: 2px solid rgba(255, 255, 255, 0.2);
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+            cursor: pointer;
+            transition: 0.2s;
+            padding: 0;
+            color: white;
+        }
+
+        #pause-btn:hover {
+            background: rgba(255, 255, 255, 0.2);
+            transform: scale(1.1);
+        }
+
         /* Рука (по центру) */
         #hand-container {
             position: absolute;
@@ -286,6 +307,147 @@
             color: white;
             z-index: 10000;
         }
+
+        /* Card Selection Overlay */
+        #card-selection-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.9);
+            display: none;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 9999;
+            animation: fadeIn 0.3s ease-out;
+        }
+
+        #card-selection-overlay.show {
+            display: flex;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+            }
+
+            to {
+                opacity: 1;
+            }
+        }
+
+        .selection-title {
+            color: #fff;
+            font-size: 32px;
+            font-weight: bold;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+
+        .selection-subtitle {
+            color: #aaa;
+            font-size: 16px;
+            margin-bottom: 30px;
+            text-align: center;
+        }
+
+        .cards-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+            gap: 20px;
+            max-width: 800px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+
+        .selection-card {
+            width: 100px;
+            height: 140px;
+            background: #fff;
+            border-radius: 12px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            box-shadow: 0 8px 16px rgba(0, 0, 0, 0.4);
+            cursor: pointer;
+            border: 3px solid transparent;
+            transition: all 0.2s;
+            animation: slideUp 0.4s ease-out backwards;
+        }
+
+        .selection-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 12px 24px rgba(0, 0, 0, 0.6);
+        }
+
+        .selection-card.selected {
+            border-color: #4caf50;
+            box-shadow: 0 0 20px rgba(76, 175, 80, 0.8);
+        }
+
+        .selection-card.type-minigun {
+            background: linear-gradient(135deg, #e1bee7, #ba68c8);
+            border-color: #8e24aa;
+            box-shadow: 0 4px 12px rgba(142, 36, 170, 0.5), 0 0 15px rgba(156, 39, 176, 0.4);
+        }
+
+        @keyframes slideUp {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .selection-card-icon {
+            font-size: 48px;
+            margin-bottom: 8px;
+        }
+
+        .selection-card-name {
+            font-size: 12px;
+            font-weight: bold;
+            color: #333;
+            text-align: center;
+        }
+
+        .selection-counter {
+            color: #fff;
+            font-size: 24px;
+            margin-bottom: 20px;
+        }
+
+        #start-game-btn {
+            padding: 15px 40px;
+            font-size: 20px;
+            font-weight: bold;
+            border: none;
+            border-radius: 12px;
+            background: #4caf50;
+            color: white;
+            cursor: pointer;
+            box-shadow: 0 8px 16px rgba(0, 0, 0, 0.3);
+            transition: all 0.2s;
+        }
+
+        #start-game-btn:hover:not(:disabled) {
+            background: #66bb6a;
+            transform: scale(1.05);
+        }
+
+        #start-game-btn:disabled {
+            background: #555;
+            color: #888;
+            cursor: not-allowed;
+        }
     </style>
 </head>
 
@@ -324,7 +486,12 @@
                         <div class="slot shop-slot">?</div>
                         <div class="slot shop-slot">?</div>
                     </div>
-                    <button id="shop-btn" disabled><span>🛒</span> 100💰</button>
+                    <!-- CHANGED: Split into Refresh + Buy -->
+                    <div style="display: flex; gap: 10px;">
+                        <button id="shop-refresh-btn" style="background: #7b1fa2; flex: 1;">↻ 15💰</button>
+                        <button id="shop-btn" disabled style="background: #1976d2; flex: 2;"><span>🛒</span>
+                            100💰</button>
+                    </div>
                 </div>
             </div>
 
@@ -338,6 +505,16 @@
 
         <div id="drag-ghost" class="card"></div>
     </div>
+
+    <!-- Card Selection Overlay -->
+    <div id="card-selection-overlay">
+        <div class="selection-title">Выберите 5 стартовых карт</div>
+        <div class="selection-subtitle">Выберите карты для начала игры. Можно выбирать одинаковые.</div>
+        <div class="cards-grid" id="card-selection-grid"></div>
+        <div class="selection-counter">Выбрано: <span id="selected-count">0</span>/5</div>
+        <button id="start-game-btn" disabled>Начать игру</button>
+    </div>
+
     <script type="module" src="/src/index.ts"></script>
 </body>
 

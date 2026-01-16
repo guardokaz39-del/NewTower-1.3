@@ -3,9 +3,9 @@ import { IUpgradeCard } from './CardType';
 /**
  * Ice Card Upgrades
  * 
- * Level 1: 20% slow, -10% range, +3 damage
- * Level 2: 35% slow, -15% range, +6 damage, +20% damage to slowed enemies
- * Level 3: 65% slow, -15% range, +9 damage, +25% damage to slowed, chain slow on death
+ * Level 1: 30% slow, -10% range, +3 damage
+ * Level 2: 45% slow, -20% range, +6 damage, +20% damage to slowed enemies
+ * Level 3: 75% slow, -25% range, +9 damage, +40% damage to slowed, chain slow on death
  */
 export const ICE_UPGRADES: Record<number, IUpgradeCard> = {
     1: {
@@ -17,8 +17,8 @@ export const ICE_UPGRADES: Record<number, IUpgradeCard> = {
         effects: [
             {
                 type: 'slow',
-                slowPower: 0.20, // 20% slow
-                slowDuration: 60, // 1 second at 60 FPS
+                slowPower: 0.30, // 30% slow
+                slowDuration: 70, // 1 second at 60 FPS
             }
         ]
     },
@@ -26,12 +26,12 @@ export const ICE_UPGRADES: Record<number, IUpgradeCard> = {
         level: 2,
         modifiers: {
             damage: 6,
-            rangeMultiplier: 0.85, // -15% range
+            rangeMultiplier: 0.80, // -20% range
         },
         effects: [
             {
                 type: 'slow',
-                slowPower: 0.35, // 35% slow
+                slowPower: 0.45, // 45% slow
                 slowDuration: 90,
                 damageToSlowed: 1.20, // +20% damage to slowed enemies
             }
@@ -41,18 +41,18 @@ export const ICE_UPGRADES: Record<number, IUpgradeCard> = {
         level: 3,
         modifiers: {
             damage: 9,
-            rangeMultiplier: 0.85, // -15% range
+            rangeMultiplier: 0.75, // -25% range
         },
         effects: [
             {
                 type: 'slow',
-                slowPower: 0.65, // 65% slow
+                slowPower: 0.75, // 75% slow
                 slowDuration: 120,
-                damageToSlowed: 1.25, // +25% damage to slowed enemies
+                damageToSlowed: 1.40, // +40% damage to slowed enemies
             },
             {
                 type: 'chainSlowOnDeath',
-                chainRadius: 60,
+                chainRadius: 80,
             }
         ]
     }

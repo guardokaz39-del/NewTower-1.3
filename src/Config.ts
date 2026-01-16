@@ -62,6 +62,7 @@ export const CONFIG = {
         ICE: { id: 'ice', name: 'Стужа', icon: '❄️', color: '#00bcd4', desc: 'Замедляет врагов' },
         SNIPER: { id: 'sniper', name: 'Снайпер', icon: '🎯', color: '#4caf50', desc: 'Дальняя стрельба' },
         MULTISHOT: { id: 'multi', name: 'Залп', icon: '💥', color: '#ff9800', desc: '+1 снаряд, -урон' },
+        MINIGUN: { id: 'minigun', name: 'Пулемёт', icon: '⚡', color: '#9c27b0', desc: 'Быстрая стрельба, урон растёт' },
     } as Readonly<Record<string, ICardTypeConfig>>,
 
     ENEMY: { BASE_HP: 25, HP_GROWTH: 1.2 },

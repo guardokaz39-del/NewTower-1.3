@@ -11,6 +11,7 @@ export class GameHUD {
     private elLives: HTMLElement;
     private elForgeBtn: HTMLButtonElement;
     private elStartBtn: HTMLButtonElement;
+    // private elPauseBtn: HTMLButtonElement; // REMOVED
 
     constructor(scene: IGameScene) {
         this.scene = scene;
@@ -20,6 +21,7 @@ export class GameHUD {
         this.elLives = document.getElementById('lives')!;
         this.elForgeBtn = document.getElementById('forge-btn') as HTMLButtonElement;
         this.elStartBtn = document.getElementById('start-wave-btn') as HTMLButtonElement;
+        // Pause button removed
 
         this.initListeners();
         this.initSubscriptions();
@@ -32,6 +34,8 @@ export class GameHUD {
 
     private initListeners() {
         this.elStartBtn.addEventListener('click', () => this.scene.waveManager.startWave());
+
+        // Pause button listener removed
 
         this.elForgeBtn.addEventListener('click', () => {
             if (this.scene.cardSys && this.scene.cardSys.canForge() && this.scene.money >= CONFIG.ECONOMY.FORGE_COST) {
@@ -50,6 +54,7 @@ export class GameHUD {
             this.updateStartBtn(true);
         });
         bus.on(Events.WAVE_COMPLETED, () => this.updateStartBtn(false));
+        // Pause toggle event listener removed for button update (button doesn't exist)
     }
 
     private updateMoney(newMoney: number) {
@@ -105,6 +110,8 @@ export class GameHUD {
             else if (!hasMoney) this.elForgeBtn.innerHTML = `<span>⚒️</span> ${forgeCost}💰`;
         }
     }
+
+    // updatePauseBtn removed
 
     public update() {
         // Polling kept only for complex checks if needed, but currently mostly event driven.

@@ -38,6 +38,10 @@ export class EffectSystem {
         this.effects.push(effect);
     }
 
+    public get activeEffects(): IEffect[] {
+        return this.effects;
+    }
+
     public update() {
         this.effects.forEach((e) => {
             e.life--;

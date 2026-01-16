@@ -8,13 +8,14 @@ import { FIRE_UPGRADES } from './FireCard';
 import { ICE_UPGRADES } from './IceCard';
 import { SNIPER_UPGRADES } from './SniperCard';
 import { MULTISHOT_UPGRADES, getMultishotConfig } from './MultishotCard';
+import { MINIGUN_UPGRADES } from './MinigunCard';
 
 // Export types
 export type { IUpgradeCard, ICardModifiers, ICardEffect };
 export { mergeModifiers, mergeEffects };
 
 // Export card upgrade data
-export { FIRE_UPGRADES, ICE_UPGRADES, SNIPER_UPGRADES, MULTISHOT_UPGRADES, getMultishotConfig };
+export { FIRE_UPGRADES, ICE_UPGRADES, SNIPER_UPGRADES, MULTISHOT_UPGRADES, MINIGUN_UPGRADES, getMultishotConfig };
 
 /**
  * Card upgrade registry
@@ -24,6 +25,7 @@ const CARD_REGISTRY: Record<string, Record<number, IUpgradeCard>> = {
     'ice': ICE_UPGRADES,
     'sniper': SNIPER_UPGRADES,
     'multi': MULTISHOT_UPGRADES,
+    'minigun': MINIGUN_UPGRADES,
 };
 
 /**

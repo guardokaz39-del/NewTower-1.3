@@ -18,6 +18,17 @@ export class WeaponSystem {
         if (tower.isBuilding) return;
         if (tower.cards.length === 0) return;
 
+        // Handle overheat cooldown
+        if (tower.isOverheated) {
+            if (tower.overheatCooldown > 0) {
+                tower.overheatCooldown--;
+            } else {
+                tower.isOverheated = false;
+                tower.spinupFrames = 0; // Reset spinup after overheat
+            }
+            return; // Can't shoot while overheated
+        }
+
         if (tower.cooldown > 0) {
             tower.cooldown--;
         }
@@ -42,6 +53,45 @@ export class WeaponSystem {
             if (tower.cooldown <= 0 && angleDiff < CONFIG.TOWER.AIM_TOLERANCE) {
                 this.fire(tower, target, stats, projectiles, pool, effects);
                 tower.cooldown = stats.cd;
+
+                // === SPINUP MECHANIC ===
+                // Increment spinup progress when firing
+                const spinupEffect = stats.effects.find(e => e.type === 'spinup');
+                if (spinupEffect) {
+                    tower.spinupFrames++;
+
+                    // Check for overheat
+                    const maxSpinupSeconds = spinupEffect.maxSpinupSeconds || 7;
+                    const maxFrames = maxSpinupSeconds * 60;
+                    tower.maxHeat = maxFrames; // Sync for visual bar
+
+                    // Check if tower has Ice card (for overheat extension)
+                    const hasIceCard = tower.cards.some(c => c.type.id === 'ice');
+                    const overheatExtension = hasIceCard ? (spinupEffect.overheatExtensionWithIce || 0) : 0;
+                    const overheatThreshold = maxFrames + overheatExtension;
+
+                    if (tower.spinupFrames >= overheatThreshold) {
+                        tower.isOverheated = true;
+                        tower.overheatCooldown = spinupEffect.overheatDuration || 90;
+                        tower.spinupFrames = 0;
+                    }
+                }
+            }
+        } else {
+            // === SPINUP RESET / COOLING ===
+            // No target - Start cooling down
+            if (tower.spinupFrames > 0) {
+                // Cool down rate: 
+                // User wants 1.5 seconds (90 frames) to cool down from max heat
+                // Max heat is dynamic (5s * 60 = 300 frames)
+                // Rate = 300 / 90 = 3.333
+
+                const coolRate = (tower.maxHeat || 300) / 90;
+                tower.spinupFrames = Math.max(0, tower.spinupFrames - coolRate);
+            }
+            if (tower.isOverheated) {
+                tower.isOverheated = false;
+                tower.overheatCooldown = 0;
             }
         }
     }
@@ -123,6 +173,24 @@ export class WeaponSystem {
                 radius: 15,
                 life: 5,
             });
+
+            // === SHELL CASING EFFECT ===
+            // Eject shell perpendicular to fire angle
+            const ejectAngle = tower.angle + Math.PI / 2 + (Math.random() - 0.5) * 0.5;
+            const ejectSpeed = 2 + Math.random() * 2;
+            effects.add({
+                type: 'debris',
+                x: tower.x, // Eject from tower center/breech
+                y: tower.y,
+                vx: Math.cos(ejectAngle) * ejectSpeed,
+                vy: Math.sin(ejectAngle) * ejectSpeed,
+                gravity: 0.2, // Now valid for debris
+                rotation: Math.random() * Math.PI,
+                vRot: (Math.random() - 0.5) * 0.5,
+                life: 60,
+                color: '#ffd700', // Gold shell
+                size: 3,
+            });
         }
 
         // Multishot logic
@@ -146,14 +214,16 @@ export class WeaponSystem {
                 const vy = Math.sin(currentAngle) * range;
                 const virtualTarget = { x: muzzleX + vx, y: muzzleY + vy };
 
+                const finalDamage = Math.max(1, stats.damage * (stats.damageMultiplier || 1));
                 const p = pool.obtain();
-                p.init(muzzleX, muzzleY, virtualTarget, stats);
+                p.init(muzzleX, muzzleY, virtualTarget, { ...stats, damage: finalDamage });
                 projectiles.push(p);
             }
         } else {
             // Single shot
+            const finalDamage = Math.max(1, stats.damage * (stats.damageMultiplier || 1));
             const p = pool.obtain();
-            p.init(muzzleX, muzzleY, target, stats);
+            p.init(muzzleX, muzzleY, target, { ...stats, damage: finalDamage });
             projectiles.push(p);
         }
 

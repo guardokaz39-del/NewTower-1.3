@@ -25,6 +25,12 @@ export class Tower {
 
     public costSpent: number = 0;
 
+    // Spinup state (for Minigun cards)
+    public spinupFrames: number = 0;        // Frames spent firing continuously
+    public maxHeat: number = 300;           // Max frames before overheat (default 5s)
+    public isOverheated: boolean = false;   // Whether tower is overheated
+    public overheatCooldown: number = 0;    // Frames remaining in overheat lockout
+
     constructor(c: number, r: number) {
         this.col = c;
         this.row = r;
@@ -101,6 +107,10 @@ export class Tower {
             } else if (mainCard.type.id === 'multi') {
                 projectileType = 'split'; // If split is first
                 color = VISUALS.PROJECTILES.SPLIT;
+            } else if (mainCard.type.id === 'minigun') {
+                projectileType = 'minigun';
+                color = VISUALS.PROJECTILES.STANDARD; // Will be updated in Assets
+                speed = 12;
             }
         }
 
@@ -123,6 +133,36 @@ export class Tower {
         const pierceEffect = allEffects.find(e => e.type === 'pierce');
         if (pierceEffect) {
             pierce = pierceEffect.pierceCount || 0;
+        }
+
+        // === SPINUP MECHANIC ===
+        // Find spinup effect and apply bonuses based on current spinupFrames
+        const spinupEffect = allEffects.find(e => e.type === 'spinup');
+        if (spinupEffect) {
+            const spinupSeconds = this.spinupFrames / 60; // Convert frames to seconds
+
+            // Apply damage bonus
+            if (spinupEffect.spinupSteps) {
+                // Stepped damage (Level 3)
+                for (const step of spinupEffect.spinupSteps) {
+                    if (spinupSeconds >= step.threshold) {
+                        damage = CONFIG.TOWER.BASE_DMG * 0.5 + step.damage; // Base 2.5 + step bonus
+                    }
+                }
+            } else if (spinupEffect.spinupDamagePerSecond) {
+                // Linear damage (Level 1-2)
+                const bonusDamage = spinupEffect.spinupDamagePerSecond * spinupSeconds;
+                damage += bonusDamage;
+            }
+
+            // Apply crit chance bonus
+            if (spinupEffect.spinupCritPerSecond) {
+                const bonusCrit = spinupEffect.spinupCritPerSecond * spinupSeconds;
+                critChance += bonusCrit;
+            }
+
+            // Cap spinup at max seconds
+            // (actual capping happens in WeaponSystem)
         }
 
         return {
@@ -199,6 +239,7 @@ export class Tower {
                 else if (mainCard.type.id === 'fire') turretName = 'turret_fire';
                 else if (mainCard.type.id === 'sniper') turretName = 'turret_sniper';
                 else if (mainCard.type.id === 'multi') turretName = 'turret_split';
+                else if (mainCard.type.id === 'minigun') turretName = 'turret_minigun';
             }
 
             // 3. Draw Turret (Rotated)
@@ -232,6 +273,7 @@ export class Tower {
                         else if (card.type.id === 'fire') modName = 'mod_fire';
                         else if (card.type.id === 'sniper') modName = 'mod_sniper';
                         else if (card.type.id === 'multi') modName = 'mod_split';
+                        else if (card.type.id === 'minigun') modName = 'mod_minigun';
 
                         const modImg = Assets.get(modName);
                         if (modImg) {
@@ -288,7 +330,52 @@ export class Tower {
                 }
 
                 ctx.restore();
+
+                // 5. Minigun Overheat Bar
+                if (turretName === 'turret_minigun' && this.spinupFrames > 0) {
+                    this.drawOverheatBar(ctx, size);
+                }
             }
         }
+    }
+
+    private drawOverheatBar(ctx: CanvasRenderingContext2D, size: number) {
+        // Calculate heat percentage
+        const maxFrames = this.maxHeat || 420;
+        let pct = this.spinupFrames / maxFrames;
+        if (pct > 1) pct = 1;
+
+        // Visual flash if overheated
+        if (this.isOverheated) {
+            pct = 1; // Full bar
+        }
+
+        const barW = 4;
+        const barH = 20;
+        const barX = this.x + 20; // Right of tower
+        const barY = this.y - 10;
+
+        // Bg
+        ctx.fillStyle = 'rgba(0,0,0,0.5)';
+        ctx.fillRect(barX, barY, barW, barH);
+
+        // Fill
+        // Color gradient from yellow to red
+        if (this.isOverheated) {
+            ctx.fillStyle = (Math.floor(Date.now() / 100) % 2 === 0) ? '#ff0000' : '#ffffff'; // Flash
+        } else {
+            const r = 255;
+            const g = Math.floor(255 * (1 - pct));
+            ctx.fillStyle = `rgb(${r},${g},0)`;
+        }
+
+        // Draw from bottom up
+        const fillH = barH * pct;
+        ctx.fillRect(barX, barY + (barH - fillH), barW, fillH);
+
+        // Border
+        ctx.strokeStyle = '#fff';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(barX, barY, barW, barH);
     }
 }

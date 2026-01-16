@@ -24,6 +24,7 @@ export class EditorScene extends BaseScene {
     // FEATURE: Saved maps panel
     private mapsPanel!: HTMLElement;
     private mapsPanelExpanded: boolean = false;
+    private currentMapName: string = '';
 
     constructor(game: Game) {
         super();
@@ -88,9 +89,12 @@ export class EditorScene extends BaseScene {
         } else if (this.mode === 'set_start') {
             this.startPoint = { x: col, y: row };
             this.map.grid[row][col].type = 1;
+            // Update waypoints list for Map to draw icons
+            this.updateMapWaypoints();
         } else if (this.mode === 'set_end') {
             this.endPoint = { x: col, y: row };
             this.map.grid[row][col].type = 1;
+            this.updateMapWaypoints();
         } else if (this.mode === 'place_waypoint') {
             // FEATURE: Add waypoint on click
             this.manualWaypoints.push({ x: col, y: row });
@@ -125,9 +129,16 @@ export class EditorScene extends BaseScene {
             }
         }
 
-        this.map.waypoints = [];
-        if (this.startPoint) this.map.waypoints.push(this.startPoint);
-        if (this.endPoint) this.map.waypoints.push(this.endPoint);
+        // We do NOT overwrite map.waypoints here every frame anymore.
+        // It prevents saving them correctly.
+        // We only show them via draw() calls or rely on map.draw() using current state.
+
+        // However, map.draw() draws start/end icons based on map.waypoints.
+        // If we want to visualize start/end points dynamically while placing them:
+        if (this.startPoint && this.mode === 'set_start') {
+            // Just specific visual feedback if needed, 
+            // but effectively we updated map.grid type so map.draw handles tiles.
+        }
 
         this.map.draw(ctx);
         this.fog.draw(ctx);
@@ -225,15 +236,23 @@ export class EditorScene extends BaseScene {
     }
 
     private saveMap(waves: any[]) {
+        // [FIX] Ensure map waves are updated before serialization
+        (this.map as any).waves = waves;
+
+        // [FIX] Ensure waypoints are synced before saving
+        this.updateMapWaypoints();
+
         const data = serializeMap(this.map);
-        data.waves = waves;
+        data.fogData = this.fog.getFogData();
         data.manualPath = this.manualWaypoints.length >= 2; // FEATURE: Mark if manual waypoints used
 
-        const name = prompt('Enter map name:', 'MyMap');
+        const name = prompt('Enter map name:', this.currentMapName || 'MyMap');
         if (!name) return;
 
         if (saveMapToStorage(name, data)) {
+            this.currentMapName = name; // Update current name
             alert(`Map "${name}" saved successfully!`);
+            this.refreshMapsPanel(); // Refresh UI
         } else {
             alert('Failed to save map (Storage full?)');
         }
@@ -475,6 +494,7 @@ export class EditorScene extends BaseScene {
         if (!confirm(`Load map "${name}"? Current work will be lost.`)) return;
 
         // Load map data into editor
+        this.currentMapName = name; // [FIX] Track loaded map name
         this.map = new MapManager(data);
         this.fog = new FogSystem(data);
 
@@ -501,6 +521,15 @@ export class EditorScene extends BaseScene {
 
         deleteMapFromStorage(name);
         this.refreshMapsPanel();
-        alert(`Map "${name}" deleted.`);
+    }
+
+    private updateMapWaypoints() {
+        if (this.manualWaypoints.length > 0) {
+            this.map.waypoints = [...this.manualWaypoints];
+        } else {
+            this.map.waypoints = [];
+            if (this.startPoint) this.map.waypoints.push(this.startPoint);
+            if (this.endPoint) this.map.waypoints.push(this.endPoint);
+        }
     }
 }

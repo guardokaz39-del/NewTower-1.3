@@ -18,12 +18,6 @@ export class PauseMenu {
         this.boundKeyHandler = this.handleKeyDown.bind(this);
         window.addEventListener('keydown', this.boundKeyHandler);
 
-        // Remove any old pause buttons if they exist
-        const existingBtn = document.getElementById('pause-btn');
-        if (existingBtn) existingBtn.remove();
-        const existingNewBtn = document.getElementById('new-pause-btn');
-        if (existingNewBtn) existingNewBtn.remove();
-
         // Create menu overlay
         this.createOverlay();
     }

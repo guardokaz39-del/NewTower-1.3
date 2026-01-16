@@ -21,7 +21,7 @@ export class CardSystem {
     private handContainer: HTMLElement;
     private forgeContainers: HTMLElement[];
 
-    constructor(scene: IGameScene) {
+    constructor(scene: IGameScene, startingCards: string[] = ['FIRE', 'ICE', 'SNIPER']) {
         this.scene = scene;
         this.handContainer = document.getElementById('hand')!;
         this.forgeContainers = [document.getElementById('forge-slot-0')!, document.getElementById('forge-slot-1')!];
@@ -29,10 +29,8 @@ export class CardSystem {
         this.ghostEl = document.getElementById('drag-ghost')!;
         this.ghostEl.style.pointerEvents = 'none';
 
-        // Стартовые карты
-        this.addCard('FIRE', 1);
-        this.addCard('ICE', 1);
-        this.addCard('SNIPER', 1);
+        // Add starting cards
+        startingCards.forEach(cardKey => this.addCard(cardKey, 1));
     }
 
     public startDrag(card: ICard, e: PointerEvent) {
@@ -150,7 +148,10 @@ export class CardSystem {
             return;
         }
 
-        this.scene.money -= cost;
+        if (!this.scene.spendMoney(cost)) {
+            // Should not happen as we check above, but for safety
+            return;
+        }
         this.isForging = true;
 
         // Get forge slot position for particle effects

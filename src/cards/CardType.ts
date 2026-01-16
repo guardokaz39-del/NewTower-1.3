@@ -11,7 +11,7 @@ export interface ICardModifiers {
 }
 
 export interface ICardEffect {
-    type: 'splash' | 'slow' | 'pierce' | 'explodeOnDeath' | 'chainSlowOnDeath';
+    type: 'splash' | 'slow' | 'pierce' | 'explodeOnDeath' | 'chainSlowOnDeath' | 'spinup';
 
     // Splash effect properties
     splashRadius?: number;
@@ -31,6 +31,14 @@ export interface ICardEffect {
 
     // Chain slow properties
     chainRadius?: number;
+
+    // Spinup properties (Minigun mechanic)
+    spinupDamagePerSecond?: number;   // Flat damage bonus per second of continuous fire
+    spinupCritPerSecond?: number;     // Crit chance bonus per second (0.02 = 2%)
+    spinupSteps?: Array<{ threshold: number; damage: number }>; // For stepped damage (level 3)
+    maxSpinupSeconds?: number;        // Maximum spinup time (7 seconds)
+    overheatDuration?: number;        // Overheat lockout duration in frames (90 or 180)
+    overheatExtensionWithIce?: number; // Bonus time before overheat when combined with Ice card (180 frames = 3 sec)
 
     // Legacy/Generic properties (fixing TS errors)
     radius?: number;

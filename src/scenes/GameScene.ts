@@ -20,11 +20,11 @@ import { IMapData, DEMO_MAP } from '../MapData';
 import { MetricsSystem } from '../MetricsSystem';
 import { WeaponSystem } from '../WeaponSystem';
 import { FogSystem } from '../FogSystem';
+import { LightingSystem } from '../systems/LightingSystem';
 
-// NEW: Import refactored modules
+import { GameController } from './GameController';
 import { GameState } from './GameState';
 import { EntityManager } from './EntityManager';
-import { GameController } from './GameController';
 
 /**
  * Main game scene - REFACTORED VERSION
@@ -36,14 +36,18 @@ export class GameScene extends BaseScene implements IGameScene {
     public game: Game;
     public mapData: IMapData;
 
-    // NEW: Modular components
+    // Modular components
     public gameState: GameState;
     public entityManager: EntityManager;
     public gameController: GameController;
 
+    // Ambient cycle
+    private dayTime: number = 0;
+
     // Map & rendering
     public map: MapManager;
     public fog: FogSystem;
+    public lighting: LightingSystem;
 
     // Systems
     public ui: UIManager;
@@ -65,13 +69,10 @@ export class GameScene extends BaseScene implements IGameScene {
     public set wave(value: number) { this.gameState.wave = value; }
 
     public get money(): number { return this.gameState.money; }
-    public set money(value: number) { throw new Error('Use gameState.addMoney() or gameState.spendMoney()'); }
 
     public get lives(): number { return this.gameState.lives; }
-    public set lives(value: number) { throw new Error('Use gameState.loseLife()'); }
 
     public get paused(): boolean { return this.gameState.paused; }
-    public set paused(value: boolean) { throw new Error('Use togglePause()'); }
 
     public get selectedTower(): Tower | null { return this.gameState.selectedTower; }
     public set selectedTower(value: Tower | null) { this.gameState.selectTower(value); }
@@ -93,6 +94,8 @@ export class GameScene extends BaseScene implements IGameScene {
         // Initialize map and rendering
         this.map = new MapManager(this.mapData);
         this.fog = new FogSystem(this.mapData);
+        this.lighting = new LightingSystem(game.canvas.width, game.canvas.height);
+        this.map.lighting = this.lighting; // [NEW] Link lighting
         this.events = new EventEmitter();
         this.effects = new EffectSystem(game.ctx);
         this.input = game.input;
@@ -110,8 +113,13 @@ export class GameScene extends BaseScene implements IGameScene {
         );
 
         // Initialize UI and card systems
+        // Get starting cards from selection or use default
+        // CHANGED: Start with ALL 5 card types
+        const startingCards = (window as any)._STARTING_CARDS || ['FIRE', 'ICE', 'SNIPER', 'MULTISHOT', 'MINIGUN'];
+        delete (window as any)._STARTING_CARDS; // Cleanup after use
+
         this.ui = new UIManager(this);
-        this.cardSys = new CardSystem(this);
+        this.cardSys = new CardSystem(this, startingCards);
         this.forge = new ForgeSystem(this);
         this.debug = new DebugSystem(this);
         this.collision = new CollisionSystem(this.effects, this.debug);
@@ -161,9 +169,29 @@ export class GameScene extends BaseScene implements IGameScene {
         // Time scale support (1x or 2x speed)
         const loops = (this.gameState.timeScale >= 2) ? 2 : 1;
 
+        // Day/Night Cycle (Simple Sine Wave)
+        // Cycle duration: approx 60 seconds (3600 frames)
+
+        // Determine current phase (Sine Wave)
+        // Math.sin(this.dayTime) -> -1 (Night) to 1 (Day)
+        const currentSin = Math.sin(this.dayTime);
+        const isNight = currentSin < 0;
+
+        // Modulate speed: Night passes 50% faster, Day is normal
+        const speedMultiplier = isNight ? 1.5 : 1.0;
+
+        this.dayTime += 0.0005 * loops * speedMultiplier;
+
+        // Oscillate between 0.5 (Darkest evening) and 0.95 (Brightest day)
+        // Math.sin goes -1 to 1. 
+        // We want range [0.5, 0.95]. Center is 0.725, Amplitude is 0.225
+        const brightness = 0.75 + currentSin * 0.20;
+        this.lighting.ambientLight = brightness;
+
         for (let l = 0; l < loops; l++) {
             this.waveManager.update();
-            this.fog.update();
+            this.fog.update(0.016);
+            // Lighting doesn't need explicit update logic for now, just render
 
             // Update projectiles
             this.entityManager.updateProjectiles();
@@ -208,6 +236,7 @@ export class GameScene extends BaseScene implements IGameScene {
 
         // Draw map and fog
         this.map.draw(ctx);
+        this.map.drawTorches(ctx, this.gameState.frames); // [NEW] Draw torches with time
         this.fog.draw(ctx);
 
         // Draw path preview
@@ -220,10 +249,61 @@ export class GameScene extends BaseScene implements IGameScene {
         this.gameState.towers.forEach((t) => t.draw(ctx));
         this.drawSelectedTowerRange(ctx);
         this.gameState.enemies.forEach((e) => e.draw(ctx));
-        this.gameState.projectiles.forEach((p) => p.draw(ctx));
-
         // Draw effects
         this.effects.draw();
+
+        // Draw lighting (over everything except UI)
+        // Update size if needed
+        if (this.game.canvas.width !== this.lighting['width'] || this.game.canvas.height !== this.lighting['height']) {
+            this.lighting.resize(this.game.canvas.width, this.game.canvas.height);
+        }
+
+        // Reset lights
+        this.lighting.clear();
+
+        // Add dynamic lights
+        // 1. Projectiles
+        this.gameState.projectiles.forEach(p => {
+            // Use p.stats.color to determine light color?
+            // Simple mapping:
+            // Fire -> Red/Orange
+            // Ice -> Cyan
+            // Sniper -> Green
+            // Standard -> Yellow
+            let color = '#ffffff';
+            let radius = 30;
+            const type = p.projectileType || 'standard';
+
+            if (type === 'fire') { color = '#ff5722'; radius = 50; }
+            else if (type === 'ice') { color = '#00bcd4'; radius = 40; }
+            else if (type === 'sniper') { color = '#4caf50'; radius = 20; }
+            else if (type === 'minigun') { color = '#e040fb'; radius = 25; }
+            else { color = '#ffeb3b'; radius = 30; }
+
+            this.lighting.addLight(p.x, p.y, radius, color, 0.6);
+        });
+
+        // 2. Towers (Muzzle flash is effect, but maybe tower itself emits faint light?)
+        this.gameState.towers.forEach(t => {
+            // Minigun overheat glow
+            if (t.spinupFrames > 0) {
+                const intensity = Math.min(1, t.spinupFrames / (t.maxHeat || 420));
+                if (intensity > 0.3) {
+                    this.lighting.addLight(t.x, t.y, 40 * intensity, '#ff0000', intensity * 0.5);
+                }
+            }
+        });
+
+        // 3. Effects (Explosions)
+        this.effects.activeEffects.forEach(e => {
+            if (e.type === 'explosion') {
+                this.lighting.addLight(e.x, e.y, e.radius * 2, e.color || '#ff9800', 0.8);
+            } else if (e.type === 'muzzle_flash') {
+                this.lighting.addLight(e.x, e.y, e.radius * 3, '#ffff00', 0.9);
+            }
+        });
+
+        this.lighting.render(ctx);
 
         ctx.restore();
     }

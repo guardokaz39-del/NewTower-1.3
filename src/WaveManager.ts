@@ -95,10 +95,8 @@ export class WaveManager {
         const reward = CONFIG.ECONOMY.WAVE_CLEAR_REWARD * 10 + CONFIG.ECONOMY.EARLY_WAVE_BONUS;
         this.scene.addMoney(reward);
 
-        // Даем карту (с шансом или гарантированно каждые X волн)
-        if (this.scene.wave % 2 === 0) {
-            this.scene.giveRandomCard();
-        }
+        // CHANGED: Always give 1 card per wave (was every 2 waves)
+        this.scene.giveRandomCard();
 
         // this.scene.ui.update(); // EventBus handles UI
     }

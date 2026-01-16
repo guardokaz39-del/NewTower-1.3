@@ -30,7 +30,7 @@ export const FIRE_UPGRADES: Record<number, IUpgradeCard> = {
         effects: [
             {
                 type: 'splash',
-                splashRadius: 70,
+                splashRadius: 85,
             }
         ]
     },
@@ -43,7 +43,7 @@ export const FIRE_UPGRADES: Record<number, IUpgradeCard> = {
         effects: [
             {
                 type: 'splash',
-                splashRadius: 70,
+                splashRadius: 90,
             },
             {
                 type: 'explodeOnDeath',

@@ -7,9 +7,11 @@ export class SoundManager {
     private static ctx: AudioContext;
     private static buffers: Record<string, AudioBuffer> = {};
     private static lastPlayed: Record<string, number> = {};
+    private static lastPlayedType: Record<string, number> = {}; // Track last play time by TYPE
 
     // Config
-    private static CULL_MS = 50; // Minimum time between same sounds
+    private static CULL_MS = 50; // Minimum time between same sounds (Legacy logic)
+    private static THROTTLE_MS = 60; // Global throttle for identical sounds
     public static MASTER_VOLUME = 0.3; // Made public for settings
     public static SFX_VOLUME = 1.0;
     public static MUSIC_VOLUME = 0.5;
@@ -51,12 +53,21 @@ export class SoundManager {
         // If High Priority, we always play (or maybe duck others? For now just play)
         // If Low Priority, check time since last played
         if (priority === SoundPriority.LOW) {
+            // Check legacy cull (per specific key/instance if unique keys used)
             if (now - last < this.CULL_MS) {
-                return; // Skip
+                return;
+            }
+
+            // Global Type Throttling 
+            // This prevents "shoot_basic" from playing 10 times in one frame from 10 towers
+            const lastType = this.lastPlayedType[key] || 0;
+            if (now - lastType < this.THROTTLE_MS) {
+                return;
             }
         }
 
         this.lastPlayed[key] = now;
+        this.lastPlayedType[key] = now;
 
         const buffer = this.buffers[key];
         if (!buffer) {
