@@ -22,7 +22,12 @@ export const MINIGUN_UPGRADES: Record<number, IUpgradeCard> = {
                 overheatDuration: 90, // 1.5 seconds (lockout)
                 overheatExtensionWithIce: 120, // +2 seconds with Ice card
             }
-        ]
+        ],
+        visualOverrides: {
+            projectileType: 'minigun',
+            projectileColor: '#fff',
+            projectileSpeed: 12,
+        }
     },
     2: {
         level: 2,

@@ -46,10 +46,17 @@ export interface ICardEffect {
     power?: number;
 }
 
+export interface ICardVisualOverrides {
+    projectileType?: string;    // Visual type: 'standard', 'fire', 'ice', 'sniper', 'minigun', 'split'
+    projectileColor?: string;   // Hex color for projectile
+    projectileSpeed?: number;   // Projectile travel speed
+}
+
 export interface IUpgradeCard {
     level: number;
     modifiers: ICardModifiers;
     effects: ICardEffect[];
+    visualOverrides?: ICardVisualOverrides; // NEW: Data-driven visuals
 }
 
 /**

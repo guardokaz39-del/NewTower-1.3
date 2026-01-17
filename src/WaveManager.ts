@@ -13,6 +13,9 @@ export class WaveManager {
     private enemiesToSpawn: string[] = [];
     private spawnTimer: number = 0;
 
+    // Card reward tracking - track last wave number that received a card
+    private lastCardGivenForWave: number = 0;
+
     constructor(scene: IGameScene) {
         this.scene = scene;
     }
@@ -39,6 +42,8 @@ export class WaveManager {
 
         this.generateWave(this.scene.wave);
         this.scene.metrics.trackWaveReached(this.scene.wave);
+
+
 
         // === WAVE START SCREEN FLASH ===
         this.scene.effects.add({
@@ -91,12 +96,16 @@ export class WaveManager {
         EventBus.getInstance().emit(Events.WAVE_COMPLETED, this.scene.wave);
         this.scene.showFloatingText('WAVE CLEARED!', this.scene.game.canvas.width / 2, 200, 'gold');
 
-        // Награда
-        const reward = CONFIG.ECONOMY.WAVE_CLEAR_REWARD * 10 + CONFIG.ECONOMY.EARLY_WAVE_BONUS;
+        // Progressive economy: Base reward + scaling per wave
+        const reward = CONFIG.ECONOMY.WAVE_BASE_REWARD + (this.scene.wave * CONFIG.ECONOMY.WAVE_SCALING_FACTOR);
         this.scene.addMoney(reward);
 
-        // CHANGED: Always give 1 card per wave (was every 2 waves)
-        this.scene.giveRandomCard();
+        // Give card for this completed wave (only once per wave number)
+        // This ensures card is given even if wave was started early
+        if (this.scene.wave > this.lastCardGivenForWave) {
+            this.scene.giveRandomCard();
+            this.lastCardGivenForWave = this.scene.wave;
+        }
 
         // this.scene.ui.update(); // EventBus handles UI
     }

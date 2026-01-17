@@ -58,9 +58,21 @@ export class GameState {
     }
 
     // === Lives Management ===
-    public loseLife(amount: number = 1): void {
+    public loseLife(amount: number = 1, effects?: any): void {
         this.lives -= amount;
         this.eventBus.emit(Events.LIVES_CHANGED, this.lives);
+
+        // Red screen flash on damage
+        if (effects) {
+            effects.add({
+                type: 'screen_flash',
+                x: 0,
+                y: 0,
+                life: 15,
+                flashColor: 'rgba(255, 0, 0, ',
+            });
+        }
+
         if (this.lives <= 0) {
             this.eventBus.emit(Events.GAME_OVER, this.wave);
             this.isRunning = false;

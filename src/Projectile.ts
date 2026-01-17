@@ -14,6 +14,7 @@ export interface IProjectileStats {
     explosionDamage?: number;       // Damage from explosion
     explosionRadius?: number;       // Radius of explosion
     projectileType?: string;        // Visual type: standard, ice, fire, sniper, split
+    towerLevel?: number;            // Tower's max card level (for trail effects)
 }
 
 export class Projectile {
@@ -35,6 +36,7 @@ export class Projectile {
     public explosionDamage: number = 0;       // Damage from explosion
     public explosionRadius: number = 0;       // Radius of explosion
     public projectileType: string = 'standard'; // Visual type
+    public towerLevel: number = 1;            // Tower's max card level (for trails)
 
     // Конструктор пустой!
     constructor() { }
@@ -50,6 +52,7 @@ export class Projectile {
         this.pierce = stats.pierce || 0;
         this.hitList = [];
         this.projectileType = stats.projectileType || 'standard';
+        this.towerLevel = stats.towerLevel || 1;
 
         // Handle critical hits
         const critChance = stats.critChance || 0;
@@ -139,7 +142,52 @@ export class Projectile {
 
                 ctx.drawImage(img, -size / 2, -size / 2);
 
-                // Sniper Trail (still dynamic, cheap line)
+                // Level-based trail effects
+                if (this.towerLevel >= 2) {
+                    const angle = Math.atan2(this.vy, this.vx);
+
+                    // Fade in trail over first 30 frames (0.5 seconds)
+                    const trailOpacity = Math.min(1, (120 - this.life) / 30);
+
+                    ctx.save();
+                    ctx.rotate(angle);
+
+                    if (this.towerLevel === 2) {
+                        // LVL 2: Light trail
+                        ctx.strokeStyle = this.color;
+                        ctx.globalAlpha = 0.4 * trailOpacity;
+                        ctx.lineWidth = 3;
+                        ctx.beginPath();
+                        ctx.moveTo(0, 0);
+                        ctx.lineTo(-size * 1.2, 0);
+                        ctx.stroke();
+                    } else if (this.towerLevel === 3) {
+                        // LVL 3: Bright trail with glow
+                        ctx.shadowBlur = 10;
+                        ctx.shadowColor = this.color;
+                        ctx.strokeStyle = this.color;
+                        ctx.globalAlpha = 0.7 * trailOpacity;
+                        ctx.lineWidth = 4;
+                        ctx.beginPath();
+                        ctx.moveTo(0, 0);
+                        ctx.lineTo(-size * 2, 0);
+                        ctx.stroke();
+
+                        // Inner bright core trail
+                        ctx.shadowBlur = 5;
+                        ctx.strokeStyle = '#fff';
+                        ctx.globalAlpha = 0.9 * trailOpacity;
+                        ctx.lineWidth = 2;
+                        ctx.beginPath();
+                        ctx.moveTo(0, 0);
+                        ctx.lineTo(-size * 1.5, 0);
+                        ctx.stroke();
+                    }
+
+                    ctx.restore();
+                }
+
+                // Sniper Trail (original, still works)
                 if (type === 'sniper') {
                     ctx.lineWidth = 2;
                     ctx.strokeStyle = this.color;

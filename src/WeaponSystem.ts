@@ -225,6 +225,18 @@ export class WeaponSystem {
             const p = pool.obtain();
             p.init(muzzleX, muzzleY, target, { ...stats, damage: finalDamage });
             projectiles.push(p);
+
+            // Trigger recoil for critical hits
+            if (p.isCrit) {
+                tower.recoilFrames = 10;
+                tower.recoilIntensity = 3;
+            }
+        }
+
+        // Minigun vibration (constant while firing)
+        if (stats.projectileType === 'minigun') {
+            tower.recoilFrames = 5;
+            tower.recoilIntensity = 0.5; // Subtle shake
         }
 
         // Play Sound

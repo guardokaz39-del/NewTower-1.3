@@ -19,7 +19,12 @@ export const FIRE_UPGRADES: Record<number, IUpgradeCard> = {
                 type: 'splash',
                 splashRadius: 50,
             }
-        ]
+        ],
+        visualOverrides: {
+            projectileType: 'fire',
+            projectileColor: '#f44336',
+            projectileSpeed: 6,
+        }
     },
     2: {
         level: 2,

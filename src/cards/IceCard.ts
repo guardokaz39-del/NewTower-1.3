@@ -20,7 +20,12 @@ export const ICE_UPGRADES: Record<number, IUpgradeCard> = {
                 slowPower: 0.30, // 30% slow
                 slowDuration: 70, // 1 second at 60 FPS
             }
-        ]
+        ],
+        visualOverrides: {
+            projectileType: 'ice',
+            projectileColor: '#00bcd4',
+            projectileSpeed: 10,
+        }
     },
     2: {
         level: 2,

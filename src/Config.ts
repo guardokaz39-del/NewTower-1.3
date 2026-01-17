@@ -22,6 +22,8 @@ export const CONFIG = {
 
     ECONOMY: {
         WAVE_CLEAR_REWARD: 2,
+        WAVE_BASE_REWARD: 20,          // NEW: Base reward for completing a wave
+        WAVE_SCALING_FACTOR: 2,        // NEW: Additional reward per wave number (+2 per wave)
         DROP_CHANCE: 0.15,
         EARLY_WAVE_BONUS: 30,
         TOWER_COST: 55,

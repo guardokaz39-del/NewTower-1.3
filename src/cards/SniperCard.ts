@@ -16,7 +16,12 @@ export const SNIPER_UPGRADES: Record<number, IUpgradeCard> = {
             attackSpeedMultiplier: 0.50, // -50% attack speed (slower)
             critChance: 0.15, // 15% crit chance
         },
-        effects: []
+        effects: [],
+        visualOverrides: {
+            projectileType: 'sniper',
+            projectileColor: '#4caf50',
+            projectileSpeed: 15,
+        }
     },
     2: {
         level: 2,

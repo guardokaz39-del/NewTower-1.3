@@ -144,6 +144,13 @@ export class EntityManager {
     }
 
     /**
+     * Update enemy counter in HUD
+     */
+    private updateEnemyCounterUI(): void {
+        // This will be called from updateEnemies
+    }
+
+    /**
      * Process enemy death - rewards, effects, cleanup
      */
     public handleEnemyDeath(enemy: Enemy): void {
@@ -203,9 +210,9 @@ export class EntityManager {
  * Process enemy reaching the end - lose life, cleanup
      */
     public handleEnemyFinished(enemy: Enemy): void {
-        this.state.loseLife();
+        this.state.loseLife(1, this.effects); // Pass effects for screen flash
         this.metrics.trackLifeLost();
-        this.state.triggerShake(10, 5);
+        // Removed triggerShake - flash effect is enough
         SoundManager.play('explosion', 1); // SoundPriority.HIGH = 1
     }
 

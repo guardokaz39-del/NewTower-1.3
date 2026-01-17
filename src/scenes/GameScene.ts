@@ -208,13 +208,15 @@ export class GameScene extends BaseScene implements IGameScene {
             // Update tower visual states
             this.gameState.towers.forEach((t) => t.updateBuilding(this.effects));
 
-            // Collision detection
+            this.weaponSystem.update(this.gameState.towers, this.gameState.enemies, this.gameState.projectiles, this.gameState.projectilePool, this.effects);
             this.collision.update(this.gameState.projectiles, this.gameState.enemies);
-
-            // Update enemies
             this.entityManager.updateEnemies();
-        }
+            this.entityManager.updateProjectiles();
+            this.effects.update();
 
+            // Update enemy counter in HUD
+            this.ui.hud.updateEnemyCounter(this.gameState.enemies.length);
+        }
         // Update shake (once per frame, not per loop)
         this.gameState.updateShake();
         this.effects.update();
@@ -248,6 +250,10 @@ export class GameScene extends BaseScene implements IGameScene {
         // Draw entities
         this.gameState.towers.forEach((t) => t.draw(ctx));
         this.drawSelectedTowerRange(ctx);
+
+        // Draw targeting mode tooltip for hovered tower
+        this.drawTargetingModeTooltip(ctx);
+
         this.gameState.enemies.forEach((e) => e.draw(ctx));
         // Draw effects
         this.effects.draw();
@@ -355,6 +361,57 @@ export class GameScene extends BaseScene implements IGameScene {
             );
             ctx.fill();
             ctx.stroke();
+        }
+    }
+
+    private drawTargetingModeTooltip(ctx: CanvasRenderingContext2D) {
+        // Find tower under mouse cursor
+        if (this.input.hoverCol < 0 || this.input.hoverRow < 0) return;
+
+        const hoverX = this.input.hoverCol * CONFIG.TILE_SIZE + CONFIG.TILE_SIZE / 2;
+        const hoverY = this.input.hoverRow * CONFIG.TILE_SIZE + CONFIG.TILE_SIZE / 2;
+
+        const hoveredTower = this.gameState.towers.find((t) => {
+            const dist = Math.hypot(t.x - hoverX, t.y - hoverY);
+            return dist < 32; // Within tower radius
+        });
+
+        if (hoveredTower && !hoveredTower.isBuilding) {
+            const modeKey = hoveredTower.targetingMode.toUpperCase();
+            const mode = Object.values(CONFIG.TARGETING_MODES).find((m: any) => m.id === hoveredTower.targetingMode);
+            if (mode) {
+                // Draw small icon above tower
+                ctx.save();
+                ctx.shadowBlur = 10;
+                ctx.shadowColor = 'rgba(0, 0, 0, 0.8)';
+
+                // Background circle
+                ctx.fillStyle = 'rgba(50, 50, 70, 0.95)';
+                ctx.beginPath();
+                ctx.arc(hoveredTower.x, hoveredTower.y - 45, 18, 0, Math.PI * 2);
+                ctx.fill();
+
+                // Border
+                ctx.strokeStyle = '#4caf50';
+                ctx.lineWidth = 2;
+                ctx.stroke();
+
+                ctx.restore();
+
+                // Icon
+                ctx.font = '20px Arial';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(mode.icon, hoveredTower.x, hoveredTower.y - 45);
+
+                // Tooltip text below
+                ctx.font = '12px Arial';
+                ctx.fillStyle = '#fff';
+                ctx.strokeStyle = '#000';
+                ctx.lineWidth = 3;
+                ctx.strokeText(mode.name, hoveredTower.x, hoveredTower.y - 22);
+                ctx.fillText(mode.name, hoveredTower.x, hoveredTower.y - 22);
+            }
         }
     }
 

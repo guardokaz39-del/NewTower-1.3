@@ -3,7 +3,7 @@
 
 <head>
     <meta charset="UTF-8">
-    <title>NewTower - Reloaded</title>
+    <title>NewTower v1.4 Alpha</title>
     <style>
         body {
             margin: 0;
@@ -184,6 +184,15 @@
 
         .slot.shop-slot {
             border-color: gold;
+            transition: all 0.2s ease;
+            cursor: pointer;
+        }
+
+        .slot.shop-slot:hover {
+            transform: scale(1.08);
+            box-shadow: 0 0 20px rgba(255, 215, 0, 0.6), 0 4px 12px rgba(0, 0, 0, 0.4);
+            border-color: #ffd700;
+            border-width: 3px;
         }
 
         /* Кнопки */
@@ -290,6 +299,29 @@
             100% {
                 transform: translateX(0);
             }
+        }
+
+        @keyframes forging {
+            0% {
+                box-shadow: 0 0 10px rgba(255, 152, 0, 0.5);
+                transform: scale(1);
+            }
+
+            50% {
+                box-shadow: 0 0 30px rgba(255, 215, 0, 0.9), 0 0 50px rgba(255, 152, 0, 0.5);
+                transform: scale(1.05);
+            }
+
+            100% {
+                box-shadow: 0 0 10px rgba(255, 152, 0, 0.5);
+                transform: scale(1);
+            }
+        }
+
+        .slot.forging {
+            animation: forging 0.4s ease-in-out infinite;
+            border-color: #ffd700 !important;
+            background: rgba(255, 215, 0, 0.2) !important;
         }
 
         /* Экран смерти и Game Over */
@@ -459,7 +491,8 @@
             <div class="top-bar">
                 <div>💰 <span id="money">0</span></div>
                 <div>❤️ <span id="lives">20</span></div>
-                <div>🌊 <span id="wave">1</span></div>
+                <div>⚔️ <span id="wave">1</span></div>
+                <div>👹 <span id="enemy-counter">0/0</span></div>
             </div>
 
             <div id="ui-left" class="ui-column">

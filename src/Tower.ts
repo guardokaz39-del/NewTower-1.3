@@ -31,6 +31,10 @@ export class Tower {
     public isOverheated: boolean = false;   // Whether tower is overheated
     public overheatCooldown: number = 0;    // Frames remaining in overheat lockout
 
+    // Visual state (Phase 3)
+    public recoilFrames: number = 0;        // Recoil animation timer
+    public recoilIntensity: number = 0;     // Recoil strength
+
     constructor(c: number, r: number) {
         this.col = c;
         this.row = r;
@@ -89,28 +93,18 @@ export class Tower {
         let damageMultiplier = 1.0;
         const multiCards = this.cards.filter((c) => c.type.id === 'multi');
 
-        // Determine main card type for visuals (First card)
+        // Get visual overrides from first card (data-driven approach)
         const mainCard = this.cards[0];
         if (mainCard) {
-            if (mainCard.type.id === 'ice') {
-                projectileType = 'ice';
-                color = VISUALS.PROJECTILES.ICE;
-                speed = 10;
-            } else if (mainCard.type.id === 'fire') {
-                projectileType = 'fire';
-                color = VISUALS.PROJECTILES.FIRE;
-                speed = 6;
-            } else if (mainCard.type.id === 'sniper') {
-                projectileType = 'sniper';
-                color = VISUALS.PROJECTILES.SNIPER;
-                speed = 15;
+            const upgrade = getCardUpgrade(mainCard.type.id, mainCard.level);
+            if (upgrade?.visualOverrides) {
+                projectileType = upgrade.visualOverrides.projectileType || 'standard';
+                color = upgrade.visualOverrides.projectileColor || VISUALS.PROJECTILES.STANDARD;
+                speed = upgrade.visualOverrides.projectileSpeed || 8;
             } else if (mainCard.type.id === 'multi') {
-                projectileType = 'split'; // If split is first
+                // Fallback for multishot (no visual overrides needed, it modifies count)
+                projectileType = 'split';
                 color = VISUALS.PROJECTILES.SPLIT;
-            } else if (mainCard.type.id === 'minigun') {
-                projectileType = 'minigun';
-                color = VISUALS.PROJECTILES.STANDARD; // Will be updated in Assets
-                speed = 12;
             }
         }
 
@@ -242,12 +236,27 @@ export class Tower {
                 else if (mainCard.type.id === 'minigun') turretName = 'turret_minigun';
             }
 
-            // 3. Draw Turret (Rotated)
+            // 3. Draw Turret (Rotated) with Level Visuals
             const turretImg = Assets.get(turretName);
             if (turretImg) {
                 ctx.save();
                 ctx.translate(this.x, this.y);
                 ctx.rotate(this.angle);
+
+                // Progressive scaling based on HIGHEST card level (not just first card)
+                const cardLevel = this.cards.length > 0
+                    ? Math.max(...this.cards.map(c => c.level))
+                    : 1;
+                const scaleMultiplier = 1.0 + ((cardLevel - 1) * 0.15); // LVL2=1.15, LVL3=1.30
+                ctx.scale(scaleMultiplier, scaleMultiplier);
+
+                // Recoil offset
+                if (this.recoilFrames > 0) {
+                    const recoilOffset = Math.sin(this.recoilFrames * 0.5) * this.recoilIntensity;
+                    ctx.translate(0, recoilOffset);
+                    this.recoilFrames--;
+                }
+
                 ctx.drawImage(turretImg, -halfSize, -halfSize);
 
                 // 4. Draw Modules (Attachments)
@@ -330,6 +339,56 @@ export class Tower {
                 }
 
                 ctx.restore();
+
+                // Level-based visual effects (outside rotation context)
+                // Use same cardLevel calculation as for scaling
+                const visualLevel = this.cards.length > 0
+                    ? Math.max(...this.cards.map(c => c.level))
+                    : 1;
+
+                if (visualLevel > 1) {
+                    ctx.save();
+                    ctx.translate(this.x, this.y);
+
+                    if (visualLevel === 2) {
+                        // LVL 2: Pulse Glow
+                        const pulse = 0.3 + Math.sin(Date.now() * 0.003) * 0.1;
+                        const cardColor = mainCard.type.color || '#fff';
+                        const gradient = ctx.createRadialGradient(0, 0, 10, 0, 0, 25);
+                        gradient.addColorStop(0, `${cardColor}00`);
+                        gradient.addColorStop(1, `${cardColor}${Math.floor(pulse * 255).toString(16).padStart(2, '0')}`);
+                        ctx.fillStyle = gradient;
+                        ctx.beginPath();
+                        ctx.arc(0, 0, 25, 0, Math.PI * 2);
+                        ctx.fill();
+                    } else if (visualLevel === 3) {
+                        // LVL 3: Rotating Aura Ring
+                        const rotation = (Date.now() * 0.002) % (Math.PI * 2);
+                        const cardColor = mainCard.type.color || '#fff';
+                        ctx.strokeStyle = cardColor;
+                        ctx.lineWidth = 2;
+                        ctx.globalAlpha = 0.5;
+
+                        // Draw rotating arc segments
+                        for (let i = 0; i < 3; i++) {
+                            const angle = rotation + (i * Math.PI * 2 / 3);
+                            ctx.beginPath();
+                            ctx.arc(0, 0, 28, angle, angle + Math.PI / 3);
+                            ctx.stroke();
+                        }
+                        ctx.globalAlpha = 1.0;
+                    }
+
+                    // Level counter badge
+                    ctx.fillStyle = '#ffd700'; // Gold
+                    ctx.font = 'bold 14px Arial';
+                    ctx.strokeStyle = '#000';
+                    ctx.lineWidth = 3;
+                    ctx.strokeText(visualLevel.toString(), 20, -20);
+                    ctx.fillText(visualLevel.toString(), 20, -20);
+
+                    ctx.restore();
+                }
 
                 // 5. Minigun Overheat Bar
                 if (turretName === 'turret_minigun' && this.spinupFrames > 0) {

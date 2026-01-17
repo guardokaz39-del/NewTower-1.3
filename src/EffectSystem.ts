@@ -1,7 +1,7 @@
 import { Assets } from './Assets';
 
 export interface IEffect {
-    type: 'explosion' | 'text' | 'particle' | 'scan' | 'debris' | 'screen_flash' | 'muzzle_flash';
+    type: 'explosion' | 'text' | 'particle' | 'scan' | 'debris' | 'screen_flash' | 'muzzle_flash' | 'scale_pop';
     x: number;
     y: number;
     life: number;
@@ -19,6 +19,8 @@ export interface IEffect {
     fontSize?: number; // For custom text size
     gravity?: number; // For debris with gravity
     flashColor?: string; // For screen flash
+    enemySprite?: string; // For scale_pop death animation
+    enemyColor?: string; // For enemy tint in scale_pop
 }
 
 export class EffectSystem {
@@ -125,6 +127,33 @@ export class EffectSystem {
                 gradient.addColorStop(1, color + flashAlpha + ')');
                 this.ctx.fillStyle = gradient;
                 this.ctx.fillRect(0, 0, this.canvasWidth, this.canvasHeight);
+            } else if (e.type === 'scale_pop') {
+                // Enemy death scale pop
+                const scaleProgress = 1 - progress; // Reverse: 0 -> 1
+                const scale = 1 + scaleProgress * 0.5; // Scale from 1.0 to 1.5
+
+                if (e.enemySprite) {
+                    const img = Assets.get(e.enemySprite);
+                    if (img) {
+                        this.ctx.save();
+                        this.ctx.translate(e.x, e.y);
+                        this.ctx.scale(scale, scale);
+
+                        const size = 64;
+                        const half = size / 2;
+                        this.ctx.drawImage(img, -half, -half, size, size);
+
+                        // Apply tint if available
+                        if (e.enemyColor) {
+                            this.ctx.globalCompositeOperation = 'source-atop';
+                            this.ctx.fillStyle = e.enemyColor;
+                            this.ctx.globalAlpha = 0.3 * progress;
+                            this.ctx.fillRect(-half, -half, size, size);
+                        }
+
+                        this.ctx.restore();
+                    }
+                }
             }
 
             this.ctx.restore();

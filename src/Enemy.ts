@@ -179,6 +179,27 @@ export class Enemy {
         ctx.save();
         ctx.translate(this.x, this.y);
 
+        // === ANIMATIONS (Phase 3) ===
+
+        // 1. Rotation towards movement
+        if (this.pathIndex < this.path.length - 1) {
+            const next = this.path[this.pathIndex];
+            const dx = next.x * CONFIG.TILE_SIZE + CONFIG.TILE_SIZE / 2 - this.x;
+            const dy = next.y * CONFIG.TILE_SIZE + CONFIG.TILE_SIZE / 2 - this.y;
+            const moveAngle = Math.atan2(dy, dx);
+            ctx.rotate(moveAngle + Math.PI / 2); // Rotate sprite to face movement direction
+        }
+
+        // 2. Breathing (pulsation)
+        const breathePhase = (Date.now() * 0.001) + (parseInt(this.id.slice(-3), 36) * 0.5);
+        const breatheScale = 1.0 + Math.sin(breathePhase) * 0.03;
+        ctx.scale(breatheScale, breatheScale);
+
+        // 3. Movement arc (vertical bob)
+        const walkCycle = (Date.now() * 0.01) % (Math.PI * 2);
+        const verticalBob = Math.abs(Math.sin(walkCycle)) * 2;
+        ctx.translate(0, -verticalBob);
+
         // -- VISUAL STACK --
 
         // 1. Shadow Layer
@@ -267,6 +288,25 @@ export class Enemy {
                     ctx.drawImage(propImg, -pHalf, -pHalf, pSize, pSize);
                 }
             });
+        }
+
+        // 3.5. Status Particles Layer (Phase 3)
+        // Ice crystals orbiting slowed enemies
+        if (this.statuses.some(s => s.type === 'slow')) {
+            for (let i = 0; i < 3; i++) {
+                const angle = (Date.now() * 0.003) + (i * Math.PI * 2 / 3);
+                const orbX = Math.cos(angle) * 20;
+                const orbY = Math.sin(angle) * 20;
+                ctx.fillStyle = '#4fc3f7'; // Light Blue 300
+                ctx.beginPath();
+                ctx.arc(orbX, orbY, 3, 0, Math.PI * 2);
+                ctx.fill();
+                // Inner glow
+                ctx.fillStyle = '#e1f5fe'; // Light Blue 50
+                ctx.beginPath();
+                ctx.arc(orbX, orbY, 1.5, 0, Math.PI * 2);
+                ctx.fill();
+            }
         }
 
         // 4. UI Layer (HP Bar)

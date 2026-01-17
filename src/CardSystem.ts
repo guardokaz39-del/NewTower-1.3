@@ -160,9 +160,13 @@ export class CardSystem {
         const canvas = this.scene.game.canvas;
         const canvasRect = canvas.getBoundingClientRect();
 
+        // Add visual feedback to forge slots (CSS animation)
+        if (forgeSlot0) forgeSlot0.classList.add('forging');
+        if (forgeSlot1) forgeSlot1.classList.add('forging');
+
         // Calculate center position between slots for effects
-        let effectX = canvas.width / 2;
-        let effectY = canvas.height - 200;
+        let effectX = 200; // Left side of screen (forge is on left)
+        let effectY = canvas.height - 300; // Above forge panel
 
         if (forgeSlot0 && forgeSlot1) {
             const rect0 = forgeSlot0.getBoundingClientRect();
@@ -176,16 +180,20 @@ export class CardSystem {
         }
 
         // Spawn particles during forge animation
+        let forgeFrame = 0;
         const particleInterval = setInterval(() => {
-            for (let i = 0; i < 3; i++) {
+            forgeFrame++;
+            const intensity = 1 + (forgeFrame / 16); // Crescendo effect
+
+            for (let i = 0; i < 5; i++) {
                 this.scene.effects.add({
                     type: 'particle',
-                    x: effectX + (Math.random() - 0.5) * 60,
-                    y: effectY + (Math.random() - 0.5) * 40,
-                    vx: (Math.random() - 0.5) * 4,
-                    vy: -(Math.random() * 3 + 1),
-                    life: 30,
-                    radius: Math.random() * 3 + 2,
+                    x: effectX + (Math.random() - 0.5) * 80,
+                    y: effectY + (Math.random() - 0.5) * 50,
+                    vx: (Math.random() - 0.5) * 6,
+                    vy: -(Math.random() * 4 + 1),
+                    life: 30 + Math.random() * 20,
+                    radius: Math.random() * 4 + 2,
                     color: Math.random() > 0.5 ? '#ff9800' : '#ffeb3b', // Orange/Yellow sparks
                 });
             }
@@ -194,6 +202,10 @@ export class CardSystem {
         // Forging complete
         setTimeout(() => {
             clearInterval(particleInterval);
+
+            // Remove forging animation from slots
+            if (forgeSlot0) forgeSlot0.classList.remove('forging');
+            if (forgeSlot1) forgeSlot1.classList.remove('forging');
 
             const c1 = this.forgeSlots[0]!;
             const newLevel = c1.level + 1;
@@ -211,15 +223,31 @@ export class CardSystem {
             this.isForging = false;
             this.addCard(typeKey, newLevel);
 
-            // Big explosion effect on completion
+            // Enhanced completion effects
+            // Big golden explosion
             this.scene.effects.add({
                 type: 'explosion',
                 x: effectX,
                 y: effectY,
-                radius: 50,
-                life: 30,
+                radius: 60,
+                life: 35,
                 color: '#ffd700', // Gold
             });
+
+            // Burst of particles in all directions
+            for (let i = 0; i < 24; i++) {
+                const angle = (i / 24) * Math.PI * 2;
+                this.scene.effects.add({
+                    type: 'particle',
+                    x: effectX,
+                    y: effectY,
+                    vx: Math.cos(angle) * 5,
+                    vy: Math.sin(angle) * 5,
+                    life: 40,
+                    radius: 4,
+                    color: '#ffd700',
+                });
+            }
 
             this.scene.showFloatingText('⚒️ FORGED!', effectX, effectY - 30, 'gold');
         }, 800);

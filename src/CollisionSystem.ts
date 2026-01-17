@@ -3,31 +3,50 @@ import { Projectile } from './Projectile';
 import { EffectSystem } from './EffectSystem';
 import { DebugSystem } from './DebugSystem';
 import { SoundManager, SoundPriority } from './SoundManager';
+import { SpatialGrid } from './SpatialGrid';
 
 export class CollisionSystem {
     private effects: EffectSystem;
     private debug: DebugSystem;
+    private enemyGrid: SpatialGrid<Enemy>;
 
     constructor(effects: EffectSystem, debug: DebugSystem) {
         this.effects = effects;
         this.debug = debug;
+        // Initialize grid with screen dimensions, 128px cells
+        this.enemyGrid = new SpatialGrid<Enemy>(window.innerWidth, window.innerHeight, 128);
     }
 
+
     public update(projectiles: Projectile[], enemies: Enemy[]) {
+        // Rebuild spatial grid each frame
+        this.enemyGrid.clear();
+        for (const enemy of enemies) {
+            if (enemy.isAlive()) {
+                this.enemyGrid.register(enemy);
+            }
+        }
+
+        // Check projectile collisions using spatial grid
         for (const p of projectiles) {
             if (!p.alive) continue;
 
+            // Out of bounds check
             if (p.x < -50 || p.x > window.innerWidth + 50 || p.y < -50 || p.y > window.innerHeight + 50) {
                 p.alive = false;
                 continue;
             }
 
-            for (const e of enemies) {
+            // Get only nearby enemies instead of checking all enemies
+            const searchRadius = 100; // Reasonable search radius for collision
+            const nearbyEnemies = this.enemyGrid.getNearby(p.x, p.y, searchRadius);
+
+            for (const e of nearbyEnemies) {
                 if (!e.isAlive()) continue;
                 if (p.hitList.includes(e.id)) continue;
 
                 const dist = Math.hypot(e.x - p.x, e.y - p.y);
-                const hitDist = 20 + p.radius; // Чуть увеличил хитбокс
+                const hitDist = 20 + p.radius;
 
                 if (dist < hitDist) {
                     this.handleHit(p, e, enemies);

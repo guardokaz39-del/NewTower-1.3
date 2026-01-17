@@ -9,6 +9,7 @@ export class GameHUD {
     private elMoney: HTMLElement;
     private elWave: HTMLElement;
     private elLives: HTMLElement;
+    private elEnemyCounter: HTMLElement;
     private elForgeBtn: HTMLButtonElement;
     private elStartBtn: HTMLButtonElement;
     // private elPauseBtn: HTMLButtonElement; // REMOVED
@@ -19,6 +20,7 @@ export class GameHUD {
         this.elMoney = document.getElementById('money')!;
         this.elWave = document.getElementById('wave')!;
         this.elLives = document.getElementById('lives')!;
+        this.elEnemyCounter = document.getElementById('enemy-counter')!;
         this.elForgeBtn = document.getElementById('forge-btn') as HTMLButtonElement;
         this.elStartBtn = document.getElementById('start-wave-btn') as HTMLButtonElement;
         // Pause button removed
@@ -78,7 +80,11 @@ export class GameHUD {
     }
 
     private updateWaveText(wave: number) {
-        this.elWave.innerText = wave + '/' + CONFIG.WAVES.length;
+        this.elWave.innerText = wave.toString();
+    }
+
+    public updateEnemyCounter(currentCount: number) {
+        this.elEnemyCounter.innerText = currentCount.toString();
     }
 
     private updateStartBtn(isWaveActive: boolean) {
