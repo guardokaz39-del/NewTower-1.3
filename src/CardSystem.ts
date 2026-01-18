@@ -277,16 +277,75 @@ export class CardSystem {
 
     private createCardElement(card: ICard): HTMLElement {
         const el = document.createElement('div');
-        el.className = `card type-${card.type.id}`;
-        if (card.type.id === 'multi') el.style.borderColor = 'orange';
+        el.className = `card type-${card.type.id} level-${card.level}`;
 
         // Звездочки уровня
         let stars = '★'.repeat(card.level);
 
+        // Получаем характеристики карты в зависимости от типа и уровня
+        let statsHTML = this.getCardStatsHTML(card);
+
         el.innerHTML = `
             <div class="card-level">${stars}</div>
             <div class="card-icon">${card.type.icon}</div>
+            <div class="card-stats">${statsHTML}</div>
         `;
         return el;
+    }
+
+    private getCardStatsHTML(card: ICard): string {
+        const type = card.type.id;
+        const level = card.level;
+
+        // Определяем какие характеристики показывать для каждого типа карты
+        switch (type) {
+            case 'fire':
+                if (level === 1) {
+                    return `<div class="card-stat-primary">Урон +15</div><div class="card-stat-line">Взрыв 50</div>`;
+                } else if (level === 2) {
+                    return `<div class="card-stat-primary">Урон +30</div><div class="card-stat-line">Взрыв 85</div>`;
+                } else {
+                    return `<div class="card-stat-primary">Урон +30</div><div class="card-stat-line">Взрыв + 💀</div>`;
+                }
+
+            case 'ice':
+                if (level === 1) {
+                    return `<div class="card-stat-primary">Урон +3</div><div class="card-stat-line">❄️ 30%</div>`;
+                } else if (level === 2) {
+                    return `<div class="card-stat-primary">Урон +6</div><div class="card-stat-line">❄️ 45%</div>`;
+                } else {
+                    return `<div class="card-stat-primary">Урон +9</div><div class="card-stat-line">❄️ 75% + ⛓️</div>`;
+                }
+
+            case 'sniper':
+                if (level === 1) {
+                    return `<div class="card-stat-primary">Урон +14</div><div class="card-stat-line">🎯 +80</div>`;
+                } else if (level === 2) {
+                    return `<div class="card-stat-primary">Урон +24</div><div class="card-stat-line">🎯 +160</div>`;
+                } else {
+                    return `<div class="card-stat-primary">Урон +46</div><div class="card-stat-line">🎯 +240 💫</div>`;
+                }
+
+            case 'multi':
+                if (level === 1) {
+                    return `<div class="card-stat-primary">2 снаряда</div><div class="card-stat-line">0.8x урон</div>`;
+                } else if (level === 2) {
+                    return `<div class="card-stat-primary">3 снаряда</div><div class="card-stat-line">0.6x урон</div>`;
+                } else {
+                    return `<div class="card-stat-primary">4 снаряда</div><div class="card-stat-line">0.45x урон</div>`;
+                }
+
+            case 'minigun':
+                if (level === 1) {
+                    return `<div class="card-stat-primary">⚡ Раскрутка</div><div class="card-stat-line">+3 урон/с</div>`;
+                } else if (level === 2) {
+                    return `<div class="card-stat-primary">⚡ Раскрутка</div><div class="card-stat-line">+урон +крит</div>`;
+                } else {
+                    return `<div class="card-stat-primary">⚡ Раскрутка</div><div class="card-stat-line">до +30 урон</div>`;
+                }
+
+            default:
+                return `<div class="card-stat-line">${card.type.desc}</div>`;
+        }
     }
 }

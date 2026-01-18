@@ -1,6 +1,11 @@
 // Структура одной волны
 export interface IWaveConfig {
-    enemies: { type: string; count: number }[]; // Кто и сколько
+    enemies: {
+        type: string;
+        count: number;
+        speed?: number; // 0.5, 1.0, 1.5, 2.0 etc (multiplier)
+        spawnRate?: 'fast' | 'medium' | 'slow'; // spawn delay
+    }[]; // Кто и сколько
 }
 
 // Полная структура файла сохранения
@@ -31,7 +36,7 @@ export interface IMapData {
     startingMoney?: number;
     startingLives?: number;
     manualPath?: boolean; // true if waypoints were manually placed
-    fogData?: number[]; // ARRAY: 0=Visible, 1=Fog (Stores logical state, not bitmask index)
+    fogData?: number[]; // ARRAY: fog density per tile (0=Visible, 1-5=Fog density 20%-100%)
 }
 
 export interface Cell {

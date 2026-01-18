@@ -159,6 +159,22 @@ export class EntityManager {
         this.metrics.trackEnemyKilled();
         this.metrics.trackMoneyEarned(reward);
 
+        const enemyTypeConf = getEnemyType(enemy.typeId.toUpperCase());
+
+        // Scale pop animation (enemy "pops" before disappearing)
+        const archetype = enemyTypeConf?.archetype || 'skeleton';
+        this.effects.add({
+            type: 'scale_pop',
+            x: enemy.x,
+            y: enemy.y,
+            life: 12,
+            enemySprite: `enemy_${archetype.toLowerCase()}`,
+            enemyColor: enemyTypeConf?.color
+        });
+
+        // Soft death sound (throttled by SoundManager)
+        SoundManager.play('death');
+
         // Floating text with emoji
         this.effects.add({
             type: 'text',
@@ -185,23 +201,22 @@ export class EntityManager {
             });
         }
 
-        // Death debris
-        const enemyTypeConf = getEnemyType(enemy.typeId.toUpperCase());
+        // Death debris (colored by enemy type)
         const debrisColor = enemyTypeConf?.color || '#888';
-        const debrisCount = 6 + Math.floor(Math.random() * 3);
+        const debrisCount = 4 + Math.floor(Math.random() * 3);
         for (let d = 0; d < debrisCount; d++) {
             this.effects.add({
                 type: 'debris',
                 x: enemy.x,
                 y: enemy.y,
-                vx: (Math.random() - 0.5) * 8,
-                vy: -(Math.random() * 4 + 1),
-                life: 30 + Math.floor(Math.random() * 15),
-                size: 3 + Math.random() * 4,
+                vx: (Math.random() - 0.5) * 6,
+                vy: -(Math.random() * 3 + 1),
+                life: 25 + Math.floor(Math.random() * 10),
+                size: 2 + Math.random() * 3,
                 color: debrisColor,
                 rotation: Math.random() * Math.PI * 2,
-                vRot: (Math.random() - 0.5) * 0.4,
-                gravity: 0.3,
+                vRot: (Math.random() - 0.5) * 0.3,
+                gravity: 0.25,
             });
         }
     }
@@ -245,7 +260,7 @@ export class EntityManager {
     public updateProjectiles(): void {
         for (let i = this.state.projectiles.length - 1; i >= 0; i--) {
             const p = this.state.projectiles[i];
-            p.update();
+            p.update(this.effects);
             if (!p.alive) {
                 this.state.projectiles.splice(i, 1);
                 this.state.projectilePool.free(p);

@@ -124,13 +124,13 @@ export class SoundManager {
             return Math.sin(t * 2000 * Math.PI * 2) * decay;
         }, 0.1);
 
-        // 3. Enemy Death - Low thud / squash
+        // 3. Enemy Death - Soft pop (pleasant, not annoying on repeat)
         this.buffers['death'] = this.createBuffer((t) => {
-            const decay = Math.exp(-t * 15);
-            // Sliding pitch down
-            const freq = 150 * Math.exp(-t * 5);
-            return (Math.sin(t * freq * Math.PI * 2) + (Math.random() * 0.5)) * decay;
-        }, 0.3);
+            const decay = Math.exp(-t * 25);
+            // Soft bubble pop - high start, quick fade
+            const freq = 400 * Math.exp(-t * 8);
+            return Math.sin(t * freq * Math.PI * 2) * decay * 0.6;
+        }, 0.15);
 
         // 4. Boss Spawn - Low droning sweep
         this.buffers['boss_spawn'] = this.createBuffer((t) => {

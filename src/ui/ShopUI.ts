@@ -162,16 +162,18 @@ export class ShopUI {
             // --- ВИЗУАЛЬНОЕ ИЗМЕНЕНИЕ ---
             // Создаем карту внутри, точно такую же, как в руке
             const cardVisual = document.createElement('div');
-            cardVisual.className = `card type-${typeConfig.id}`;
+            cardVisual.className = `card type-${typeConfig.id} level-1`;
             // Убираем pointer-events, чтобы клик проходил сквозь карту на слот
-            // Немного уменьшаем (scale), чтобы влезла в слот красиво
             cardVisual.style.pointerEvents = 'none';
-            cardVisual.style.transform = 'scale(0.9)';
+
+            // Get stats HTML for level 1
+            const statsHTML = this.getCardStatsHTML(typeConfig.id);
 
             // В магазине мы продаем карты 1 уровня
             cardVisual.innerHTML = `
-                <div class="card-level">1</div>
+                <div class="card-level">★</div>
                 <div class="card-icon">${typeConfig.icon}</div>
+                <div class="card-stats">${statsHTML}</div>
             `;
 
             slot.appendChild(cardVisual);
@@ -193,5 +195,23 @@ export class ShopUI {
 
             this.elSlotsContainer.appendChild(slot);
         });
+    }
+
+    private getCardStatsHTML(typeId: string): string {
+        // Same logic as CardSystem, but always level 1
+        switch (typeId) {
+            case 'fire':
+                return `<div class="card-stat-primary">Урон +15</div><div class="card-stat-line">Взрыв 50</div>`;
+            case 'ice':
+                return `<div class="card-stat-primary">Урон +3</div><div class="card-stat-line">❄️ 30%</div>`;
+            case 'sniper':
+                return `<div class="card-stat-primary">Урон +14</div><div class="card-stat-line">🎯 +80</div>`;
+            case 'multi':
+                return `<div class="card-stat-primary">2 снаряда</div><div class="card-stat-line">0.8x урон</div>`;
+            case 'minigun':
+                return `<div class="card-stat-primary">⚡ Раскрутка</div><div class="card-stat-line">+3 урон/с</div>`;
+            default:
+                return `<div class="card-stat-line">Карта</div>`;
+        }
     }
 }

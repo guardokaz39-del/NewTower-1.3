@@ -8,23 +8,29 @@ import { UIUtils } from '../UIUtils';
 import { Pathfinder } from '../Pathfinder';
 import { WaveEditor } from '../WaveEditor';
 import { FogSystem } from '../FogSystem';
+import { EditorToolbar, EditorMode } from '../editor/EditorToolbar';
+import { WaypointManager } from '../editor/WaypointManager';
+import { EditorHistory, EditorActions } from '../editor/EditorHistory';
 
 export class EditorScene extends BaseScene {
     private game: Game;
     private map: MapManager;
     private fog: FogSystem;
-    private container!: HTMLElement;
+    private toolbar!: EditorToolbar;
+    private controlsContainer!: HTMLElement;
+    private waypointMgr!: WaypointManager;
+    private history!: EditorHistory;
 
-    private mode: 'paint_road' | 'paint_grass' | 'set_start' | 'set_end' | 'place_waypoint' | 'eraser' | 'paint_fog' = 'paint_road';
-
-    private startPoint: { x: number; y: number } | null = null;
-    private endPoint: { x: number; y: number } | null = null;
-    private manualWaypoints: { x: number; y: number }[] = []; // FEATURE: Manual waypoints
+    private mode: EditorMode = 'paint_road';
 
     // FEATURE: Saved maps panel
     private mapsPanel!: HTMLElement;
     private mapsPanelExpanded: boolean = false;
     private currentMapName: string = '';
+
+    // Track previous mouse state for click detection (not hold)
+    private prevMouseDown: boolean = false;
+    private lastClickedTile: { col: number; row: number } | null = null;
 
     constructor(game: Game) {
         super();
@@ -47,75 +53,128 @@ export class EditorScene extends BaseScene {
 
         this.map = new MapManager(emptyData);
         this.fog = new FogSystem(emptyData);
+        this.waypointMgr = new WaypointManager();
+        this.history = new EditorHistory();
         this.createUI();
         this.createMapsPanel();
+        this.setupHotkeys();
     }
 
     public onEnter() {
-        this.container.style.display = 'flex';
+        this.toolbar.show();
+        this.controlsContainer.style.display = 'flex';
         this.mapsPanel.style.display = 'block';
         const uiLayer = document.getElementById('ui-layer');
         if (uiLayer) uiLayer.style.display = 'none';
+
+        // Initial fog render
+        this.fog.update(0);
     }
 
     public onExit() {
-        this.container.style.display = 'none';
+        this.toolbar.hide();
+        this.controlsContainer.style.display = 'none';
         this.mapsPanel.style.display = 'none';
-        if (this.container.parentNode) this.container.parentNode.removeChild(this.container);
+        if (this.toolbar) this.toolbar.destroy();
+        if (this.controlsContainer.parentNode) this.controlsContainer.parentNode.removeChild(this.controlsContainer);
         if (this.mapsPanel.parentNode) this.mapsPanel.parentNode.removeChild(this.mapsPanel);
     }
 
     public update() {
-        this.fog.update();
+        // Don't update fog animation in editor - only static rendering
         const input = this.game.input;
 
-        if (input.isMouseDown && input.hoverCol >= 0 && input.hoverRow >= 0) {
-            this.handleInput(input.hoverCol, input.hoverRow);
+        // Detect mouse click (edge detection: was up, now down)
+        const isNewClick = input.isMouseDown && !this.prevMouseDown;
+
+        if (isNewClick && input.hoverCol >= 0 && input.hoverRow >= 0) {
+            // Check if clicked on a different tile or first click
+            const isDifferentTile =
+                !this.lastClickedTile ||
+                this.lastClickedTile.col !== input.hoverCol ||
+                this.lastClickedTile.row !== input.hoverRow;
+
+            if (isDifferentTile) {
+                this.handleInput(input.hoverCol, input.hoverRow);
+                this.lastClickedTile = { col: input.hoverCol, row: input.hoverRow };
+
+                // Trigger fog re-render after data change (static, no animation)
+                this.fog.update(0);
+            }
+        }
+
+        // Update previous state
+        this.prevMouseDown = input.isMouseDown;
+
+        // Reset last clicked tile when mouse is released
+        if (!input.isMouseDown) {
+            this.lastClickedTile = null;
         }
     }
 
     private handleInput(col: number, row: number) {
         if (col >= this.map.cols || row >= this.map.rows) return;
 
+        const oldTileType = this.map.grid[row][col].type;
+        const oldFogDensity = this.fog.getFog(col, row);
+
         if (this.mode === 'paint_road') {
-            this.map.grid[row][col].type = 1;
-            this.map.grid[row][col].decor = null;
+            if (oldTileType !== 1) {
+                this.history.push(EditorActions.createTileAction(this.map.grid, col, row, oldTileType, 1));
+                this.map.grid[row][col].type = 1;
+                this.map.grid[row][col].decor = null;
+            }
         } else if (this.mode === 'paint_grass') {
-            this.map.grid[row][col].type = 0;
+            if (oldTileType !== 0) {
+                this.history.push(EditorActions.createTileAction(this.map.grid, col, row, oldTileType, 0));
+                this.map.grid[row][col].type = 0;
+            }
         } else if (this.mode === 'eraser') {
-            // FEATURE: Eraser - reset to grass
-            this.map.grid[row][col].type = 0;
-            this.map.grid[row][col].decor = null;
+            // FEATURE: Eraser - reset to grass and fog
+            if (oldTileType !== 0 || oldFogDensity !== 0) {
+                this.history.push(EditorActions.createTileAction(this.map.grid, col, row, oldTileType, 0));
+                this.map.grid[row][col].type = 0;
+                this.map.grid[row][col].decor = null;
+                if (oldFogDensity !== 0) {
+                    this.history.push(EditorActions.createFogAction(this.fog, col, row, oldFogDensity, 0));
+                    this.fog.setFog(col, row, 0);
+                }
+            }
         } else if (this.mode === 'set_start') {
-            this.startPoint = { x: col, y: row };
+            const oldState = {
+                start: this.waypointMgr.getStart(),
+                end: this.waypointMgr.getEnd(),
+                waypoints: this.waypointMgr.getWaypoints()
+            };
+            this.history.push(EditorActions.createWaypointAction(this.waypointMgr, 'setStart', { x: col, y: row }, oldState));
+            this.waypointMgr.setStart({ x: col, y: row });
             this.map.grid[row][col].type = 1;
-            // Update waypoints list for Map to draw icons
-            this.updateMapWaypoints();
         } else if (this.mode === 'set_end') {
-            this.endPoint = { x: col, y: row };
+            const oldState = {
+                start: this.waypointMgr.getStart(),
+                end: this.waypointMgr.getEnd(),
+                waypoints: this.waypointMgr.getWaypoints()
+            };
+            this.history.push(EditorActions.createWaypointAction(this.waypointMgr, 'setEnd', { x: col, y: row }, oldState));
+            this.waypointMgr.setEnd({ x: col, y: row });
             this.map.grid[row][col].type = 1;
-            this.updateMapWaypoints();
         } else if (this.mode === 'place_waypoint') {
-            // FEATURE: Add waypoint on click
-            this.manualWaypoints.push({ x: col, y: row });
+            if (this.waypointMgr.canAddWaypoint()) {
+                const oldState = {
+                    start: this.waypointMgr.getStart(),
+                    end: this.waypointMgr.getEnd(),
+                    waypoints: this.waypointMgr.getWaypoints()
+                };
+                this.history.push(EditorActions.createWaypointAction(this.waypointMgr, 'addWaypoint', { x: col, y: row }, oldState));
+                this.waypointMgr.addWaypoint({ x: col, y: row });
+            }
         } else if (this.mode === 'paint_fog') {
-            const isLeftClick = this.game.input.isMouseDown;
-            // We need to know if it's left or right click to paint/erase
-            // Check InputSystem or just assume left click is paint (1) and maybe add right click check later?
-            // The prompt said: "Left Click: Paint Fog (1). Right Click: Erase Fog (0)."
-            // My current input system might not expose right click easily in this method.
-            // Let's assume standard behavior: left click paints 1.
-            // But for eraser logic in 'paint_fog' mode?
-            // The 'eraser' mode sets type to 0.
-            // Let's implement toggle or just set to 1 for now.
-            // Ideally we check `input.button` if available.
-            // Assuming `this.game.input` has `isRightDown` or similar?
-            // Checking `InputSystem.ts` (list_dir step 11) - I haven't read InputSystem.
-            // I'll stick to left click paints fog (1). The 'Eraser' tool can clear fog too?
-            // Or I use the 'Eraser' mode to clear fog if clicked on fog?
-            // The plan said "Right Click: Erase Fog (0)".
-            // I'll try to check mouse button if possible, otherwise I'll use simple set(1).
-            this.fog.setFog(col, row, 1);
+            // Cycle fog density: 0 → 1 → 2 → 3 → 4 → 5 → 0
+            this.fog.cycleFogDensity(col, row);
+            const newFogDensity = this.fog.getFog(col, row);
+            if (oldFogDensity !== newFogDensity) {
+                this.history.push(EditorActions.createFogAction(this.fog, col, row, oldFogDensity, newFogDensity));
+            }
         }
     }
 
@@ -131,57 +190,12 @@ export class EditorScene extends BaseScene {
 
         // We do NOT overwrite map.waypoints here every frame anymore.
         // It prevents saving them correctly.
-        // We only show them via draw() calls or rely on map.draw() using current state.
-
-        // However, map.draw() draws start/end icons based on map.waypoints.
-        // If we want to visualize start/end points dynamically while placing them:
-        if (this.startPoint && this.mode === 'set_start') {
-            // Just specific visual feedback if needed, 
-            // but effectively we updated map.grid type so map.draw handles tiles.
-        }
-
         this.map.draw(ctx);
         this.fog.draw(ctx);
 
-        // FEATURE: Draw manual waypoints
-        if (this.manualWaypoints.length > 0) {
-            ctx.strokeStyle = '#00ff00';
-            ctx.fillStyle = 'rgba(0, 255, 0, 0.3)';
-            ctx.lineWidth = 3;
+        // Draw waypoints with WaypointManager
+        this.waypointMgr.draw(ctx);
 
-            // Draw lines connecting waypoints
-            ctx.beginPath();
-            for (let i = 0; i < this.manualWaypoints.length; i++) {
-                const wp = this.manualWaypoints[i];
-                const wpX = wp.x * CONFIG.TILE_SIZE + CONFIG.TILE_SIZE / 2;
-                const wpY = wp.y * CONFIG.TILE_SIZE + CONFIG.TILE_SIZE / 2;
-
-                if (i === 0) ctx.moveTo(wpX, wpY);
-                else ctx.lineTo(wpX, wpY);
-            }
-            ctx.stroke();
-
-            // Draw numbered waypoint markers
-            this.manualWaypoints.forEach((wp, idx) => {
-                const wpX = wp.x * CONFIG.TILE_SIZE + CONFIG.TILE_SIZE / 2;
-                const wpY = wp.y * CONFIG.TILE_SIZE + CONFIG.TILE_SIZE / 2;
-
-                ctx.fillStyle = '#00ff00';
-                ctx.beginPath();
-                ctx.arc(wpX, wpY, 12, 0, Math.PI * 2);
-                ctx.fill();
-
-                ctx.strokeStyle = '#ffffff';
-                ctx.lineWidth = 2;
-                ctx.stroke();
-
-                ctx.fillStyle = '#000';
-                ctx.font = 'bold 14px Arial';
-                ctx.textAlign = 'center';
-                ctx.textBaseline = 'middle';
-                ctx.fillText((idx + 1).toString(), wpX, wpY);
-            });
-        }
 
         const input = this.game.input;
         if (input.hoverCol >= 0) {
@@ -194,7 +208,26 @@ export class EditorScene extends BaseScene {
             if (this.mode === 'set_start') ctx.strokeStyle = 'cyan';
             if (this.mode === 'set_end') ctx.strokeStyle = 'magenta';
             if (this.mode === 'place_waypoint') ctx.strokeStyle = '#00ff00';
-            if (this.mode === 'paint_fog') ctx.strokeStyle = '#607d8b';
+
+            if (this.mode === 'paint_fog') {
+                // Show current fog density with color intensity
+                const density = this.fog.getFog(input.hoverCol, input.hoverRow);
+                const intensity = density * 40 + 80; // 80-280 range
+                ctx.strokeStyle = `rgb(${intensity}, ${intensity + 30}, ${intensity + 50})`;
+
+                // Draw density indicator
+                ctx.fillStyle = `rgba(200, 215, 230, ${density * 0.15})`;
+                ctx.fillRect(x, y, CONFIG.TILE_SIZE, CONFIG.TILE_SIZE);
+
+                // Draw density number
+                if (density > 0) {
+                    ctx.fillStyle = '#fff';
+                    ctx.font = 'bold 16px Arial';
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillText(density.toString(), x + CONFIG.TILE_SIZE / 2, y + CONFIG.TILE_SIZE / 2);
+                }
+            }
 
             ctx.lineWidth = 2;
             ctx.strokeRect(x, y, CONFIG.TILE_SIZE, CONFIG.TILE_SIZE);
@@ -202,24 +235,12 @@ export class EditorScene extends BaseScene {
     }
 
     private openWaveConfig() {
-        // FEATURE: Priority: manual waypoints > auto pathfinding
-        if (this.manualWaypoints.length >= 2) {
-            // Use manual waypoints
-            this.map.waypoints = this.manualWaypoints;
+        // Use WaypointManager's full path
+        if (this.waypointMgr.isValid()) {
+            this.map.waypoints = this.waypointMgr.getFullPath();
         } else {
-            // Fallback to auto pathfinding
-            if (!this.startPoint || !this.endPoint) {
-                alert('Set Start and End points first (or place at least 2 waypoints)!');
-                return;
-            }
-
-            const path = Pathfinder.findPath(this.map.grid, this.startPoint, this.endPoint);
-            if (path.length === 0) {
-                alert('No path found between Start and End! Make sure they are connected by Road tiles.');
-                return;
-            }
-
-            this.map.waypoints = path;
+            alert('Set Start and End points first!');
+            return;
         }
 
         const currentWaves = (this.map as any).waves || [];
@@ -239,12 +260,9 @@ export class EditorScene extends BaseScene {
         // [FIX] Ensure map waves are updated before serialization
         (this.map as any).waves = waves;
 
-        // [FIX] Ensure waypoints are synced before saving
-        this.updateMapWaypoints();
-
         const data = serializeMap(this.map);
         data.fogData = this.fog.getFogData();
-        data.manualPath = this.manualWaypoints.length >= 2; // FEATURE: Mark if manual waypoints used
+        data.manualPath = this.waypointMgr.isValid(); // Using waypoint manager
 
         const name = prompt('Enter map name:', this.currentMapName || 'MyMap');
         if (!name) return;
@@ -259,107 +277,45 @@ export class EditorScene extends BaseScene {
     }
 
     private createUI() {
-        this.container = UIUtils.createContainer({
+        // Create new modular toolbar
+        this.toolbar = new EditorToolbar((mode) => {
+            this.mode = mode;
+        });
+
+        // Create controls container for additional buttons (WAVES, MENU, Clear Path)
+        this.controlsContainer = UIUtils.createContainer({
             position: 'absolute',
-            bottom: '20px',
-            left: '50%',
-            transform: 'translateX(-50%)',
+            top: '20px',
+            right: '20px',
             display: 'flex',
-            gap: '10px',
+            flexDirection: 'column',
+            gap: '8px',
             padding: '10px',
-            background: 'rgba(0,0,0,0.8)',
+            background: 'rgba(0,0,0,0.85)',
             borderRadius: '8px',
             zIndex: '1000'
         });
 
         const addBtn = (text: string, onClick: () => void, color: string = '#444') => {
-            UIUtils.createButton(this.container, text, onClick, {
+            UIUtils.createButton(this.controlsContainer, text, onClick, {
                 background: color,
                 border: '1px solid #666',
-                padding: '8px 15px',
-                borderRadius: '4px',
-                fontSize: '16px',
-                fontWeight: 'bold'
+                padding: '10px 16px',
+                borderRadius: '6px',
+                fontSize: '14px',
+                fontWeight: 'bold',
+                width: '100%'
             });
         };
 
-        addBtn(
-            '🌲 Grass',
-            () => {
-                this.mode = 'paint_grass';
-            },
-            '#388e3c',
-        );
-        addBtn(
-            '🟫 Road',
-            () => {
-                this.mode = 'paint_road';
-            },
-            '#795548',
-        );
-        addBtn(
-            '🧹 Eraser',
-            () => {
-                this.mode = 'eraser';
-            },
-            '#ff6600',
-        );
-
-        addBtn(
-            '🌫️ Fog',
-            () => {
-                this.mode = 'paint_fog';
-            },
-            '#607d8b'
-        );
-
-        const sep1 = document.createElement('div');
-        sep1.style.width = '10px';
-        this.container.appendChild(sep1);
-
-        addBtn(
-            '🏁 Start',
-            () => {
-                this.mode = 'set_start';
-            },
-            '#00bcd4',
-        );
-        addBtn(
-            '🛑 End',
-            () => {
-                this.mode = 'set_end';
-            },
-            '#e91e63',
-        );
-
-        const sep2 = document.createElement('div');
-        sep2.style.width = '10px';
-        this.container.appendChild(sep2);
-
-        // FEATURE: Waypoint buttons
-        addBtn(
-            '📍 Waypoints',
-            () => {
-                this.mode = 'place_waypoint';
-            },
-            '#9c27b0',
-        );
-        addBtn(
-            '🗑️ Clear Path',
-            () => {
-                this.manualWaypoints = [];
-            },
-            '#e91e63',
-        );
-
-        const sep3 = document.createElement('div');
-        sep3.style.width = '10px';
-        this.container.appendChild(sep3);
+        addBtn('🗑️ Clear Path', () => {
+            this.waypointMgr.clearAll();
+        }, '#e91e63');
 
         addBtn('⚙️ WAVES & SAVE', () => this.openWaveConfig(), '#ff9800');
         addBtn('🚪 MENU', () => this.game.toMenu(), '#d32f2f');
 
-        document.body.appendChild(this.container);
+        document.body.appendChild(this.controlsContainer);
     }
 
     // FEATURE: Create saved maps panel
@@ -498,22 +454,25 @@ export class EditorScene extends BaseScene {
         this.map = new MapManager(data);
         this.fog = new FogSystem(data);
 
-        // Handle waypoints based on whether they were manually placed
-        if (data.manualPath && data.waypoints && data.waypoints.length > 0) {
-            this.manualWaypoints = [...data.waypoints];
-            this.startPoint = null;
-            this.endPoint = null;
-        } else if (data.waypoints && data.waypoints.length > 0) {
-            // Auto-generated path - set start/end points only
-            this.startPoint = data.waypoints[0];
-            this.endPoint = data.waypoints[data.waypoints.length - 1];
-            this.manualWaypoints = [];
-        } else {
-            // No waypoints at all
-            this.manualWaypoints = [];
-            this.startPoint = null;
-            this.endPoint = null;
+        // Load waypoints into WaypointManager
+        this.waypointMgr.clearAll();
+        if (data.waypoints && data.waypoints.length > 0) {
+            // First point is always Start
+            this.waypointMgr.setStart(data.waypoints[0]);
+
+            // Last point is always End (if more than 1)
+            if (data.waypoints.length > 1) {
+                this.waypointMgr.setEnd(data.waypoints[data.waypoints.length - 1]);
+            }
+
+            // Middle points are waypoints
+            for (let i = 1; i < data.waypoints.length - 1; i++) {
+                this.waypointMgr.addWaypoint(data.waypoints[i]);
+            }
         }
+
+        // Render loaded fog
+        this.fog.update(0);
     }
 
     private deleteMap(name: string) {
@@ -523,13 +482,51 @@ export class EditorScene extends BaseScene {
         this.refreshMapsPanel();
     }
 
-    private updateMapWaypoints() {
-        if (this.manualWaypoints.length > 0) {
-            this.map.waypoints = [...this.manualWaypoints];
-        } else {
-            this.map.waypoints = [];
-            if (this.startPoint) this.map.waypoints.push(this.startPoint);
-            if (this.endPoint) this.map.waypoints.push(this.endPoint);
-        }
+    private setupHotkeys() {
+        document.addEventListener('keydown', (e) => {
+            // Ignore if typing in input fields
+            if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
+                return;
+            }
+
+            // Ctrl+Z - Undo
+            if (e.ctrlKey && e.key === 'z' && !e.shiftKey) {
+                e.preventDefault();
+                if (this.history.undo()) {
+                    this.fog.update(0); // Re-render fog after undo
+                }
+                return;
+            }
+
+            // Ctrl+Shift+Z - Redo
+            if (e.ctrlKey && e.shiftKey && e.key === 'Z') {
+                e.preventDefault();
+                if (this.history.redo()) {
+                    this.fog.update(0); // Re-render fog after redo
+                }
+                return;
+            }
+
+            // Ctrl+S - Save
+            if (e.ctrlKey && e.key === 's') {
+                e.preventDefault();
+                this.openWaveConfig();
+                return;
+            }
+
+            // E - Eraser mode
+            if (e.key === 'e' || e.key === 'E') {
+                this.mode = 'eraser';
+                return;
+            }
+
+            // 1-3 - Category selection
+            if (e.key >= '1' && e.key <= '3') {
+                const categoryIndex = parseInt(e.key) - 1;
+                this.toolbar.selectCategory(categoryIndex);
+                return;
+            }
+        });
     }
+
 }

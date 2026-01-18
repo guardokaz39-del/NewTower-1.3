@@ -21,6 +21,9 @@ import { MetricsSystem } from '../MetricsSystem';
 import { WeaponSystem } from '../WeaponSystem';
 import { FogSystem } from '../FogSystem';
 import { LightingSystem } from '../systems/LightingSystem';
+import { NotificationSystem } from '../systems/NotificationSystem';
+import { DayNightCycle } from '../DayNightCycle';
+import { AtmosphereSystem } from '../systems/AtmosphereSystem';
 
 import { GameController } from './GameController';
 import { GameState } from './GameState';
@@ -63,6 +66,9 @@ export class GameScene extends BaseScene implements IGameScene {
     public bestiary: BestiarySystem;
     public metrics: MetricsSystem;
     public weaponSystem: WeaponSystem;
+    public notifications: NotificationSystem;
+    private dayNightCycle!: DayNightCycle;
+    private atmosphere!: AtmosphereSystem;
 
     // IGameScene compatibility properties (delegate to gameState)
     public get wave(): number { return this.gameState.wave; }
@@ -96,6 +102,12 @@ export class GameScene extends BaseScene implements IGameScene {
         this.fog = new FogSystem(this.mapData);
         this.lighting = new LightingSystem(game.canvas.width, game.canvas.height);
         this.map.lighting = this.lighting; // [NEW] Link lighting
+        this.dayNightCycle = new DayNightCycle(); // Default cycle (4 min)
+        this.atmosphere = new AtmosphereSystem(this.dayNightCycle); // Default config
+        // Set world size for cloud positioning (map dimensions in pixels)
+        const worldWidth = this.mapData.width * CONFIG.TILE_SIZE;
+        const worldHeight = this.mapData.height * CONFIG.TILE_SIZE;
+        this.atmosphere.setWorldSize(worldWidth, worldHeight);
         this.events = new EventEmitter();
         this.effects = new EffectSystem(game.ctx);
         this.input = game.input;
@@ -103,6 +115,7 @@ export class GameScene extends BaseScene implements IGameScene {
         // Initialize systems
         this.weaponSystem = new WeaponSystem();
         this.metrics = new MetricsSystem();
+        this.notifications = new NotificationSystem(this.effects, game.canvas);
         this.waveManager = new WaveManager(this);
 
         // Initialize entity manager
@@ -181,6 +194,11 @@ export class GameScene extends BaseScene implements IGameScene {
         const speedMultiplier = isNight ? 1.5 : 1.0;
 
         this.dayTime += 0.0005 * loops * speedMultiplier;
+
+        // Update DayNightCycle system
+        const deltaTime = (1 / 60) * loops; // Approximate deltaTime
+        this.dayNightCycle.update(deltaTime);
+        this.atmosphere.update(deltaTime);
 
         // Oscillate between 0.5 (Darkest evening) and 0.95 (Brightest day)
         // Math.sin goes -1 to 1. 
@@ -310,6 +328,9 @@ export class GameScene extends BaseScene implements IGameScene {
         });
 
         this.lighting.render(ctx);
+
+        // Draw atmosphere effects (sunlight, moonlight, stars, etc)
+        this.atmosphere.draw(ctx);
 
         ctx.restore();
     }

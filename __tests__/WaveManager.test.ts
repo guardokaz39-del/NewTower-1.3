@@ -18,7 +18,13 @@ const mockScene = {
     showFloatingText: jest.fn(),
     spawnEnemy: jest.fn(),
     giveRandomCard: jest.fn(),
-    mapData: { waves: [] }
+    addMoney: jest.fn(),
+    mapData: { waves: [] },
+    metrics: {
+        trackWaveReached: jest.fn(),
+        trackMoneyEarned: jest.fn()
+    },
+    effects: { add: jest.fn() }
 } as unknown as GameScene;
 
 describe('WaveManager', () => {
@@ -38,13 +44,14 @@ describe('WaveManager', () => {
         waveManager.startWave();
         expect(mockScene.wave).toBe(1);
         expect(waveManager.isWaveActive).toBe(true);
-        expect(mockScene.showFloatingText).toHaveBeenCalled();
+        // Wave visuals now handled by NotificationSystem via EventBus
     });
 
-    test('should not start wave if already active', () => {
+    test('should allow early wave start with bonus', () => {
         waveManager.startWave();
-        waveManager.startWave();
-        expect(mockScene.wave).toBe(1); // Should still be 1, not 2
+        waveManager.startWave(); // Early start!
+        expect(mockScene.wave).toBe(2); // Wave increments
+        expect(mockScene.addMoney).toHaveBeenCalled(); // Bonus given
     });
 
     test('should spawn enemies during update', () => {

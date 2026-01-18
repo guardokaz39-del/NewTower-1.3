@@ -171,8 +171,8 @@
         }
 
         .slot {
-            width: 70px;
-            height: 100px;
+            width: 84px;
+            height: 124px;
             border: 2px dashed #666;
             border-radius: 8px;
             display: flex;
@@ -225,48 +225,207 @@
 
         /* Карты */
         .card {
-            width: 70px;
-            height: 100px;
+            width: 80px;
+            height: 120px;
             background: #fff;
-            border-radius: 8px;
+            border-radius: 10px;
             display: flex;
             flex-direction: column;
             align-items: center;
-            justify-content: center;
+            justify-content: flex-start;
             position: relative;
             box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
             cursor: grab;
-            border: 2px solid rgba(0, 0, 0, 0.1);
+            border: 3px solid rgba(0, 0, 0, 0.1);
+            padding: 6px;
+            transition: transform 0.2s, box-shadow 0.2s;
+            overflow: hidden;
         }
 
+        .card:hover {
+            transform: translateY(-3px);
+        }
+
+        /* Типы карт - базовые градиенты */
         .card.type-fire {
             background: linear-gradient(135deg, #ffcdd2, #e57373);
             border-color: #b71c1c;
-            box-shadow: 0 4px 12px rgba(183, 28, 28, 0.5), 0 0 15px rgba(255, 87, 34, 0.4);
         }
 
         .card.type-ice {
             background: linear-gradient(135deg, #b3e5fc, #4fc3f7);
             border-color: #0288d1;
-            box-shadow: 0 4px 12px rgba(2, 136, 209, 0.5), 0 0 15px rgba(0, 188, 212, 0.4);
         }
 
         .card.type-sniper {
             background: linear-gradient(135deg, #c8e6c9, #81c784);
             border-color: #388e3c;
-            box-shadow: 0 4px 12px rgba(56, 142, 60, 0.5), 0 0 15px rgba(76, 175, 80, 0.4);
         }
 
+        .card.type-multi {
+            background: linear-gradient(135deg, #ffe0b2, #ffb74d);
+            border-color: #f57c00;
+        }
+
+        .card.type-minigun {
+            background: linear-gradient(135deg, #e1bee7, #ba68c8);
+            border-color: #8e24aa;
+        }
+
+        /* Уровень 1 - стандартный */
+        .card.level-1 {
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+        }
+
+        /* Уровень 2 - лёгкое свечение с пульсацией */
+        .card.level-2 {
+            border-width: 3px;
+            animation: level2glow 3s ease-in-out infinite;
+        }
+
+        @keyframes level2glow {
+
+            0%,
+            100% {
+                box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4),
+                    0 0 15px var(--card-glow-color, rgba(255, 255, 255, 0.3));
+            }
+
+            50% {
+                box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5),
+                    0 0 25px var(--card-glow-color, rgba(255, 255, 255, 0.5));
+            }
+        }
+
+        .card.type-fire.level-2 {
+            --card-glow-color: rgba(255, 87, 34, 0.4);
+        }
+
+        .card.type-ice.level-2 {
+            --card-glow-color: rgba(0, 188, 212, 0.4);
+        }
+
+        .card.type-sniper.level-2 {
+            --card-glow-color: rgba(76, 175, 80, 0.4);
+        }
+
+        .card.type-multi.level-2 {
+            --card-glow-color: rgba(255, 152, 0, 0.4);
+        }
+
+        .card.type-minigun.level-2 {
+            --card-glow-color: rgba(156, 39, 176, 0.4);
+        }
+
+        /* Уровень 3 - ЛЕГЕНДАРНЫЙ эффект */
+        .card.level-3 {
+            border-width: 4px;
+            border-color: #ffd700;
+            animation: level3legendary 2s ease-in-out infinite;
+        }
+
+        .card.level-3::before {
+            content: '';
+            position: absolute;
+            top: -4px;
+            left: -4px;
+            right: -4px;
+            bottom: -4px;
+            background: linear-gradient(45deg,
+                    #ffd700 0%,
+                    #ff8c00 25%,
+                    #ffd700 50%,
+                    #ff8c00 75%,
+                    #ffd700 100%);
+            border-radius: 10px;
+            z-index: -1;
+            background-size: 200% 200%;
+            animation: legendaryBorder 3s linear infinite;
+        }
+
+        @keyframes level3legendary {
+
+            0%,
+            100% {
+                box-shadow: 0 6px 20px rgba(255, 215, 0, 0.6),
+                    0 0 30px rgba(255, 215, 0, 0.4),
+                    inset 0 0 20px rgba(255, 215, 0, 0.1);
+            }
+
+            50% {
+                box-shadow: 0 8px 30px rgba(255, 215, 0, 0.8),
+                    0 0 50px rgba(255, 140, 0, 0.6),
+                    inset 0 0 30px rgba(255, 215, 0, 0.2);
+            }
+        }
+
+        @keyframes legendaryBorder {
+            0% {
+                background-position: 0% 50%;
+            }
+
+            50% {
+                background-position: 100% 50%;
+            }
+
+            100% {
+                background-position: 0% 50%;
+            }
+        }
+
+        /* Звёздочки уровня - верхний левый угол */
         .card-level {
             position: absolute;
-            top: 5px;
-            right: 5px;
+            top: 4px;
+            left: 6px;
             font-weight: bold;
+            font-size: 11px;
             color: #333;
+            text-shadow: 0 1px 2px rgba(255, 255, 255, 0.8);
+            line-height: 1;
         }
 
+        .card.level-3 .card-level {
+            color: #ffd700;
+            text-shadow: 0 0 4px rgba(255, 215, 0, 0.8), 0 1px 2px rgba(0, 0, 0, 0.5);
+        }
+
+        /* Иконка - центр */
         .card-icon {
-            font-size: 32px;
+            font-size: 36px;
+            margin-top: 8px;
+            margin-bottom: 4px;
+            filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.2));
+        }
+
+        /* Характеристики карты - снизу */
+        .card-stats {
+            margin-top: auto;
+            width: calc(100% + 12px);
+            margin-left: -6px;
+            margin-bottom: -6px;
+            text-align: center;
+            font-size: 9px;
+            line-height: 1.3;
+            color: #fff;
+            font-weight: 700;
+            background: rgba(0, 0, 0, 0.55);
+            padding: 4px 6px;
+            border-radius: 0 0 7px 7px;
+            backdrop-filter: blur(2px);
+        }
+
+        .card-stat-line {
+            white-space: nowrap;
+            margin: 1px 0;
+            text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
+        }
+
+        .card-stat-primary {
+            font-size: 10px;
+            font-weight: bold;
+            color: #fff;
+            text-shadow: 0 1px 2px rgba(0, 0, 0, 0.9);
         }
 
         #drag-ghost {
@@ -479,6 +638,15 @@
             background: #555;
             color: #888;
             cursor: not-allowed;
+        }
+
+        /* Selected card in card selection screen */
+        .card.selected {
+            transform: translateY(-10px) !important;
+            border-color: #4caf50 !important;
+            border-width: 4px !important;
+            box-shadow: 0 8px 20px rgba(76, 175, 80, 0.6),
+                0 0 30px rgba(76, 175, 80, 0.4) !important;
         }
     </style>
 </head>

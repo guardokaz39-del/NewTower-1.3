@@ -83,12 +83,61 @@ export class Projectile {
         if (this.projectileType === 'sniper') this.life = 60;
     }
 
-    public update() {
+    public update(effects?: any) { // Type 'any' to avoid strict circular import issues if EffectSystem isn't imported, but normally it should be fine. Using any for safety here or import it.
         if (!this.alive) return;
 
         this.x += this.vx;
         this.y += this.vy;
         this.life--;
+
+        // --- TRAIL EFFECTS ---
+        if (effects && this.life % 2 === 0) { // Spawn every 2 frames
+            const type = this.projectileType || 'standard';
+
+            // Fire Trail (Smoke/Embers)
+            if (type === 'fire') {
+                effects.add({
+                    type: 'particle',
+                    x: this.x + (Math.random() - 0.5) * 4,
+                    y: this.y + (Math.random() - 0.5) * 4,
+                    vx: -this.vx * 0.2 + (Math.random() - 0.5),
+                    vy: -this.vy * 0.2 + (Math.random() - 0.5),
+                    life: 15 + Math.random() * 10,
+                    radius: 2 + Math.random() * 2,
+                    color: Math.random() > 0.5 ? 'rgba(255, 100, 0, 0.5)' : 'rgba(100, 100, 100, 0.3)'
+                });
+            }
+            // Ice Trail (Snow/Sparkle)
+            else if (type === 'ice') {
+                effects.add({
+                    type: 'particle',
+                    x: this.x,
+                    y: this.y,
+                    vx: (Math.random() - 0.5) * 0.5,
+                    vy: (Math.random() - 0.5) * 0.5,
+                    life: 20,
+                    radius: 1.5,
+                    color: '#e1f5fe'
+                });
+            }
+            // Sniper Trail (handled by draw mostly, but particles are nice)
+            else if (type === 'sniper') {
+                // Sniper is fast, maybe no particles needed, leaving trail line in draw()
+            }
+            // Level 3 Trail (Glow)
+            if (this.towerLevel >= 3) {
+                effects.add({
+                    type: 'particle',
+                    x: this.x,
+                    y: this.y,
+                    vx: 0,
+                    vy: 0,
+                    life: 10,
+                    radius: 2,
+                    color: this.color
+                });
+            }
+        }
 
         if (this.life <= 0 || this.x < -100 || this.x > 2000 || this.y < -100 || this.y > 2000) {
             this.alive = false;

@@ -192,9 +192,41 @@ export class Tower {
     updateBuilding(effects: EffectSystem) {
         if (this.isBuilding) {
             this.buildProgress++;
+
+            // Spawn dust particles during construction (every 10 frames)
+            if (this.buildProgress % 10 === 0) {
+                effects.add({
+                    type: 'particle',
+                    x: this.x + (Math.random() - 0.5) * 30,
+                    y: this.y + 15,
+                    vx: (Math.random() - 0.5) * 2,
+                    vy: -Math.random() * 2,
+                    life: 20 + Math.random() * 10,
+                    color: '#a69060',
+                    radius: 2 + Math.random() * 2
+                });
+            }
+
             if (this.buildProgress >= this.maxBuildProgress) {
                 this.isBuilding = false;
-                effects.add({ type: 'explosion', x: this.x, y: this.y, radius: 30, life: 20, color: VISUALS.PROJECTILES.STANDARD });
+
+                // Completion burst - dust cloud
+                for (let i = 0; i < 12; i++) {
+                    const angle = (i / 12) * Math.PI * 2;
+                    effects.add({
+                        type: 'particle',
+                        x: this.x,
+                        y: this.y,
+                        vx: Math.cos(angle) * 3,
+                        vy: Math.sin(angle) * 3 - 1,
+                        life: 25 + Math.random() * 10,
+                        color: '#c0a060',
+                        radius: 3 + Math.random() * 2
+                    });
+                }
+
+                // Flash effect
+                effects.add({ type: 'explosion', x: this.x, y: this.y, radius: 25, life: 15, color: '#ffd700' });
             }
         }
     }
@@ -205,16 +237,51 @@ export class Tower {
         const drawY = this.row * size;
 
         if (this.isBuilding) {
-            // Стройка (фундамент)
-
-            ctx.fillStyle = VISUALS.TOWER.BUILDING.BASE;
-            ctx.fillRect(drawX + 5, drawY + 5, size - 10, size - 10);
-            const barWidth = size - 10;
+            // Enhanced building animation - base emerges from below with opacity
             const pct = this.buildProgress / this.maxBuildProgress;
+            const emergeOffset = (1 - pct) * 15; // Starts 15px below, rises to 0
+            const halfSize = size / 2;
+
+            ctx.save();
+
+            // Clip to only show portion based on progress (reveal from bottom)
+            ctx.beginPath();
+            const clipHeight = size * pct;
+            ctx.rect(drawX, drawY + size - clipHeight - emergeOffset, size, clipHeight + 5);
+            ctx.clip();
+
+            // Draw actual base with reduced opacity
+            ctx.globalAlpha = 0.5 + pct * 0.5; // 50% -> 100% opacity
+            const baseImg = Assets.get('base_default');
+            if (baseImg) {
+                ctx.drawImage(baseImg, drawX, drawY - emergeOffset);
+            } else {
+                // Fallback circle
+                ctx.fillStyle = '#9e9e9e';
+                ctx.beginPath();
+                ctx.arc(this.x, this.y - emergeOffset, size * 0.35, 0, Math.PI * 2);
+                ctx.fill();
+            }
+
+            ctx.restore();
+
+            // Holographic construction lines overlay
+            ctx.save();
+            ctx.globalAlpha = 0.3 * (1 - pct); // Fade out as progress increases
+            ctx.strokeStyle = '#00ffff';
+            ctx.lineWidth = 1;
+            ctx.setLineDash([4, 4]);
+            ctx.beginPath();
+            ctx.arc(this.x, this.y, size * 0.35, 0, Math.PI * 2);
+            ctx.stroke();
+            ctx.restore();
+
+            // Progress bar
+            const barWidth = size - 10;
             ctx.fillStyle = VISUALS.TOWER.BUILDING.BAR_BG;
-            ctx.fillRect(drawX + 5, drawY + size - 15, barWidth, 8);
-            ctx.fillStyle = VISUALS.TOWER.BUILDING.BAR_FILL;
-            ctx.fillRect(drawX + 5, drawY + size - 15, barWidth * pct, 8);
+            ctx.fillRect(drawX + 5, drawY + size - 10, barWidth, 5);
+            ctx.fillStyle = '#4caf50'; // Green progress
+            ctx.fillRect(drawX + 5, drawY + size - 10, barWidth * pct, 5);
         } else {
             // --- MODULAR RENDER SYSTEM ---
 

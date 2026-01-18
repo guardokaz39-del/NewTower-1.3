@@ -36,7 +36,7 @@ export const CONFIG = {
     TOWER: {
         BASE_RANGE: 120,
         BASE_DMG: 5,
-        BASE_CD: 45,
+        BASE_CD: 54, // Increased for balance (was 45)
         BUILD_TIME: 60,
         MAX_CARDS: 3,
         BARREL_LENGTH: 22,

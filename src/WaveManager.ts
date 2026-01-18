@@ -45,23 +45,7 @@ export class WaveManager {
 
 
 
-        // === WAVE START SCREEN FLASH ===
-        this.scene.effects.add({
-            type: 'screen_flash',
-            x: 0,
-            y: 0,
-            life: 20,
-            flashColor: 'rgba(255, 50, 50, ',
-        });
-        // === END WAVE START FLASH ===
-
-        this.scene.showFloatingText(
-            `WAVE ${this.scene.wave}`,
-            this.scene.game.canvas.width / 2,
-            this.scene.game.canvas.height / 2,
-            '#fff',
-        );
-
+        // Wave visuals now handled by NotificationSystem via EventBus
         // this.scene.ui.update(); // EventBus handles UI
     }
 
@@ -94,7 +78,7 @@ export class WaveManager {
     private endWave() {
         this.isWaveActive = false;
         EventBus.getInstance().emit(Events.WAVE_COMPLETED, this.scene.wave);
-        this.scene.showFloatingText('WAVE CLEARED!', this.scene.game.canvas.width / 2, 200, 'gold');
+        // Wave clear visuals now handled by NotificationSystem via EventBus
 
         // Progressive economy: Base reward + scaling per wave
         const reward = CONFIG.ECONOMY.WAVE_BASE_REWARD + (this.scene.wave * CONFIG.ECONOMY.WAVE_SCALING_FACTOR);

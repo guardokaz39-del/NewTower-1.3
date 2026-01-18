@@ -81,12 +81,18 @@ export class CardSelectionUI {
             }
 
             const cardEl = document.createElement('div');
-            cardEl.className = `selection-card type-${config.id}`;
+            // Use same structure as CardSystem
+            cardEl.className = `card type-${config.id} level-1`;
             cardEl.style.animationDelay = `${index * 0.05}s`;
+            cardEl.style.cursor = 'pointer';
+
+            // Get stats HTML for level 1
+            const statsHTML = this.getCardStatsHTML(config.id);
 
             cardEl.innerHTML = `
-                <div class="selection-card-icon">${config.icon}</div>
-                <div class="selection-card-name">${config.name}</div>
+                <div class="card-level">★</div>
+                <div class="card-icon">${config.icon}</div>
+                <div class="card-stats">${statsHTML}</div>
             `;
 
             cardEl.addEventListener('click', () => this.selectCard(cardKey, cardEl));
@@ -127,6 +133,24 @@ export class CardSelectionUI {
         if (this.selectedCards.length === 5) {
             this.hide();
             this.onComplete(this.selectedCards);
+        }
+    }
+
+    private getCardStatsHTML(typeId: string): string {
+        // Same logic as CardSyst em, but always level 1
+        switch (typeId) {
+            case 'fire':
+                return `<div class="card-stat-primary">Урон +15</div><div class="card-stat-line">Взрыв 50</div>`;
+            case 'ice':
+                return `<div class="card-stat-primary">Урон +3</div><div class="card-stat-line">❄️ 30%</div>`;
+            case 'sniper':
+                return `<div class="card-stat-primary">Урон +14</div><div class="card-stat-line">🎯 +80</div>`;
+            case 'multi':
+                return `<div class="card-stat-primary">2 снаряда</div><div class="card-stat-line">0.8x урон</div>`;
+            case 'minigun':
+                return `<div class="card-stat-primary">⚡ Раскрутка</div><div class="card-stat-line">+3 урон/с</div>`;
+            default:
+                return `<div class="card-stat-line">Карта</div>`;
         }
     }
 }

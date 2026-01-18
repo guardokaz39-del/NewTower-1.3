@@ -149,6 +149,48 @@ export class WaveEditor {
                     group.count = parseInt((e.target as HTMLInputElement).value) || 1;
                 };
 
+                // Speed dropdown
+                const speedSelect = document.createElement('select');
+                speedSelect.style.width = '60px';
+                speedSelect.style.fontSize = '12px';
+                const speeds = [
+                    { value: '0.5', label: '0.5x' },
+                    { value: '0.7', label: '0.7x' },
+                    { value: '1.0', label: '1.0x' },
+                    { value: '1.5', label: '1.5x' },
+                    { value: '2.0', label: '2.0x' },
+                ];
+                speeds.forEach(({ value, label }) => {
+                    const opt = document.createElement('option');
+                    opt.value = value;
+                    opt.innerText = label;
+                    if (parseFloat(value) === (group.speed || 1.0)) opt.selected = true;
+                    speedSelect.appendChild(opt);
+                });
+                speedSelect.onchange = (e) => {
+                    group.speed = parseFloat((e.target as HTMLSelectElement).value);
+                };
+
+                // Spawn Rate dropdown
+                const spawnSelect = document.createElement('select');
+                spawnSelect.style.width = '70px';
+                spawnSelect.style.fontSize = '12px';
+                const spawnRates: Array<{ value: 'fast' | 'medium' | 'slow'; label: string }> = [
+                    { value: 'fast', label: 'Fast' },
+                    { value: 'medium', label: 'Medium' },
+                    { value: 'slow', label: 'Slow' },
+                ];
+                spawnRates.forEach(({ value, label }) => {
+                    const opt = document.createElement('option');
+                    opt.value = value;
+                    opt.innerText = label;
+                    if (value === (group.spawnRate || 'medium')) opt.selected = true;
+                    spawnSelect.appendChild(opt);
+                });
+                spawnSelect.onchange = (e) => {
+                    group.spawnRate = (e.target as HTMLSelectElement).value as 'fast' | 'medium' | 'slow';
+                };
+
                 UIUtils.createButton(groupRow, '-', () => {
                     wave.enemies.splice(gIndex, 1);
                     this.renderWaves(parent);
@@ -157,6 +199,8 @@ export class WaveEditor {
                 groupRow.appendChild(typeSelect);
                 groupRow.appendChild(document.createTextNode('x'));
                 groupRow.appendChild(countInput);
+                groupRow.appendChild(speedSelect);
+                groupRow.appendChild(spawnSelect);
 
                 groupsDiv.appendChild(groupRow);
             });
