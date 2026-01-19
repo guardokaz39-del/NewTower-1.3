@@ -34,15 +34,15 @@ export const MULTISHOT_UPGRADES: Record<number, IUpgradeCard> = {
 /**
  * Get multishot configuration for a given level
  */
-export function getMultishotConfig(level: number): { projectileCount: number; damageMultiplier: number } {
+export function getMultishotConfig(level: number): { projectileCount: number; damageMultiplier: number; spread: number } {
     switch (level) {
         case 1:
-            return { projectileCount: 2, damageMultiplier: 0.60 };
+            return { projectileCount: 2, damageMultiplier: 0.60, spread: 0.30 };
         case 2:
-            return { projectileCount: 2, damageMultiplier: 0.70 };
+            return { projectileCount: 2, damageMultiplier: 0.70, spread: 0.20 };
         case 3:
-            return { projectileCount: 3, damageMultiplier: 0.55 };
+            return { projectileCount: 3, damageMultiplier: 0.55, spread: 0.25 };
         default:
-            return { projectileCount: 1, damageMultiplier: 1.0 };
+            return { projectileCount: 1, damageMultiplier: 1.0, spread: 0 };
     }
 }

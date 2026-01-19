@@ -6,7 +6,8 @@ import { ObjectPool } from './Utils';
 import { EffectSystem } from './EffectSystem';
 import { Assets } from './Assets';
 import { VISUALS } from './VisualConfig';
-import { getCardUpgrade, mergeModifiers, mergeEffects, getMultishotConfig, ICardEffect } from './cards';
+import { getCardUpgrade, getMultishotConfig, ICardEffect } from './cards';
+import { mergeCardsWithStacking } from './CardStackingSystem';
 
 export class Tower {
     public col: number;
@@ -60,37 +61,36 @@ export class Tower {
         let pierce = 0;
         let projectileType = 'standard';
 
-        const allEffects: ICardEffect[] = [];
-        const cardModifiers: any[] = [];
+        // Use new card stacking system
+        const { modifiers: mergedMods, effects: allEffects } = mergeCardsWithStacking(this.cards);
 
-        // Collect modifiers and effects from all cards (except multishot)
-        this.cards.forEach((card) => {
-            const typeId = card.type.id;
-            const level = card.level;
+        // Calculate damage with proper order:
+        // 1. Collect base damage and flat bonuses
+        const baseDamage = CONFIG.TOWER.BASE_DMG;
+        const flatDamageBonuses = mergedMods.damage || 0;
 
-            // Skip multishot for now - handle separately
-            if (typeId === 'multi') return;
+        // 2. Apply damageMultiplier if present (Minigun)
+        //    This affects both base and bonuses for better balance
+        if (mergedMods.damageMultiplier !== undefined) {
+            damage = (baseDamage + flatDamageBonuses) * mergedMods.damageMultiplier;
+        } else {
+            damage = baseDamage + flatDamageBonuses;
+        }
 
-            const upgrade = getCardUpgrade(typeId, level);
-            if (!upgrade) return;
-
-            cardModifiers.push(upgrade.modifiers);
-            allEffects.push(...upgrade.effects);
-        });
-
-        // Merge all modifiers
-        const mergedMods = mergeModifiers(cardModifiers);
-
-        // Apply modifiers
-        damage += mergedMods.damage || 0;
+        // Apply range modifiers
         range += mergedMods.range || 0;
         range *= mergedMods.rangeMultiplier || 1.0;
+
+        // Apply attack speed
         attackSpeed = attackSpeed / (mergedMods.attackSpeedMultiplier || 1.0);
+
+        // Apply crit chance
         critChance = mergedMods.critChance || 0;
 
         // Handle multishot cards
         let projCount = 1;
         let damageMultiplier = 1.0;
+        let spread = 0;
         const multiCards = this.cards.filter((c) => c.type.id === 'multi');
 
         // Get visual overrides from first card (data-driven approach)
@@ -114,6 +114,7 @@ export class Tower {
             const multiConfig = getMultishotConfig(maxLevel);
             projCount = multiConfig.projectileCount;
             damageMultiplier = multiConfig.damageMultiplier;
+            spread = multiConfig.spread; // NEW: Get spread from config
 
             // If main card is NOT multishot, but we have multishot upgrades, 
             // the projectile type stays as main card (e.g. Ice + Split = 3 Ice Shards)
@@ -137,12 +138,17 @@ export class Tower {
 
             // Apply damage bonus
             if (spinupEffect.spinupSteps) {
-                // Stepped damage (Level 3)
+                // Stepped damage (Level 3) - optimized to find max applicable step
+                let maxStepDamage = 0;
                 for (const step of spinupEffect.spinupSteps) {
                     if (spinupSeconds >= step.threshold) {
-                        damage = CONFIG.TOWER.BASE_DMG * 0.5 + step.damage; // Base 2.5 + step bonus
+                        maxStepDamage = step.damage;
+                    } else {
+                        // Steps are ordered, so no need to check further
+                        break;
                     }
                 }
+                damage = damage + maxStepDamage;
             } else if (spinupEffect.spinupDamagePerSecond) {
                 // Linear damage (Level 1-2)
                 const bonusDamage = spinupEffect.spinupDamagePerSecond * spinupSeconds;
@@ -168,7 +174,7 @@ export class Tower {
             effects: allEffects,
             pierce,
             projCount,
-            spread: projCount > 1 ? 0.3 : 0,
+            spread,
             critChance,
             projectileType
         };

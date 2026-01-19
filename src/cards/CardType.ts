@@ -4,6 +4,7 @@
 
 export interface ICardModifiers {
     damage?: number;              // Flat damage bonus
+    damageMultiplier?: number;    // Multiplier for base damage (e.g., 0.30 = 30% of base)
     attackSpeedMultiplier?: number; // Multiplier for attack speed (0.85 = -15% speed, 1.0 = no change)
     range?: number;               // Flat range bonus
     rangeMultiplier?: number;     // Multiplier for range

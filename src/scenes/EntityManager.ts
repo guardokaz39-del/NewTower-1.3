@@ -32,12 +32,6 @@ export class EntityManager {
             return { valid: false, reason: "Can't build here!" };
         }
 
-        // Check fog
-        const idx = row * mapData.width + col;
-        if (mapData.fogData && mapData.fogData[idx] === 1) {
-            return { valid: false, reason: "Too foggy!" };
-        }
-
         // Check existing tower
         const existingTower = this.state.towers.find((t) => t.col === col && t.row === row);
         if (existingTower) {

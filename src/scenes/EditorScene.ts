@@ -2,7 +2,7 @@ import { BaseScene } from '../BaseScene';
 import { Game } from '../Game';
 import { MapManager } from '../Map';
 import { CONFIG } from '../Config';
-import { IMapData } from '../MapData';
+import { IMapData, IMapObject } from '../MapData';
 import { serializeMap, saveMapToStorage, getSavedMaps, deleteMapFromStorage } from '../Utils';
 import { UIUtils } from '../UIUtils';
 import { Pathfinder } from '../Pathfinder';
@@ -84,11 +84,9 @@ export class EditorScene extends BaseScene {
         // Don't update fog animation in editor - only static rendering
         const input = this.game.input;
 
-        // Detect mouse click (edge detection: was up, now down)
-        const isNewClick = input.isMouseDown && !this.prevMouseDown;
-
-        if (isNewClick && input.hoverCol >= 0 && input.hoverRow >= 0) {
-            // Check if clicked on a different tile or first click
+        // Handle mouse input - works on hold
+        if (input.isMouseDown && input.hoverCol >= 0 && input.hoverRow >= 0) {
+            // Check if clicked on a different tile
             const isDifferentTile =
                 !this.lastClickedTile ||
                 this.lastClickedTile.col !== input.hoverCol ||
@@ -130,14 +128,33 @@ export class EditorScene extends BaseScene {
                 this.map.grid[row][col].type = 0;
             }
         } else if (this.mode === 'eraser') {
-            // FEATURE: Eraser - reset to grass and fog
-            if (oldTileType !== 0 || oldFogDensity !== 0) {
-                this.history.push(EditorActions.createTileAction(this.map.grid, col, row, oldTileType, 0));
-                this.map.grid[row][col].type = 0;
-                this.map.grid[row][col].decor = null;
+            // FEATURE: Eraser - reset to grass, remove fog, and remove objects
+            const hasObject = this.map.objects.find(obj => {
+                const size = obj.size || 1;
+                return col >= obj.x && col < obj.x + size &&
+                    row >= obj.y && row < obj.y + size;
+            });
+
+            if (oldTileType !== 0 || oldFogDensity !== 0 || hasObject) {
+                // Сброс тайла в траву
+                if (oldTileType !== 0) {
+                    this.history.push(EditorActions.createTileAction(this.map.grid, col, row, oldTileType, 0));
+                    this.map.grid[row][col].type = 0;
+                    this.map.grid[row][col].decor = null;
+                }
+                // Удаление тумана
                 if (oldFogDensity !== 0) {
                     this.history.push(EditorActions.createFogAction(this.fog, col, row, oldFogDensity, 0));
                     this.fog.setFog(col, row, 0);
+                }
+                // Удаление объектов (все объекты, перекрывающие этот тайл)
+                if (hasObject) {
+                    this.map.objects = this.map.objects.filter(obj => {
+                        const size = obj.size || 1;
+                        const overlaps = col >= obj.x && col < obj.x + size &&
+                            row >= obj.y && row < obj.y + size;
+                        return !overlaps;
+                    });
                 }
             }
         } else if (this.mode === 'set_start') {
@@ -175,7 +192,48 @@ export class EditorScene extends BaseScene {
             if (oldFogDensity !== newFogDensity) {
                 this.history.push(EditorActions.createFogAction(this.fog, col, row, oldFogDensity, newFogDensity));
             }
+        } else if (this.mode === 'place_stone') {
+            this.placeObject(col, row, 'stone', 1);
+        } else if (this.mode === 'place_rock') {
+            // Скалы - рандомный размер 2-3 тайла
+            const size = Math.random() > 0.5 ? 3 : 2;
+            this.placeObject(col, row, 'rock', size);
+        } else if (this.mode === 'place_tree') {
+            this.placeObject(col, row, 'tree', 1);
+        } else if (this.mode === 'place_wheat') {
+            this.placeObject(col, row, 'wheat', 1);
+        } else if (this.mode === 'place_flowers') {
+            this.placeObject(col, row, 'flowers', 1);
         }
+    }
+
+    /**
+     * Place an object on the map
+     */
+    private placeObject(col: number, row: number, type: string, size: number): void {
+        // Проверка границ для больших объектов
+        if (col + size > this.map.cols || row + size > this.map.rows) {
+            return; // Выходит за границы
+        }
+
+        // Удалить существующие объекты в этой области
+        this.map.objects = this.map.objects.filter(obj => {
+            const objSize = obj.size || 1;
+            // Проверка пересечения
+            const overlaps = !(col + size <= obj.x || col >= obj.x + objSize ||
+                row + size <= obj.y || row >= obj.y + objSize);
+            return !overlaps;
+        });
+
+        // Добавить новый объект
+        const newObj = {
+            type,
+            x: col,
+            y: row,
+            properties: {},
+            size: size > 1 ? size : undefined
+        };
+        this.map.objects.push(newObj);
     }
 
     public draw(ctx: CanvasRenderingContext2D) {

@@ -3,15 +3,15 @@ import { IUpgradeCard } from './CardType';
 /**
  * Minigun Card Upgrades
  * 
- * Level 1: Linear damage ramp-up, +3 dmg/sec, overheat after 5s (1.5s lockout)
- * Level 2: Same as level 1 + 3% crit chance per second
- * Level 3: Stepped damage ramp (5 steps), + crit, overheat 3s lockout
+ * Level 1: Percentage damage modifier (-70%), +3 dmg/sec, overheat after 5s (1.5s lockout)
+ * Level 2: Same as level 1 (-60%) + 2% crit chance per second
+ * Level 3: Stepped damage ramp (-45%), + crit, overheat 3s lockout
  */
 export const MINIGUN_UPGRADES: Record<number, IUpgradeCard> = {
     1: {
         level: 1,
         modifiers: {
-            damage: -2.5, // FIXED: Base 5 - 2.5 = 2.5 final damage (50% of standard)
+            damageMultiplier: 0.30, // 30% of base damage (70% reduction)
             attackSpeedMultiplier: 2.65, // 45 / 17 = 2.65x faster attacks
         },
         effects: [
@@ -32,14 +32,14 @@ export const MINIGUN_UPGRADES: Record<number, IUpgradeCard> = {
     2: {
         level: 2,
         modifiers: {
-            damage: -2.0, // FIXED: Same as level 1
+            damageMultiplier: 0.40, // 40% of base damage (60% reduction)
             attackSpeedMultiplier: 2.75,
         },
         effects: [
             {
                 type: 'spinup',
                 spinupDamagePerSecond: 3,
-                spinupCritPerSecond: 0.02, // +3% crit chance per second
+                spinupCritPerSecond: 0.02, // +2% crit chance per second
                 maxSpinupSeconds: 5,
                 overheatDuration: 90,
                 overheatExtensionWithIce: 120,
@@ -49,14 +49,13 @@ export const MINIGUN_UPGRADES: Record<number, IUpgradeCard> = {
     3: {
         level: 3,
         modifiers: {
-            damage: -1.5, // FIXED: Same as level 1-2
+            damageMultiplier: 0.55, // 55% of base damage (45% reduction)
             attackSpeedMultiplier: 2.65,
         },
         effects: [
             {
                 type: 'spinup',
-                // Stepped damage: 5 steps over 7 seconds -> Adjusted for 5s? 
-                // We'll keep the steps but maybe compress them or just leave them as 'bonus later'
+                // Stepped damage: 5 steps over 5 seconds
                 spinupSteps: [
                     { threshold: 1, damage: 5 },   // 0-1 sec: +5 dmg
                     { threshold: 2, damage: 10 },  // 1-2 sec: +10 dmg
@@ -64,7 +63,7 @@ export const MINIGUN_UPGRADES: Record<number, IUpgradeCard> = {
                     { threshold: 4, damage: 20 },  // 3-4 sec: +20 dmg
                     { threshold: 5, damage: 30 },  // 4-5 sec: +30 dmg (max)
                 ],
-                spinupCritPerSecond: 0.02, // +4% crit chance per second
+                spinupCritPerSecond: 0.02, // +2% crit chance per second
                 maxSpinupSeconds: 5,
                 overheatDuration: 90,
                 overheatExtensionWithIce: 120,

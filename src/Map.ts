@@ -1,8 +1,9 @@
 import { CONFIG } from './Config';
-import { IMapData, Cell } from './MapData';
+import { IMapData, Cell, IMapObject } from './MapData';
 import { Assets } from './Assets';
 import { Pathfinder } from './Pathfinder';
 import { LightingSystem } from './systems/LightingSystem';
+import { ObjectRenderer, ObjectType } from './ObjectRenderer';
 
 export class MapManager {
     public cols!: number;
@@ -12,8 +13,9 @@ export class MapManager {
 
     public tiles: number[][] = [];
     public waypoints: { x: number; y: number }[] = [];
-    public waves: any[] = []; // [NEW] Store waves
-    public lighting?: LightingSystem; // [NEW] Link to lighting
+    public waves: any[] = [];
+    public lighting?: LightingSystem;
+    public objects: IMapObject[] = []; // Objects for decoration and blocking
 
     constructor(data: IMapData) {
         this.loadMap(data);
@@ -24,7 +26,8 @@ export class MapManager {
         this.rows = data.height;
         this.tiles = data.tiles;
         this.waypoints = data.waypoints;
-        this.waves = data.waves || []; // [NEW] Load waves
+        this.waves = data.waves || [];
+        this.objects = data.objects || []; // Load objects
 
         // Генерация объекта grid для совместимости с редактором
         this.grid = [];
@@ -51,7 +54,16 @@ export class MapManager {
 
     public isBuildable(col: number, row: number): boolean {
         if (col < 0 || col >= this.cols || row < 0 || row >= this.rows) return false;
-        return this.tiles[row][col] === 0;
+        if (this.tiles[row][col] !== 0) return false; // Only grass is buildable
+
+        // Check if any object occupies this tile
+        const hasObject = this.objects.some(obj => {
+            const size = obj.size || 1;
+            return col >= obj.x && col < obj.x + size &&
+                row >= obj.y && row < obj.y + size;
+        });
+
+        return !hasObject;
     }
 
     public draw(ctx: CanvasRenderingContext2D) {
@@ -67,16 +79,8 @@ export class MapManager {
                 if (type === 1) {
                     // PATH
                     this.drawTile(ctx, 'path', px, py);
-                } else if (type === 2) {
-                    // DECOR
-                    this.drawTile(ctx, 'grass', px, py);
-                    const cellDecor = this.grid[y] && this.grid[y][x] ? this.grid[y][x].decor : 'tree';
-                    const decorKey = cellDecor === 'rock' ? 'decor_rock' : 'decor_tree';
-
-                    const decorImg = Assets.get(decorKey);
-                    if (decorImg) ctx.drawImage(decorImg, px, py);
                 } else {
-                    // GRASS (0)
+                    // GRASS (0) - тип 2 больше не используется
                     this.drawTile(ctx, 'grass', px, py);
                     // Сетка
                     ctx.strokeStyle = 'rgba(0,0,0,0.05)';
@@ -84,6 +88,13 @@ export class MapManager {
                     ctx.strokeRect(px, py, TS, TS);
                 }
             }
+        }
+
+        // Draw objects
+        for (const obj of this.objects) {
+            const px = obj.x * TS;
+            const py = obj.y * TS;
+            ObjectRenderer.draw(ctx, obj.type as ObjectType, px, py, obj.size || 1);
         }
 
         if (this.waypoints.length > 0) {

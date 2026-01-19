@@ -57,7 +57,7 @@ export function serializeMap(map: MapManager): IMapData {
         height: map.rows,
         tiles: simpleTiles,
         waypoints: map.waypoints.map((wp) => ({ x: wp.x, y: wp.y })),
-        objects: [],
+        objects: map.objects || [], // Include objects from map
         waves: map.waves && map.waves.length > 0 ? map.waves : generateDefaultWaves(15),
         startingMoney: CONFIG.PLAYER.START_MONEY,
         startingLives: CONFIG.PLAYER.START_LIVES,

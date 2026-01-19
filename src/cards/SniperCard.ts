@@ -13,7 +13,7 @@ export const SNIPER_UPGRADES: Record<number, IUpgradeCard> = {
         modifiers: {
             damage: 14,
             range: 80,
-            attackSpeedMultiplier: 0.50, // -50% attack speed (slower)
+            attackSpeedMultiplier: 0.30, // -70% attack speed (slower)
             critChance: 0.15, // 15% crit chance
         },
         effects: [],
@@ -28,7 +28,7 @@ export const SNIPER_UPGRADES: Record<number, IUpgradeCard> = {
         modifiers: {
             damage: 24,
             range: 160,
-            attackSpeedMultiplier: 0.65, // -35% attack speed
+            attackSpeedMultiplier: 0.45, // -55% attack speed
             critChance: 0.15,
         },
         effects: []
@@ -38,7 +38,7 @@ export const SNIPER_UPGRADES: Record<number, IUpgradeCard> = {
         modifiers: {
             damage: 46,
             range: 240,
-            attackSpeedMultiplier: 0.85, // -15% attack speed (improved from level 2)
+            attackSpeedMultiplier: 0.60, // -40% attack speed (improved from level 2)
             critChance: 0.20,
         },
         effects: [

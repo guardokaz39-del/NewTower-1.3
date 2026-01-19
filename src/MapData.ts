@@ -10,10 +10,11 @@ export interface IWaveConfig {
 
 // Полная структура файла сохранения
 export interface IMapObject {
-    type: string;
+    type: string; // 'stone' | 'rock' | 'tree' | 'wheat' | 'flowers'
     x: number;
     y: number;
     properties?: Record<string, any>;
+    size?: number; // Размер объекта в тайлах (для скал: 2 или 3)
 }
 
 export interface Cell {

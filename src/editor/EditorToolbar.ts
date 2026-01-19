@@ -7,7 +7,12 @@ export type EditorMode =
     | 'set_end'
     | 'place_waypoint'
     | 'eraser'
-    | 'paint_fog';
+    | 'paint_fog'
+    | 'place_stone'
+    | 'place_rock'
+    | 'place_tree'
+    | 'place_wheat'
+    | 'place_flowers';
 
 interface ITool {
     id: EditorMode;
@@ -56,6 +61,18 @@ export class EditorToolbar {
                     { id: 'set_start', label: 'Старт', icon: '🏁', color: '#00bcd4' },
                     { id: 'set_end', label: 'Финиш', icon: '🛑', color: '#e91e63' },
                     { id: 'place_waypoint', label: 'Точка', icon: '📍', color: '#9c27b0' },
+                ]
+            },
+            {
+                id: 'objects',
+                name: 'Объекты',
+                icon: '🪨',
+                tools: [
+                    { id: 'place_stone', label: 'Камни', icon: '🪨', color: '#757575' },
+                    { id: 'place_rock', label: 'Скалы', icon: '⛰️', color: '#616161' },
+                    { id: 'place_tree', label: 'Лес', icon: '🌲', color: '#2e7d32' },
+                    { id: 'place_wheat', label: 'Пшеница', icon: '🌾', color: '#f9a825' },
+                    { id: 'place_flowers', label: 'Цветы', icon: '🌸', color: '#c2185b' },
                 ]
             },
             {
