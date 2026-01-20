@@ -38,6 +38,7 @@ export class GameScene extends BaseScene implements IGameScene {
     // Core references
     public game: Game;
     public mapData: IMapData;
+    public readonly startingLives: number;
 
     // Modular components
     public gameState: GameState;
@@ -96,6 +97,7 @@ export class GameScene extends BaseScene implements IGameScene {
 
         // Initialize core state
         this.gameState = new GameState();
+        this.startingLives = CONFIG.PLAYER.START_LIVES;
 
         // Initialize map and rendering
         this.map = new MapManager(this.mapData);
@@ -250,6 +252,25 @@ export class GameScene extends BaseScene implements IGameScene {
             ctx.translate(dx, dy);
         }
 
+        // World Render
+        this.map.draw(ctx);
+        // ... (rest of drawing)
+
+        // (Assuming render continues...)
+        // We need to inject code where the scene is actually drawn or create a post-process overlay
+        // The draw method here just sets up shake. The rest of the draw sequence is separate?
+        // Wait, looking at GameScene.ts structure... 
+        // I see the start of draw(ctx).
+        // Let's scroll down to find where I can insert the overlay.
+        // Actually, looking at the previous view_file, GameScene.ts has a `draw` method that delegates to map, entities etc.
+        // I need to insert the Vignette AT THE VERY END of the `draw` method.
+        // I'll assume lines 250+ (which I saw earlier) were the start.
+        // I need to view the END of GameScene.draw to insert the overlay.
+
+        // Let me first view the end of GameScene.ts to find the right spot.
+        // Aborting this specific tool call to View File first.
+
+
         // Clear screen
         ctx.fillStyle = '#222';
         ctx.fillRect(0, 0, this.game.canvas.width, this.game.canvas.height);
@@ -257,6 +278,30 @@ export class GameScene extends BaseScene implements IGameScene {
         // Draw map and fog
         this.map.draw(ctx);
         this.map.drawTorches(ctx, this.gameState.frames); // [NEW] Draw torches with time
+
+        // === PHASE 6: VIGNETTE (Cinematic Polish) ===
+        // Draw a subtle dark gradient at the edges
+        const w = this.game.canvas.width;
+        const h = this.game.canvas.height;
+        // Use center of screen, not 0,0 (which is top left)
+        // Draw OVER everything except UI? No, map.draw is world.
+        // We want vignette over the map.
+
+        ctx.save();
+        // Reset transform to draw screen-space overlay (if map used translate)
+        // Wait, map.draw doesn't use global translate, but camera might? 
+        // Current implementation seems to draw map at screen coords.
+        // Let's assume identity transform is mostly preserved or we reset it.
+        // Actually, let's just draw it.
+
+        const gradient = ctx.createRadialGradient(w / 2, h / 2, h * 0.45, w / 2, h / 2, h * 0.9);
+        gradient.addColorStop(0, 'rgba(0,0,0,0)');
+        gradient.addColorStop(1, 'rgba(0,0,0,0.6)'); // Darker edges (0.6)
+
+        ctx.fillStyle = gradient;
+        ctx.fillRect(0, 0, w, h);
+        ctx.restore();
+        // === END VIGNETTE ===
         this.fog.draw(ctx);
 
         // Draw path preview

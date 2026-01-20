@@ -11,26 +11,30 @@ export class LightingSystem {
     private ctx: CanvasRenderingContext2D;
     private width: number;
     private height: number;
+    private scale: number; // Phase 6: Performance optimization
 
     private lights: ILight[] = [];
     public ambientLight: number = 0.9; // 0 = Pitch Black, 1 = Full Brightness
 
-    constructor(width: number, height: number) {
+    constructor(width: number, height: number, optimization: boolean = false) {
         this.width = width;
         this.height = height;
 
-        // Create offscreen canvas for light map
+        // Phase 6: 2x scale optimization for performance
+        this.scale = optimization ? 2 : 1;
+
+        // Create offscreen canvas for light map (at reduced resolution if optimized)
         this.canvas = document.createElement('canvas');
-        this.canvas.width = width;
-        this.canvas.height = height;
+        this.canvas.width = Math.floor(width / this.scale);
+        this.canvas.height = Math.floor(height / this.scale);
         this.ctx = this.canvas.getContext('2d', { alpha: true })!;
     }
 
     public resize(width: number, height: number) {
         this.width = width;
         this.height = height;
-        this.canvas.width = width;
-        this.canvas.height = height;
+        this.canvas.width = Math.floor(width / this.scale);
+        this.canvas.height = Math.floor(height / this.scale);
     }
 
     public clear() {
@@ -38,17 +42,41 @@ export class LightingSystem {
     }
 
     public addLight(x: number, y: number, radius: number, color: string, intensity: number = 1.0) {
-        this.lights.push({ x, y, radius, color, intensity });
+        // Adjust for scale
+        this.lights.push({
+            x: x / this.scale,
+            y: y / this.scale,
+            radius: radius / this.scale,
+            color,
+            intensity
+        });
+    }
+
+    /**
+     * Phase 6: Enable global darkness (nighttime mode)
+     */
+    public enableGlobalDarkness(darknessLevel: number = 0.7) {
+        this.ambientLight = 1 - darknessLevel; // e.g., 0.7 darkness = 0.3 ambient
+    }
+
+    /**
+     * Phase 6: Add light from a tower
+     */
+    public addTowerLight(x: number, y: number, tileSize: number) {
+        this.addLight(x + tileSize / 2, y + tileSize / 2, tileSize * 2.5, '#ffaa00', 0.8);
     }
 
     public render(targetCtx: CanvasRenderingContext2D) {
+        const w = this.canvas.width;
+        const h = this.canvas.height;
+
         // 0. Clear previous frame
-        this.ctx.clearRect(0, 0, this.width, this.height);
+        this.ctx.clearRect(0, 0, w, h);
 
         // 1. Fill light map with "Darkness"
         this.ctx.globalCompositeOperation = 'source-over';
-        this.ctx.fillStyle = `rgba(0, 0, 0, ${1 - this.ambientLight})`; // e.g., 0.7 alpha black
-        this.ctx.fillRect(0, 0, this.width, this.height);
+        this.ctx.fillStyle = `rgba(0, 0, 0, ${1 - this.ambientLight})`;
+        this.ctx.fillRect(0, 0, w, h);
 
         // 2. Punch holes / Add lights (Visibility)
         this.ctx.globalCompositeOperation = 'destination-out';
@@ -69,9 +97,9 @@ export class LightingSystem {
         // OR we render to a separate canvas. 
         // Rendering to targetCtx directly is better for performance and visual control.
 
-        // Draw the darkness overlay first
+        // Draw the darkness overlay first (scaled up if using optimization)
         targetCtx.save();
-        targetCtx.drawImage(this.canvas, 0, 0);
+        targetCtx.drawImage(this.canvas, 0, 0, this.width, this.height);
 
         // Now draw colored lights on TOP using 'lighter' (or 'screen')
         targetCtx.globalCompositeOperation = 'lighter'; // Additive blending
@@ -79,7 +107,12 @@ export class LightingSystem {
         this.lights.forEach(light => {
             if (light.color === '#000000') return; // Skip black lights
 
-            const g = targetCtx.createRadialGradient(light.x, light.y, 0, light.x, light.y, light.radius);
+            // Scale back to target resolution
+            const x = light.x * this.scale;
+            const y = light.y * this.scale;
+            const r = light.radius * this.scale;
+
+            const g = targetCtx.createRadialGradient(x, y, 0, x, y, r);
             // Convert hex to rgb for gradient? Or just use hex if browser supports (it does usually)
             // But we need alpha falloff.
 

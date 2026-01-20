@@ -64,7 +64,7 @@ export class AtmosphereSystem {
             // Cloud shadows
             cloudShadowCount: 8,
             cloudShadowSpeed: 20, // pixels/second
-            cloudShadowOpacity: 0.12,
+            cloudShadowOpacity: 0.06, // Reduced from 0.12 for brighter atmosphere
             cloudShadowMinSize: 180,
             cloudShadowMaxSize: 320,
             cloudShadowDirection: 45, // diagonal movement (top-left to bottom-right)
@@ -194,6 +194,10 @@ export class AtmosphereSystem {
             nightIntensity = 1;
         }
 
+        // Draw clouds (always visible, independent of day/night blend)
+        // We draw them here to ensure they are consistent across transition
+        this.drawCloudShadows(ctx, 1.0); // Always draw clouds
+
         // Draw both day and night effects with smooth blending
         if (dayIntensity > 0) {
             this.drawDayEffects(ctx, canvasWidth, canvasHeight, dayIntensity);
@@ -228,8 +232,16 @@ export class AtmosphereSystem {
         }
         ctx.restore();
 
-        // 2. Cloud shadows (moving dark spots)
+        // 3. Subtle warm tint (removed harsh overlay)
+        // Ambient lighting already handles color temperature
+        ctx.restore();
+    }
+
+    private drawCloudShadows(ctx: CanvasRenderingContext2D, intensity: number): void {
         ctx.save();
+        // Base opacity for clouds
+        // At night, maybe slightly less opaque? Or darker? 
+        // For now constant opacity from config
         ctx.globalAlpha = this.config.cloudShadowOpacity * intensity;
 
         this.clouds.forEach(cloud => {
@@ -238,8 +250,8 @@ export class AtmosphereSystem {
                 cloud.x, cloud.y, 0,
                 cloud.x, cloud.y, cloud.width * 0.6
             );
-            gradient.addColorStop(0, 'rgba(0, 0, 0, 0.4)');
-            gradient.addColorStop(0.5, 'rgba(0, 0, 0, 0.2)');
+            gradient.addColorStop(0, 'rgba(0, 0, 0, 0.2)');   // Reduced from 0.4
+            gradient.addColorStop(0.5, 'rgba(0, 0, 0, 0.1)'); // Reduced from 0.2
             gradient.addColorStop(1, 'rgba(0, 0, 0, 0)');
 
             ctx.fillStyle = gradient;
@@ -277,10 +289,6 @@ export class AtmosphereSystem {
             );
             ctx.fill();
         });
-        ctx.restore();
-
-        // 3. Subtle warm tint (removed harsh overlay)
-        // Ambient lighting already handles color temperature
         ctx.restore();
     }
 

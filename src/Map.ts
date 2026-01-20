@@ -82,10 +82,10 @@ export class MapManager {
                 } else {
                     // GRASS (0) - тип 2 больше не используется
                     this.drawTile(ctx, 'grass', px, py);
-                    // Сетка
-                    ctx.strokeStyle = 'rgba(0,0,0,0.05)';
-                    ctx.lineWidth = 1;
-                    ctx.strokeRect(px, py, TS, TS);
+                    // Сетка (REMOVED: User requested polish, no grid lines)
+                    // ctx.strokeStyle = 'rgba(0,0,0,0.05)';
+                    // ctx.lineWidth = 1;
+                    // ctx.strokeRect(px, py, TS, TS);
                 }
             }
         }
@@ -198,9 +198,72 @@ export class MapManager {
     }
 
     private drawTile(ctx: CanvasRenderingContext2D, key: string, x: number, y: number) {
-        const img = Assets.get(key);
+        // Phase 2: Bitmasking для path
+        if (key === 'path') {
+            // Вычислить координаты тайла
+            const col = Math.floor(x / CONFIG.TILE_SIZE);
+            const row = Math.floor(y / CONFIG.TILE_SIZE);
+
+            // Проверить соседей (для битмаска)
+            const NORTH = (row > 0 && this.tiles[row - 1][col] === 1) ? 1 : 0;
+            const WEST = (col > 0 && this.tiles[row][col - 1] === 1) ? 1 : 0;
+            const EAST = (col < this.cols - 1 && this.tiles[row][col + 1] === 1) ? 1 : 0;
+            const SOUTH = (row < this.rows - 1 && this.tiles[row + 1][col] === 1) ? 1 : 0;
+
+            // Вычислить индекс битмаска (0-15)
+            const bitmask = NORTH | (WEST << 1) | (EAST << 2) | (SOUTH << 3);
+
+            // Получить соответствующий path tile
+            const pathTile = Assets.get(`path_${bitmask}`);
+
+            if (pathTile) {
+                ctx.drawImage(pathTile, x, y);
+            } else {
+                // Fallback - простой path
+                const fallback = Assets.get('path');
+                if (fallback) {
+                    ctx.drawImage(fallback, x, y);
+                } else {
+                    ctx.fillStyle = '#ded29e';
+                    ctx.fillRect(x, y, CONFIG.TILE_SIZE, CONFIG.TILE_SIZE);
+                }
+            }
+            return;
+        }
+
+        // Grass (с вариативностью)
+        // FIX: Use deterministic variant to prevent flickering (Assets.get is random)
+        let img: HTMLCanvasElement | HTMLImageElement | undefined;
+
+        if (key === 'grass') {
+            const variantCount = Assets.getVariantCount('grass');
+            if (variantCount > 0) {
+                // Deterministic index based on position
+                const index = Math.abs((x * 73 + y * 37)) % variantCount;
+                img = Assets.getVariant('grass', index);
+            } else {
+                img = Assets.get('grass');
+            }
+        } else {
+            img = Assets.get(key);
+        }
+
         if (img) {
-            ctx.drawImage(img, x, y);
+            // Для разнообразия травы - случайное отражение
+            if (key === 'grass') {
+                // Используем координаты для детерминированной "случайности"
+                const seed = x * 73 + y * 37;
+                const flipH = (seed % 2) === 0;
+                const flipV = (Math.floor(seed / 2) % 2) === 0;
+
+                ctx.save();
+                ctx.translate(x + CONFIG.TILE_SIZE / 2, y + CONFIG.TILE_SIZE / 2);
+                ctx.scale(flipH ? -1 : 1, flipV ? -1 : 1);
+                ctx.drawImage(img, -CONFIG.TILE_SIZE / 2, -CONFIG.TILE_SIZE / 2);
+                ctx.restore();
+            } else {
+                ctx.drawImage(img, x, y);
+            }
         } else {
             ctx.fillStyle = key === 'path' ? '#ded29e' : '#8bc34a';
             ctx.fillRect(x, y, CONFIG.TILE_SIZE, CONFIG.TILE_SIZE);

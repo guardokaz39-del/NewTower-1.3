@@ -30,6 +30,7 @@ export interface IGameScene {
     wave: number;
     readonly money: number;
     readonly lives: number;
+    readonly startingLives: number; // For perfect wave bonus detection
     enemies: Enemy[];
     towers: Tower[];
     projectiles: Projectile[];

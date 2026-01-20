@@ -6,28 +6,43 @@
 export const VISUALS = {
     ENVIRONMENT: {
         GRASS: {
-            MAIN: '#4caf50',
-            VAR_1: '#66bb6a', // Light
-            VAR_2: '#388e3c', // Dark
+            // Dark Fantasy grass (чуть светлее для читаемости)
+            MAIN: '#3d5233',      // Темно-зеленый (был #3a4a2f - слишком темный)
+            VAR_1: '#4d6343',     // Вариация светлее
+            VAR_2: '#2d4223',     // Вариация темнее
+            BIOLUM: '#4dd0e1',    // Биолюминесценция (cyan) - акцент!
         },
         PATH: {
-            MAIN: '#d7ccc8',
-            DETAIL: '#a1887f',
+            // Techno Path (окисленный металл - ОСВЕТЛЕН для лучшей видимости)
+            MAIN: '#5a5a62',      // Светлый металл (было #4a4a52 - слишком темный)
+            GRID: '#222',         // Швы между плитами
+            RIVET: '#6a6a70',     // Заклепки 
+            GLOW: '#00ffcc',      // Неоновая подсветка
+            BORDER: '#2a2a30',    // Darker border (almost black/grey) for flush look
+            DETAIL: '#a1887f',    // Legacy 
         },
         DECOR: {
             TREE: {
-                BASE: '#4caf50', // Match grass
-                FOLIAGE_LIGHT: '#2e7d32',
-                FOLIAGE_DARK: '#1b5e20',
+                BASE: '#3a4a2f', // Match новую grass
+                FOLIAGE_LIGHT: '#2e4d32',
+                FOLIAGE_DARK: '#1b3e20',
             },
             ROCK: {
-                BASE: '#4caf50',
-                STONE: '#78909c',
+                BASE: '#3a4a2f',
+                STONE: '#5a606c', // Темнее для Dark стиля
             }
         },
         FOG: {
             BASE: '#263238',
         }
+    },
+    // Глобальное направление света (критично для Фазы 5!)
+    LIGHTING: {
+        GLOBAL_LIGHT_ANGLE: Math.PI * 0.75,  // 135° (северо-запад → юго-восток)
+        SHADOW_OFFSET_X: 3,   // px смещения тени
+        SHADOW_OFFSET_Y: 3,
+        HIGHLIGHT_OFFSET_X: -2,  // px блика (противоположно тени)
+        HIGHLIGHT_OFFSET_Y: -2,
     },
     TOWER: {
         BASE: {

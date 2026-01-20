@@ -1,38 +1,371 @@
 import { CONFIG } from './Config';
 import { VISUALS } from './VisualConfig';
+import { ProceduralPatterns } from './ProceduralPatterns';
 
 export class Assets {
     // Хранилище изображений
     private static images: Record<string, HTMLCanvasElement | HTMLImageElement> = {};
 
+    // Хранилище вариантов для рандомизации (например, grass может иметь grass_1, grass_2, grass_3)
+    private static variants: Record<string, (HTMLCanvasElement | HTMLImageElement)[]> = {};
+
+    // Режим работы: true = пытаться загрузить PNG, false = только процедурная генерация
+    private static USE_EXTERNAL_ASSETS = true;
+
+    // Статистика загрузки
+    private static loadStats = {
+        attempted: 0,
+        loaded: 0,
+        failed: 0,
+        procedural: 0
+    };
+
     // ГЛАВНЫЙ МЕТОД ЗАГРУЗКИ
     public static async loadAll(): Promise<void> {
         console.log('Assets: Start loading...');
 
-        // Здесь можно добавить загрузку внешних картинок:
-        // await this.loadImage('hero', 'hero.png');
+        this.loadStats = { attempted: 0, loaded: 0, failed: 0, procedural: 0 };
 
-        // Пока генерируем процедурные текстуры (синхронно, но быстро)
-        this.generateAllTextures();
+        if (this.USE_EXTERNAL_ASSETS) {
+            try {
+                await this.loadExternalAssets();
+                console.log(`Assets: External loading complete! Loaded: ${this.loadStats.loaded}, Failed: ${this.loadStats.failed}`);
+            } catch (error) {
+                console.warn('Assets: External asset loading had errors, using fallbacks', error);
+            }
+        }
 
-        console.log('Assets: Loading complete!');
+        // Генерируем процедурные текстуры для недостающих ассетов
+        this.generateFallbackTextures();
+
+        console.log(`Assets: Loading complete! Total: ${Object.keys(this.images).length} assets (${this.loadStats.loaded} PNG, ${this.loadStats.procedural} procedural)`);
         return Promise.resolve();
     }
 
+    /**
+     * Получить ассет по имени. Если есть варианты - вернет случайный.
+     */
     public static get(name: string): HTMLCanvasElement | HTMLImageElement | undefined {
+        // Если есть варианты - выбрать случайный
+        if (this.variants[name] && this.variants[name].length > 0) {
+            const variantList = this.variants[name];
+            return variantList[Math.floor(Math.random() * variantList.length)];
+        }
+
+        // Иначе вернуть основной ассет
         return this.images[name];
     }
 
-    // --- ГЕНЕРАЦИЯ ТЕКСТУР (Как и было, но собрано в один метод) ---
-    private static generateAllTextures() {
-        // Окружение
-        this.generateTexture('grass', CONFIG.TILE_SIZE, (ctx, w, h) => {
-            ctx.fillStyle = VISUALS.ENVIRONMENT.GRASS.MAIN;
-            ctx.fillRect(0, 0, w, h);
-            for (let i = 0; i < 20; i++) {
-                ctx.fillStyle = Math.random() > 0.5 ? VISUALS.ENVIRONMENT.GRASS.VAR_1 : VISUALS.ENVIRONMENT.GRASS.VAR_2;
-                ctx.fillRect(Math.random() * w, Math.random() * h, 4, 4);
+    /**
+     * Получить конкретный вариант ассета (для детерминированного выбора)
+     */
+    public static getVariant(name: string, variantIndex: number): HTMLCanvasElement | HTMLImageElement | undefined {
+        if (this.variants[name] && this.variants[name][variantIndex]) {
+            return this.variants[name][variantIndex];
+        }
+        return this.images[name];
+    }
+
+    /**
+     * Получить количество вариантов для ассета
+     */
+    public static getVariantCount(name: string): number {
+        return this.variants[name]?.length || 0;
+    }
+
+    /**
+     * Загрузка одного изображения с поддержкой вариантов
+     * Пытается загрузить: name.png, name_1.png, name_2.png, etc.
+     */
+    private static async loadImage(name: string, path: string, maxVariants: number = 5): Promise<void> {
+        this.loadStats.attempted++;
+
+        // Попытка загрузить основной файл
+        const mainLoaded = await this.tryLoadSingleImage(name, path);
+
+        if (mainLoaded) {
+            this.loadStats.loaded++;
+
+            // Попытка загрузить варианты (name_1.png, name_2.png, etc.)
+            const variantList: (HTMLCanvasElement | HTMLImageElement)[] = [];
+
+            // Добавить основной как первый вариант
+            if (this.images[name]) {
+                variantList.push(this.images[name]);
             }
+
+            // Попробовать загрузить дополнительные варианты
+            for (let i = 1; i <= maxVariants; i++) {
+                const variantPath = path.replace(/\.png$/, `_${i}.png`);
+                const variantName = `${name}_${i}`;
+                const loaded = await this.tryLoadSingleImage(variantName, variantPath, true); // silent = true
+
+                if (loaded && this.images[variantName]) {
+                    variantList.push(this.images[variantName]);
+                }
+            }
+
+            // Если есть несколько вариантов - сохранить их
+            if (variantList.length > 1) {
+                this.variants[name] = variantList;
+                console.log(`Assets: Found ${variantList.length} variants for "${name}"`);
+            }
+        } else {
+            this.loadStats.failed++;
+        }
+    }
+
+    /**
+     * Попытка загрузить одно изображение
+     */
+    private static tryLoadSingleImage(name: string, path: string, silent: boolean = false): Promise<boolean> {
+        return new Promise((resolve) => {
+            const img = new Image();
+            img.onload = () => {
+                this.images[name] = img;
+                if (!silent) {
+                    console.log(`✅ Assets: "${path}" loaded successfully`);
+                }
+                resolve(true);
+            };
+            img.onerror = () => {
+                if (!silent) {
+                    console.log(`❌ Assets: "${path}" not found, will use procedural fallback`);
+                }
+                resolve(false);
+            };
+            img.src = `/assets/images/${path}`;
+        });
+    }
+
+    /**
+     * Загрузка всех внешних ассетов
+     */
+    private static async loadExternalAssets(): Promise<void> {
+        const loadTasks: Promise<void>[] = [];
+
+        // === КРИТИЧНЫЕ АССЕТЫ (приоритет для PNG) ===
+
+        // Tiles - окружение (поддерживают варианты для разнообразия)
+        loadTasks.push(this.loadImage('grass', 'tiles/grass.png', 5));  // до 5 вариантов
+        loadTasks.push(this.loadImage('path', 'tiles/path.png', 3));
+
+        // Fog tiles (0-15) - без вариантов, т.к. используются для битмаскинга
+        for (let i = 0; i < 16; i++) {
+            loadTasks.push(this.loadImage(`fog_${i}`, `tiles/fog_${i}.png`, 0));
+        }
+
+        // Декорации - поддерживают варианты
+        loadTasks.push(this.loadImage('decor_tree', 'tiles/tree.png', 3));
+        loadTasks.push(this.loadImage('decor_rock', 'tiles/rock.png', 5));
+        loadTasks.push(this.loadImage('stone', 'tiles/stone.png', 3));
+        loadTasks.push(this.loadImage('wheat', 'tiles/wheat.png', 2));
+        loadTasks.push(this.loadImage('flowers', 'tiles/flowers.png', 3));
+
+        // Башни - базовые (без вариантов, т.к. визуально важна консистентность)
+        loadTasks.push(this.loadImage('tower_base', 'towers/base.png'));
+        loadTasks.push(this.loadImage('base_default', 'towers/base_default.png'));
+        loadTasks.push(this.loadImage('tower_gun', 'towers/gun.png'));
+
+        // Турели
+        loadTasks.push(this.loadImage('turret_standard', 'towers/turret_standard.png'));
+        loadTasks.push(this.loadImage('turret_ice', 'towers/turret_ice.png'));
+        loadTasks.push(this.loadImage('turret_fire', 'towers/turret_fire.png'));
+        loadTasks.push(this.loadImage('turret_sniper', 'towers/turret_sniper.png'));
+        loadTasks.push(this.loadImage('turret_split', 'towers/turret_split.png'));
+        loadTasks.push(this.loadImage('turret_minigun', 'towers/turret_minigun.png'));
+
+        // Модули
+        loadTasks.push(this.loadImage('mod_ice', 'modules/ice.png'));
+        loadTasks.push(this.loadImage('mod_fire', 'modules/fire.png'));
+        loadTasks.push(this.loadImage('mod_sniper', 'modules/sniper.png'));
+        loadTasks.push(this.loadImage('mod_split', 'modules/split.png'));
+        loadTasks.push(this.loadImage('mod_minigun', 'modules/minigun.png'));
+
+        // Враги - базовые архетипы (могут иметь варианты для разнообразия)
+        loadTasks.push(this.loadImage('enemy_skeleton', 'enemies/skeleton.png', 3));
+        loadTasks.push(this.loadImage('enemy_wolf', 'enemies/wolf.png', 2));
+        loadTasks.push(this.loadImage('enemy_troll', 'enemies/troll.png', 2));
+        loadTasks.push(this.loadImage('enemy_spider', 'enemies/spider.png', 2));
+
+        // Props врагов
+        loadTasks.push(this.loadImage('prop_shield', 'props/shield.png'));
+        loadTasks.push(this.loadImage('prop_helmet', 'props/helmet.png'));
+        loadTasks.push(this.loadImage('prop_weapon', 'props/weapon.png'));
+        loadTasks.push(this.loadImage('prop_barrier', 'props/barrier.png'));
+
+        // Снаряды - критичные для геймплея
+        loadTasks.push(this.loadImage('projectile_standard', 'projectiles/standard.png'));
+        loadTasks.push(this.loadImage('projectile_ice', 'projectiles/ice.png'));
+        loadTasks.push(this.loadImage('projectile_fire', 'projectiles/fire.png'));
+        loadTasks.push(this.loadImage('projectile_sniper', 'projectiles/sniper.png'));
+        loadTasks.push(this.loadImage('projectile_split', 'projectiles/split.png'));
+        loadTasks.push(this.loadImage('projectile_minigun', 'projectiles/minigun.png'));
+
+        // ЭФФЕКТЫ - оставляем процедурными (не загружаем PNG)
+        // effect_muzzle_flash, shadow_small - будут сгенерированы процедурно
+
+        // Загружаем все параллельно
+        await Promise.all(loadTasks);
+    }
+
+    /**
+     * Генерирует процедурные текстуры для всех ассетов, которые не были загружены
+     */
+    private static generateFallbackTextures(): void {
+        // Проверяем какие ассеты отсутствуют и генерируем для них процедурные текстуры
+        const requiredAssets = [
+            'grass_0', 'grass_1', 'grass_2', 'grass_3', // 4 variants for grass
+            'path', 'decor_tree', 'decor_rock', 'stone', 'wheat', 'flowers',
+            'tower_base', 'base_default', 'tower_gun',
+            'turret_standard', 'turret_ice', 'turret_fire', 'turret_sniper', 'turret_split', 'turret_minigun',
+            'mod_ice', 'mod_fire', 'mod_sniper', 'mod_split', 'mod_minigun',
+            'projectile_standard', 'projectile_ice', 'projectile_fire', 'projectile_sniper', 'projectile_split', 'projectile_minigun',
+            'effect_muzzle_flash', 'shadow_small'
+        ];
+
+        // Добавляем fog tiles
+        for (let i = 0; i < 16; i++) {
+            requiredAssets.push(`fog_${i}`);
+        }
+
+        // Добавляем path tiles (Phase 2 - bitmasking)
+        for (let i = 0; i < 16; i++) {
+            requiredAssets.push(`path_${i}`);
+        }
+
+        // Добавляем enemies
+        const enemies = Object.values(CONFIG.ENEMY_TYPES);
+        enemies.forEach((e) => {
+            requiredAssets.push(`enemy_${e.id}`);
+        });
+
+        // Добавляем props
+        requiredAssets.push('prop_shield', 'prop_helmet', 'prop_weapon', 'prop_barrier');
+
+        // Генерируем недостающие
+        requiredAssets.forEach(assetName => {
+            if (!this.images[assetName]) {
+                this.generateProceduralAsset(assetName);
+            }
+        });
+    }
+
+    /**
+     * Генерирует процедурную текстуру для конкретного ассета
+     */
+    private static generateProceduralAsset(name: string): void {
+        // Вызываем старую систему процедурной генерации
+        if (name.startsWith('grass_')) {
+            // Phase 3: Layered grass generation - VARIANTS
+            const variantIdx = parseInt(name.split('_')[1]);
+
+            this.generateLayeredTexture(name, CONFIG.TILE_SIZE, {
+                // Layer 1: Solid base (Gradient caused banding grid effect - SEMI-FIXED)
+                base: (ctx, w, h) => {
+                    ctx.fillStyle = VISUALS.ENVIRONMENT.GRASS.MAIN;
+                    ctx.fillRect(0, 0, w, h);
+
+                    // Add very subtle noise instead of gradient
+                    for (let i = 0; i < 5; i++) {
+                        ctx.fillStyle = `rgba(0,0,0,${Math.random() * 0.05})`;
+                        ctx.fillRect(Math.random() * w, Math.random() * h, Math.random() * w / 2, Math.random() * h / 2);
+                    }
+                },
+                // Layer 2: Organic veins (Deterministic based on variant)
+                pattern: (ctx, w, h) => {
+                    ProceduralPatterns.organicVeins(ctx, w, h, 0.1, variantIdx * 100);
+                },
+                // Layer 3: Bioluminescent spots (Deterministic)
+                highlight: (ctx, w, h) => {
+                    ProceduralPatterns.biolumSpots(
+                        ctx,
+                        w,
+                        h,
+                        VISUALS.ENVIRONMENT.GRASS.BIOLUM,
+                        0.05, // Reduced from 25% to 5% for subtler effect
+                        42 + variantIdx * 50    // Детерминированный seed
+                    );
+                }
+            });
+
+            // IMPORTANT: Register as variant for 'grass'
+            if (!this.variants['grass']) {
+                this.variants['grass'] = [];
+            }
+            if (this.images[name] instanceof HTMLCanvasElement) {
+                this.variants['grass'].push(this.images[name] as HTMLCanvasElement);
+            }
+
+            this.loadStats.procedural++;
+
+            // Если это первый вариант, регистрируем его как основной ассет 'grass'
+            if (name === 'grass_0') {
+                this.images['grass'] = this.images[name];
+            }
+
+        } else if (name === 'path') {
+            this.generateTexture('path', CONFIG.TILE_SIZE, (ctx, w, h) => {
+                ctx.fillStyle = VISUALS.ENVIRONMENT.PATH.MAIN;
+                ctx.fillRect(0, 0, w, h);
+                for (let i = 0; i < 15; i++) {
+                    ctx.fillStyle = VISUALS.ENVIRONMENT.PATH.DETAIL;
+                    ctx.beginPath();
+                    ctx.arc(Math.random() * w, Math.random() * h, 3, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+            });
+            this.loadStats.procedural++;
+        } else if (name.startsWith('fog_')) {
+            // Генерируем fog tiles по старому
+            const index = parseInt(name.replace('fog_', ''));
+            if (!isNaN(index)) {
+                this.generateFogTile(index);
+                this.loadStats.procedural++;
+            }
+        } else if (name.startsWith('path_')) {
+            // Генерируем path tiles (Phase 2 - bitmasking)
+            this.generatePathTiles(); // Генерируем все 16 за раз
+            this.loadStats.procedural++;
+        } else if (name.startsWith('enemy_')) {
+            // Enemies
+            const enemyId = name.replace('enemy_', '');
+            const enemy = Object.values(CONFIG.ENEMY_TYPES).find(e => e.id === enemyId);
+            if (enemy) {
+                this.generateEnemyTexture(enemy.id, enemy.color);
+                this.loadStats.procedural++;
+            }
+        } else {
+            // Для всех остальных ассетов генерируем через старую систему
+            // НО ТОЛЬКО ЕСЛИ они ещё не загружены!
+            console.log(`[Assets] No specific fallback for "${name}", checking if already loaded...`);
+            if (!this.images[name]) {
+                console.log(`[Assets] "${name}" not loaded, generating procedurally...`);
+                this.generateAllTextures();  // Генерируем ВСЕ недостающие
+            } else {
+                console.log(`[Assets] "${name}" already loaded (PNG), skipping generation`);
+            }
+        }
+    }
+
+    // --- СТАРАЯ СИСТЕМА ПРОЦЕДУРНОЙ ГЕНЕРАЦИИ (оставляем для fallback) ---
+    private static generateAllTextures() {
+        // Окружение - Phase 3: Layered grass (CORRECTED)
+        this.generateLayeredTexture('grass', CONFIG.TILE_SIZE, {
+            base: (ctx, w, h) => {
+                const gradient = ctx.createLinearGradient(0, 0, 0, h);
+                gradient.addColorStop(0, VISUALS.ENVIRONMENT.GRASS.VAR_1);
+                gradient.addColorStop(1, VISUALS.ENVIRONMENT.GRASS.MAIN);
+                ctx.fillStyle = gradient;
+                ctx.fillRect(0, 0, w, h);
+            },
+            pattern: (ctx, w, h) => {
+                ProceduralPatterns.organicVeins(ctx, w, h, 0.1); // Тоньше
+            },
+            highlight: (ctx, w, h) => {
+                ProceduralPatterns.biolumSpots(ctx, w, h, VISUALS.ENVIRONMENT.GRASS.BIOLUM, 0.25, 42); // Больше
+            }
+            // Perlin noise убран
         });
 
         this.generateTexture('path', CONFIG.TILE_SIZE, (ctx, w, h) => {
@@ -109,6 +442,9 @@ export class Assets {
         // Fog
         this.generateFogTiles();
 
+        // Path tiles (Phase 2 - bitmasking)
+        this.generatePathTiles();
+
         // --- NEW MODULAR TOWER ASSETS ---
         this.generateTowerParts();
 
@@ -122,13 +458,71 @@ export class Assets {
         size: number,
         drawFn: (ctx: CanvasRenderingContext2D, w: number, h: number) => void,
     ) {
+        // КРИТИЧНО: Не перезаписывать уже загруженные PNG!
+        if (this.images[name]) {
+            console.log(`[generateTexture] Skipping "${name}" - already loaded as PNG`);
+            return;
+        }
+
         const canvas = document.createElement('canvas');
         canvas.width = size;
         canvas.height = size;
         const ctx = canvas.getContext('2d')!;
         drawFn(ctx, size, size);
         this.images[name] = canvas;
+        console.log(`[generateTexture] Generated procedural "${name}"`);
     }
+
+    /**
+     * Layered Texture Generation (Phase 1)
+     * Generates textures using multiple layers for richer visuals
+     * @param name Asset name
+     * @param size Texture size
+     * @param layers Layer functions: base, pattern, highlight, dirt
+     */
+    private static generateLayeredTexture(
+        name: string,
+        size: number,
+        layers: {
+            base: (ctx: CanvasRenderingContext2D, w: number, h: number) => void;
+            pattern?: (ctx: CanvasRenderingContext2D, w: number, h: number) => void;
+            highlight?: (ctx: CanvasRenderingContext2D, w: number, h: number) => void;
+            dirt?: (ctx: CanvasRenderingContext2D, w: number, h: number) => void;
+        }
+    ): void {
+        // КРИТИЧНО (из аудита): Защита от повторной генерации!
+        if (this.images[name]) {
+            console.warn(`[Assets] Texture "${name}" already generated, skipping`);
+            return;
+        }
+
+        const canvas = document.createElement('canvas');
+        canvas.width = size;
+        canvas.height = size;
+        const ctx = canvas.getContext('2d')!;
+
+        // Layer 1: Base (подложка)
+        layers.base(ctx, size, size);
+
+        // Layer 2: Pattern (узор)
+        if (layers.pattern) {
+            layers.pattern(ctx, size, size);
+        }
+
+        // Layer 3: Highlight (блики/акценты)
+        if (layers.highlight) {
+            layers.highlight(ctx, size, size);
+        }
+
+        // Layer 4: Dirt (грязь/шум)
+        if (layers.dirt) {
+            layers.dirt(ctx, size, size);
+        }
+
+        this.images[name] = canvas;
+        console.log(`[generateLayeredTexture] Generated "${name}" with ${Object.keys(layers).length} layers`);
+    }
+
 
     private static generateEnemyTexture(name: string, color: string) {
         this.generateTexture(`enemy_${name}`, 48, (ctx, w, h) => {
@@ -256,6 +650,212 @@ export class Assets {
             });
         }
     }
+
+    /**
+     * Генератирует один fog tile по индексу (для fallback)
+     */
+    private static generateFogTile(index: number) {
+        const TS = CONFIG.TILE_SIZE;
+        this.generateTexture(`fog_${index}`, TS, (ctx, w, h) => {
+            const NORTH = (index & 1) !== 0;
+            const WEST = (index & 2) !== 0;
+            const EAST = (index & 4) !== 0;
+            const SOUTH = (index & 8) !== 0;
+
+            ctx.clearRect(0, 0, w, h);
+            ctx.fillStyle = VISUALS.ENVIRONMENT.FOG.BASE;
+
+            const cX = Math.floor(w / 4);
+            const cY = Math.floor(h / 4);
+            const cW = Math.floor(w / 2);
+            const cH = Math.floor(h / 2);
+            const arcRadius = Math.floor(cW / 2);
+
+            // Draw Center
+            ctx.fillRect(cX, cY, cW, cH);
+
+            // NORTH
+            if (NORTH) {
+                ctx.fillRect(cX, 0, cW, cY);
+            } else {
+                ctx.beginPath();
+                ctx.arc(w / 2, cY, arcRadius, Math.PI, 0);
+                ctx.fill();
+            }
+
+            // SOUTH
+            if (SOUTH) {
+                ctx.fillRect(cX, cY + cH, cW, h - (cY + cH));
+            } else {
+                ctx.beginPath();
+                ctx.arc(w / 2, cY + cH, arcRadius, 0, Math.PI); ctx.fill();
+            }
+
+            // WEST
+            if (WEST) {
+                ctx.fillRect(0, cY, cX, cH);
+            } else {
+                ctx.beginPath();
+                ctx.arc(cX, h / 2, arcRadius, Math.PI * 0.5, Math.PI * 1.5);
+                ctx.fill();
+            }
+
+            // EAST
+            if (EAST) {
+                ctx.fillRect(cX + cW, cY, w - (cX + cW), cH);
+            } else {
+                ctx.beginPath();
+                ctx.arc(cX + cW, h / 2, arcRadius, Math.PI * 1.5, Math.PI * 0.5);
+                ctx.fill();
+            }
+
+            // Fill corners if both adjacent sides are connected
+            if (NORTH && WEST) ctx.fillRect(0, 0, cX, cY);
+            if (NORTH && EAST) ctx.fillRect(cX + cW, 0, w - (cX + cW), cY);
+            if (SOUTH && WEST) ctx.fillRect(0, cY + cH, cX, h - (cY + cH));
+            if (SOUTH && EAST) ctx.fillRect(cX + cW, cY + cH, w - (cX + cW), h - (cY + cH));
+        });
+    }
+
+    /**
+     * Generate Path Tiles with Bitmasking (Phase 2 + Phase 4)
+     * Creates 16 variants (0-15) for smooth path connections
+     * Phase 4: Adds techno texture (grid, rivets, neon glow)
+     */
+    private static generatePathTiles() {
+        const TS = CONFIG.TILE_SIZE;
+
+        // Generate 16 bitmask variations (0-15)
+        for (let i = 0; i < 16; i++) {
+            this.generateTexture(`path_${i}`, TS, (ctx, w, h) => {
+                const NORTH = (i & 1) !== 0;
+                const WEST = (i & 2) !== 0;
+                const EAST = (i & 4) !== 0;
+                const SOUTH = (i & 8) !== 0;
+
+                ctx.clearRect(0, 0, w, h);
+
+                // Phase 4: Metallic gradient base (slightly darker gradient)
+                const gradient = ctx.createLinearGradient(0, 0, w, h);
+                gradient.addColorStop(0, VISUALS.ENVIRONMENT.PATH.MAIN); // #5a5a62
+                gradient.addColorStop(1, '#4a4a52'); // Darker shade
+                ctx.fillStyle = gradient;
+
+                // Dynamic dimensions (same as fog)
+                const cX = Math.floor(w / 4);
+                const cY = Math.floor(h / 4);
+                const cW = Math.floor(w / 2);
+                const cH = Math.floor(h / 2);
+                const arcRadius = Math.floor(cW / 2);
+
+                // Draw Center
+                ctx.fillRect(cX, cY, cW, cH);
+
+                // NORTH
+                if (NORTH) {
+                    ctx.fillRect(cX, 0, cW, cY);
+                } else {
+                    ctx.beginPath();
+                    ctx.arc(w / 2, cY, arcRadius, Math.PI, 0);
+                    ctx.fill();
+                }
+
+                // SOUTH
+                if (SOUTH) {
+                    ctx.fillRect(cX, cY + cH, cW, h - (cY + cH));
+                } else {
+                    ctx.beginPath();
+                    ctx.arc(w / 2, cY + cH, arcRadius, 0, Math.PI);
+                    ctx.fill();
+                }
+
+                // WEST
+                if (WEST) {
+                    ctx.fillRect(0, cY, cX, cH);
+                } else {
+                    ctx.beginPath();
+                    ctx.arc(cX, h / 2, arcRadius, Math.PI * 0.5, Math.PI * 1.5);
+                    ctx.fill();
+                }
+
+                // EAST
+                if (EAST) {
+                    ctx.fillRect(cX + cW, cY, w - (cX + cW), cH);
+                } else {
+                    ctx.beginPath();
+                    ctx.arc(cX + cW, h / 2, arcRadius, Math.PI * 1.5, Math.PI * 0.5);
+                    ctx.fill();
+                }
+
+                // Fill corners if both adjacent sides are connected
+                if (NORTH && WEST) ctx.fillRect(0, 0, cX, cY);
+                if (NORTH && EAST) ctx.fillRect(cX + cW, 0, w - (cX + cW), cY);
+                if (SOUTH && WEST) ctx.fillRect(0, cY + cH, cX, h - (cY + cH));
+                if (SOUTH && EAST) ctx.fillRect(cX + cW, cY + cH, w - (cX + cW), h - (cY + cH));
+
+                // === PHASE 4: TECHNO TEXTURE ===
+
+                // 1. Grid Lines (швы между плитами)
+                ctx.strokeStyle = VISUALS.ENVIRONMENT.PATH.GRID; // #222
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                // Vertical center line
+                ctx.moveTo(w / 2, 0);
+                ctx.lineTo(w / 2, h);
+                // Horizontal center line
+                ctx.moveTo(0, h / 2);
+                ctx.lineTo(w, h / 2);
+                ctx.stroke();
+
+                // 2. Rivets (reduced to corners/sparse)
+                ctx.fillStyle = VISUALS.ENVIRONMENT.PATH.RIVET;
+                const rivetSize = 1.5; // Slightly smaller
+                // Draw only near corners/intersections (2x2 grid, offset)
+                const rOffset = w / 4;
+                for (let rx = 1; rx <= 3; rx += 2) { // 1, 3 -> 2 rivets horizontally
+                    for (let ry = 1; ry <= 3; ry += 2) { // 1, 3 -> 2 rivets vertically
+                        const x = rx * rOffset;
+                        const y = ry * rOffset;
+                        ctx.beginPath();
+                        ctx.arc(x, y, rivetSize, 0, Math.PI * 2);
+                        ctx.fill();
+                    }
+                }
+
+                // 3. Neon Glow (toned down)
+                // Используем индекс битмаска как seed
+                const hasNeon = ((i * 73) % 100) < 20; // 20% вероятность
+                if (hasNeon) {
+                    ctx.save();
+                    ctx.shadowBlur = 4; // Decreased from 8
+                    ctx.shadowColor = VISUALS.ENVIRONMENT.PATH.GLOW;
+                    ctx.strokeStyle = VISUALS.ENVIRONMENT.PATH.GLOW;
+                    ctx.lineWidth = 1; // Thinner lines
+                    ctx.globalAlpha = 0.2; // Much more subtle (was 0.6)
+
+                    // Неоновая линия по центру (случайно горизонтальная или вертикальная)
+                    ctx.beginPath();
+                    if ((i * 137) % 2 === 0) {
+                        // Горизонтальная
+                        ctx.moveTo(cX, h / 2);
+                        ctx.lineTo(cX + cW, h / 2);
+                    } else {
+                        // Вертикальная
+                        ctx.moveTo(w / 2, cY);
+                        ctx.lineTo(w / 2, cY + cH);
+                    }
+                    ctx.stroke();
+                    ctx.restore();
+                }
+
+                // 4. Border for visibility (уже был, оставляем)
+                ctx.strokeStyle = VISUALS.ENVIRONMENT.PATH.BORDER; // #787880
+                ctx.lineWidth = 1;
+                ctx.stroke();
+            });
+        }
+    }
+
 
     private static generateTowerParts() {
         const size = CONFIG.TILE_SIZE;

@@ -236,7 +236,12 @@ export class WeaponSystem {
         // Minigun vibration (constant while firing)
         if (stats.projectileType === 'minigun') {
             tower.recoilFrames = 5;
-            tower.recoilIntensity = 0.5; // Subtle shake
+            // tower.recoilIntensity = 0.5; // OLD: Caused constant shaking
+            // Only purely visual recoil for the tower itself, do not trigger screen shake here if possible
+            // But if recoilFrames is used for screen shake, we need to be careful.
+            // GameScene uses gameState.shakeTimer for screen shake. 
+            // Tower.recoilFrames usually just shakes the tower sprite.
+            // Let's verify Tower.ts usage of recoil.
         }
 
         // Play Sound

@@ -183,7 +183,7 @@ export class Tower {
     addCard(c: ICard): boolean {
         if (this.cards.length < CONFIG.TOWER.MAX_CARDS) {
             this.cards.push(c);
-            this.costSpent += 100;
+            // this.costSpent += 100; // Removed cost tracking for cards
             return true;
         }
         return false;

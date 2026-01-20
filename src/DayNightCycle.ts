@@ -13,7 +13,7 @@ export class DayNightCycle {
     constructor(config?: Partial<IDayNightConfig>) {
         this.config = {
             cycleDuration: 240, // 4 minutes default (was reduced from original by 30%)
-            startTime: 0.2, // Start at early morning
+            startTime: 0.15, // Start closer to dawn for brighter initial lighting
             ...config
         };
 

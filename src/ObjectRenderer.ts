@@ -1,4 +1,5 @@
 import { CONFIG } from './Config';
+import { VISUALS } from './VisualConfig';
 
 /**
  * ObjectRenderer - programmatic rendering for map objects
@@ -41,6 +42,7 @@ export class ObjectRenderer {
 
     /**
      * Draw small stones (1 tile)
+     * Phase 5: Uses global light direction from VISUALS.LIGHTING
      */
     private static drawStone(ctx: CanvasRenderingContext2D, x: number, y: number, TS: number): void {
         const centerX = x + TS / 2;
@@ -54,10 +56,14 @@ export class ObjectRenderer {
             const offsetY = ((y + i * 23) % 30) - 15;
             const radius = 6 + ((x + y + i) % 4);
 
-            // Stone shadow
-            ctx.fillStyle = 'rgba(0, 0, 0, 0.2)';
+            // Stone shadow (uses global light direction)
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.3)'; // Slightly darker
             ctx.beginPath();
-            ctx.ellipse(centerX + offsetX + 2, centerY + offsetY + 2, radius, radius * 0.8, 0, 0, Math.PI * 2);
+            ctx.ellipse(
+                centerX + offsetX + VISUALS.LIGHTING.SHADOW_OFFSET_X,
+                centerY + offsetY + VISUALS.LIGHTING.SHADOW_OFFSET_Y,
+                radius, radius * 0.8, 0, 0, Math.PI * 2
+            );
             ctx.fill();
 
             // Stone body
@@ -66,16 +72,21 @@ export class ObjectRenderer {
             ctx.ellipse(centerX + offsetX, centerY + offsetY, radius, radius * 0.8, 0, 0, Math.PI * 2);
             ctx.fill();
 
-            // Highlight
-            ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
+            // Highlight (opposite direction from shadow)
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.4)'; // Brighter
             ctx.beginPath();
-            ctx.ellipse(centerX + offsetX - 2, centerY + offsetY - 2, radius * 0.4, radius * 0.3, 0, 0, Math.PI * 2);
+            ctx.ellipse(
+                centerX + offsetX + VISUALS.LIGHTING.HIGHLIGHT_OFFSET_X,
+                centerY + offsetY + VISUALS.LIGHTING.HIGHLIGHT_OFFSET_Y,
+                radius * 0.4, radius * 0.3, 0, 0, Math.PI * 2
+            );
             ctx.fill();
         }
     }
 
     /**
      * Draw large rocks (2-3 tiles) with varied shapes
+     * Phase 5: Uses global light direction
      */
     private static drawRock(ctx: CanvasRenderingContext2D, x: number, y: number, TS: number, size: number): void {
         const width = size * TS;
@@ -149,6 +160,7 @@ export class ObjectRenderer {
 
     /**
      * Draw tree (1 tile)
+     * Phase 5: Uses global light direction, gradient trunk, layered foliage
      */
     private static drawTree(ctx: CanvasRenderingContext2D, x: number, y: number, TS: number): void {
         const centerX = x + TS / 2;

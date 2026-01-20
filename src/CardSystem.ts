@@ -142,7 +142,12 @@ export class CardSystem {
     public tryForge() {
         if (!this.canForge()) return;
 
-        const cost = CONFIG.ECONOMY.FORGE_COST;
+        // Progressive Forge Cost
+        const card = this.forgeSlots[0]!;
+        const cost = card.level === 1
+            ? CONFIG.ECONOMY.FORGE_COST_LVL1   // 50
+            : CONFIG.ECONOMY.FORGE_COST_LVL2;  // 65
+
         if (this.scene.money < cost) {
             this.scene.showFloatingText('Need Money!', 500, 500, 'red');
             return;

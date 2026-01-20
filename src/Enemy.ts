@@ -202,6 +202,19 @@ export class Enemy {
 
         // -- VISUAL STACK --
 
+        // 0. RIM LIGHT (Phase 3: Pop from background)
+        // Draw a soft glow/outline behind the enemy
+        ctx.save();
+        ctx.globalCompositeOperation = 'screen'; // Additive-like for glow
+        ctx.fillStyle = tint ? tint : baseColor;
+        ctx.globalAlpha = 0.3;
+
+        const rimSize = (48 * scale) * 1.2; // 20% larger than body
+        ctx.beginPath();
+        ctx.arc(0, 0, rimSize / 2, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+
         // 1. Shadow Layer
         const shadowImg = Assets.get('shadow_small');
         if (shadowImg) {

@@ -13,7 +13,7 @@ export class ShopUI {
     private selectedSlot: number = -1;
 
     public readonly cost: number = 100;
-    public readonly refreshCost: number = 15; // [NEW]
+    public readonly refreshCost: number = CONFIG.ECONOMY.SHOP_REROLL_COST; // [NEW]
 
     constructor(scene: IGameScene) {
         this.scene = scene;
@@ -138,6 +138,7 @@ export class ShopUI {
         }
 
         // Refresh Btn State
+        this.elRefreshBtn.innerHTML = `↻ ${this.refreshCost}💰`; // NEW: Update text dynamically
         if (this.scene.money >= this.refreshCost) {
             this.elRefreshBtn.disabled = false;
             this.elRefreshBtn.style.opacity = '1';

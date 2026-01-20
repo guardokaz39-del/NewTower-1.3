@@ -35,9 +35,10 @@ export class WaveManager {
             this.isWaveActive = true;
         } else {
             // Early wave bonus!
+            // Early wave bonus!
             this.scene.addMoney(CONFIG.ECONOMY.EARLY_WAVE_BONUS);
             this.scene.metrics.trackMoneyEarned(CONFIG.ECONOMY.EARLY_WAVE_BONUS);
-            this.scene.showFloatingText('EARLY START!', this.scene.game.canvas.width / 2, 300, 'gold');
+            this.scene.showFloatingText(`EARLY! +${CONFIG.ECONOMY.EARLY_WAVE_BONUS}💰`, this.scene.game.canvas.width / 2, 300, 'gold');
         }
 
         this.generateWave(this.scene.wave);
@@ -83,6 +84,22 @@ export class WaveManager {
         // Progressive economy: Base reward + scaling per wave
         const reward = CONFIG.ECONOMY.WAVE_BASE_REWARD + (this.scene.wave * CONFIG.ECONOMY.WAVE_SCALING_FACTOR);
         this.scene.addMoney(reward);
+
+        // Perfect wave bonus (no lives lost this game/wave - strictly checking if at max lives)
+        // Note: This checks if current lives equals starting lives. 
+        // If we want per-wave perfection, we'd need to snapshot lives at wave start.
+        // Assuming "Perfect Wave" means "No leaks currently" or "Full Health".
+        // Let's go with: If player has full health (startingLives), give bonus.
+        if (this.scene.lives >= this.scene.startingLives) {
+            this.scene.addMoney(CONFIG.ECONOMY.PERFECT_WAVE_BONUS);
+            this.scene.metrics.trackMoneyEarned(CONFIG.ECONOMY.PERFECT_WAVE_BONUS);
+            this.scene.showFloatingText(
+                `PERFECT! +${CONFIG.ECONOMY.PERFECT_WAVE_BONUS}💰`,
+                this.scene.game.canvas.width / 2,
+                350,
+                '#00ffff' // Cyan for perfect
+            );
+        }
 
         // Give card for this completed wave (only once per wave number)
         // This ensures card is given even if wave was started early
