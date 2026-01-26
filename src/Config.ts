@@ -1,7 +1,23 @@
 import type { ICardTypeConfig, IEnemyTypeConfig } from './types';
 
 export const CONFIG = {
+    // Configuration flags for safe refactoring
+    USE_NEW_RENDERER: true, // Toggle this to enable new modular renderers
+    VISUAL_STYLE: 'SPRITE' as 'SPRITE' | 'INK', // 'SPRITE' | 'INK' - Styling mode
+
     TILE_SIZE: 64,
+
+    AMBIENT: {
+        DAY_SPEED: 0.0005,
+        NIGHT_SPEED_MULTIPLIER: 1.5,
+        LIGHTING: {
+            FIRE: '#ff5722',
+            ICE: '#00bcd4',
+            SNIPER: '#4caf50',
+            MINIGUN: '#e040fb',
+            STANDARD: '#ffeb3b',
+        }
+    },
 
     COLORS: {
         GRASS: '#8bc34a',
@@ -181,7 +197,7 @@ export const CONFIG = {
             { type: 'BOSS', count: 1, interval: 300 },
         ],
     ],
-} as const;
+};
 
 /**
  * Type-safe helper to get card type configuration

@@ -10,6 +10,7 @@ import { Enemy } from '../Enemy';
 import { Tower } from '../Tower';
 import { Projectile } from '../Projectile';
 import { EffectSystem } from '../EffectSystem';
+import { EventEmitter } from '../Events';
 
 // Define the interface for the GameScene
 export interface IGameScene {
@@ -25,6 +26,7 @@ export interface IGameScene {
     inspector: InspectorSystem;
     metrics: MetricsSystem;
     effects: EffectSystem;
+    events: EventEmitter;
 
     // State
     wave: number;

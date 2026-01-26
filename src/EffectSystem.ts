@@ -1,4 +1,5 @@
 import { Assets } from './Assets';
+import { RendererFactory } from './RendererFactory';
 
 export interface IEffect {
     type: 'explosion' | 'text' | 'particle' | 'scan' | 'debris' | 'screen_flash' | 'muzzle_flash' | 'scale_pop';
@@ -66,6 +67,11 @@ export class EffectSystem {
 
     public draw() {
         this.effects.forEach((e) => {
+            // Try Factory first
+            if (RendererFactory.drawEffect(this.ctx, e)) {
+                return;
+            }
+
             const progress = e.life / (e.maxLife || 1);
 
             this.ctx.save();

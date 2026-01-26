@@ -1,6 +1,8 @@
 import { CONFIG, getEnemyType } from './Config';
+import { RendererFactory } from './RendererFactory';
 import { Assets } from './Assets';
 import { Projectile } from './Projectile';
+import { EnemyRenderer } from './renderers/EnemyRenderer';
 
 export interface IEnemyConfig {
     id: string;
@@ -31,7 +33,7 @@ export class Enemy {
     public x: number;
     public y: number;
 
-    private path: { x: number; y: number }[];
+    public path: { x: number; y: number }[];
     public pathIndex: number = 0;
     public finished: boolean = false;
 
@@ -166,183 +168,6 @@ export class Enemy {
     }
 
     public draw(ctx: CanvasRenderingContext2D) {
-        const safeType = this.typeId ? this.typeId.toLowerCase() : 'grunt';
-        const typeConf = getEnemyType(safeType.toUpperCase()) || getEnemyType('GRUNT');
-
-        // Defaults
-        const scale = typeConf?.scale || 1.0;
-        const archetype = typeConf?.archetype || 'SKELETON';
-        const props = typeConf?.props || [];
-        const baseColor = typeConf?.color || '#fff';
-        const tint = typeConf?.tint;
-
-        ctx.save();
-        ctx.translate(this.x, this.y);
-
-        // === ANIMATIONS (Phase 3) ===
-
-        // 1. Rotation towards movement
-        if (this.pathIndex < this.path.length - 1) {
-            const next = this.path[this.pathIndex];
-            const dx = next.x * CONFIG.TILE_SIZE + CONFIG.TILE_SIZE / 2 - this.x;
-            const dy = next.y * CONFIG.TILE_SIZE + CONFIG.TILE_SIZE / 2 - this.y;
-            const moveAngle = Math.atan2(dy, dx);
-            ctx.rotate(moveAngle + Math.PI / 2); // Rotate sprite to face movement direction
-        }
-
-        // 2. Breathing (pulsation)
-        const breathePhase = (Date.now() * 0.001) + (parseInt(this.id.slice(-3), 36) * 0.5);
-        const breatheScale = 1.0 + Math.sin(breathePhase) * 0.03;
-        ctx.scale(breatheScale, breatheScale);
-
-        // 3. Movement arc (vertical bob)
-        const walkCycle = (Date.now() * 0.01) % (Math.PI * 2);
-        const verticalBob = Math.abs(Math.sin(walkCycle)) * 2;
-        ctx.translate(0, -verticalBob);
-
-        // -- VISUAL STACK --
-
-        // 0. RIM LIGHT (Phase 3: Pop from background)
-        // Draw a soft glow/outline behind the enemy
-        ctx.save();
-        ctx.globalCompositeOperation = 'screen'; // Additive-like for glow
-        ctx.fillStyle = tint ? tint : baseColor;
-        ctx.globalAlpha = 0.3;
-
-        const rimSize = (48 * scale) * 1.2; // 20% larger than body
-        ctx.beginPath();
-        ctx.arc(0, 0, rimSize / 2, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.restore();
-
-        // 1. Shadow Layer
-        const shadowImg = Assets.get('shadow_small');
-        if (shadowImg) {
-            const shadowW = 32 * scale; // Native size 32x16
-            const shadowH = 16 * scale;
-            ctx.drawImage(shadowImg, -shadowW / 2, -shadowH / 2 + 10 * scale, shadowW, shadowH);
-        } else {
-            // Fallback
-            ctx.fillStyle = 'rgba(0,0,0,0.3)';
-            ctx.beginPath();
-            const shadowW = 16 * scale;
-            const shadowH = 8 * scale;
-            ctx.ellipse(0, 10 * scale, shadowW, shadowH, 0, 0, Math.PI * 2);
-            ctx.fill();
-        }
-
-        // 2. Body Layer
-        const bodyImgName = `enemy_${archetype.toLowerCase()}`;
-        const bodyImg = Assets.get(bodyImgName);
-
-        if (bodyImg) {
-            const size = 48 * scale;
-            const half = size / 2;
-
-            // Draw Body
-            ctx.drawImage(bodyImg, -half, -half, size, size);
-
-            // Apply Tint (if defined)
-            if (tint) {
-                ctx.save();
-                ctx.globalCompositeOperation = 'source-atop'; // Draw only on existing pixels
-                ctx.fillStyle = tint;
-                ctx.globalAlpha = 0.5; // Tint strength
-                ctx.fillRect(-half, -half, size, size);
-                ctx.restore();
-            }
-
-            // Apply Hit Flash (White)
-            if (this.hitFlashTimer > 0) {
-                ctx.save();
-                ctx.globalCompositeOperation = 'source-atop';
-                ctx.fillStyle = '#ffffff';
-                ctx.globalAlpha = 0.8;
-                ctx.fillRect(-half, -half, size, size);
-                ctx.restore();
-            }
-
-            // Apply Status Tints (Ice/Burn)
-            // Ice
-            if (this.statuses.some(s => s.type === 'slow')) {
-                ctx.save();
-                ctx.globalCompositeOperation = 'source-atop';
-                ctx.fillStyle = '#00e5ff'; // Cyan
-                ctx.globalAlpha = 0.4;
-                ctx.fillRect(-half, -half, size, size);
-                ctx.restore();
-            }
-            // Burn
-            if (this.statuses.some(s => s.type === 'burn')) {
-                ctx.save();
-                ctx.globalCompositeOperation = 'source-atop';
-                ctx.fillStyle = '#ff3d00'; // Orange
-                ctx.globalAlpha = 0.4;
-                ctx.fillRect(-half, -half, size, size);
-                ctx.restore();
-            }
-
-        } else {
-            // Fallback
-            ctx.fillStyle = baseColor;
-            ctx.beginPath();
-            ctx.arc(0, 0, 16 * scale, 0, Math.PI * 2);
-            ctx.fill();
-        }
-
-        // 3. Props Layer (Equipmnent)
-        if (props.length > 0) {
-            props.forEach(propId => {
-                const propImg = Assets.get(propId);
-                if (propImg) {
-                    // Prop specific offsets? For now center them
-                    const pSize = 32 * scale;
-                    const pHalf = pSize / 2;
-                    ctx.drawImage(propImg, -pHalf, -pHalf, pSize, pSize);
-                }
-            });
-        }
-
-        // 3.5. Status Particles Layer (Phase 3)
-        // Ice crystals orbiting slowed enemies
-        if (this.statuses.some(s => s.type === 'slow')) {
-            for (let i = 0; i < 3; i++) {
-                const angle = (Date.now() * 0.003) + (i * Math.PI * 2 / 3);
-                const orbX = Math.cos(angle) * 20;
-                const orbY = Math.sin(angle) * 20;
-                ctx.fillStyle = '#4fc3f7'; // Light Blue 300
-                ctx.beginPath();
-                ctx.arc(orbX, orbY, 3, 0, Math.PI * 2);
-                ctx.fill();
-                // Inner glow
-                ctx.fillStyle = '#e1f5fe'; // Light Blue 50
-                ctx.beginPath();
-                ctx.arc(orbX, orbY, 1.5, 0, Math.PI * 2);
-                ctx.fill();
-            }
-        }
-
-        // 4. UI Layer (HP Bar)
-        // Only show if damaged
-        if (this.currentHealth < this.maxHealth) {
-            const barWidth = CONFIG.UI.HP_BAR_WIDTH;
-            const barHeight = CONFIG.UI.HP_BAR_HEIGHT;
-            const barY = -30 * scale; // Adjust height based on scale
-
-            // Background
-            ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
-            ctx.fillRect(-barWidth / 2, barY, barWidth, barHeight);
-
-            // Health bar
-            const hpPercent = this.currentHealth / this.maxHealth;
-            let hpColor = '#4caf50'; // green
-            if (hpPercent < 0.3) hpColor = '#f44336'; // red
-            else if (hpPercent < 0.6) hpColor = '#ff9800'; // orange
-
-            ctx.fillStyle = hpColor;
-            ctx.fillRect(-barWidth / 2, barY, barWidth * hpPercent, barHeight);
-        }
-
-        ctx.restore();
+        RendererFactory.drawEnemy(ctx, this);
     }
 }

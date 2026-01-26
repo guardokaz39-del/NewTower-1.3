@@ -4,7 +4,86 @@
 <head>
     <meta charset="UTF-8">
     <title>NewTower v1.4 Alpha</title>
+    <!-- Import Google Font for Ink Mode -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=MedievalSharp&display=swap" rel="stylesheet">
     <style>
+        /* --- INK MODE STYLES --- */
+        body.ink-mode {
+            background: #f4e4bc url('https://www.transparenttextures.com/patterns/old-paper.png');
+            /* Old Paper Texture */
+            color: #3e2723;
+            font-family: 'MedievalSharp', cursive;
+        }
+
+        body.ink-mode .top-bar,
+        body.ink-mode .ui-panel,
+        body.ink-mode #hand {
+            background: rgba(255, 250, 240, 0.9);
+            border: 2px solid #5d4037;
+            box-shadow: 0 4px 10px rgba(93, 64, 55, 0.3);
+            color: #3e2723;
+        }
+
+        body.ink-mode .panel-title {
+            color: #5d4037;
+            border-bottom: 2px solid #8d6e63;
+            font-family: 'MedievalSharp', cursive;
+            letter-spacing: 1px;
+        }
+
+        body.ink-mode .slot {
+            border: 2px dashed #8d6e63;
+            color: #5d4037;
+            font-family: 'MedievalSharp', cursive;
+        }
+
+        body.ink-mode button {
+            font-family: 'MedievalSharp', cursive;
+            border: 2px solid #3e2723;
+            text-transform: uppercase;
+        }
+
+        body.ink-mode #shop-btn {
+            background: #5d99c6;
+            /* Faded blue ink */
+            color: #fff;
+        }
+
+        body.ink-mode #forge-btn {
+            background: #d87c4a;
+            /* Faded orange ink */
+            color: #fff;
+        }
+
+        body.ink-mode #start-wave-btn {
+            background: #c62828;
+            border: 3px double #fff;
+            box-shadow: 0 0 0 3px #c62828;
+        }
+
+        /* Ink Mode Cards */
+        body.ink-mode .card {
+            border: 2px solid #3e2723;
+            background: #fff8e1;
+            box-shadow: 2px 2px 5px rgba(62, 39, 35, 0.4);
+        }
+
+        body.ink-mode .card::after {
+            /* Paper texture overlay for cards */
+            content: "";
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: url('https://www.transparenttextures.com/patterns/cream-paper.png');
+            opacity: 0.3;
+            pointer-events: none;
+        }
+
+        /* Default Mode */
         body {
             margin: 0;
             overflow: hidden;
@@ -23,7 +102,8 @@
         }
 
         canvas {
-            box-shadow: 0 0 30px rgba(0, 0, 0, 0.5);
+            box-shadow: 0 0 15px rgba(0, 0, 0, 0.3);
+            /* Reduced from 30px/0.5 */
             border-radius: 4px;
         }
 
@@ -660,7 +740,10 @@
                 <div>💰 <span id="money">0</span></div>
                 <div>❤️ <span id="lives">20</span></div>
                 <div>⚔️ <span id="wave">1</span></div>
+
                 <div>👹 <span id="enemy-counter">0/0</span></div>
+                <button id="theme-btn"
+                    style="padding: 5px 10px; font-size: 16px; width: auto; background: #444;">🎨</button>
             </div>
 
             <div id="ui-left" class="ui-column">

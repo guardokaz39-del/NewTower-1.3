@@ -28,6 +28,7 @@ import { AtmosphereSystem } from '../systems/AtmosphereSystem';
 import { GameController } from './GameController';
 import { GameState } from './GameState';
 import { EntityManager } from './EntityManager';
+import { RendererFactory } from '../RendererFactory';
 
 /**
  * Main game scene - REFACTORED VERSION
@@ -152,6 +153,7 @@ export class GameScene extends BaseScene implements IGameScene {
             this.mapData,
             (col, row) => this.map.isBuildable(col, row),
             this.cardSys,
+            this.events,
         );
     }
 
@@ -253,7 +255,7 @@ export class GameScene extends BaseScene implements IGameScene {
         }
 
         // World Render
-        this.map.draw(ctx);
+        RendererFactory.drawMap(ctx, this.map);
         // ... (rest of drawing)
 
         // (Assuming render continues...)
@@ -276,7 +278,8 @@ export class GameScene extends BaseScene implements IGameScene {
         ctx.fillRect(0, 0, this.game.canvas.width, this.game.canvas.height);
 
         // Draw map and fog
-        this.map.draw(ctx);
+        // Draw map and fog
+        RendererFactory.drawMap(ctx, this.map);
         this.map.drawTorches(ctx, this.gameState.frames); // [NEW] Draw torches with time
 
         // === PHASE 6: VIGNETTE (Cinematic Polish) ===

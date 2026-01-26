@@ -40,16 +40,17 @@ export class GameHUD {
         // Pause button listener removed
 
         this.elForgeBtn.addEventListener('click', () => {
-            if (!this.scene.cardSys || !this.scene.cardSys.canForge()) return;
+            // FIX: Use forge system
+            if (!this.scene.forge || !this.scene.forge.canForge()) return;
 
             // Determine cost based on card level
-            const card = this.scene.cardSys.forgeSlots[0];
+            const card = this.scene.forge.forgeSlots[0];
             const forgeCost = card && card.level >= 2
                 ? CONFIG.ECONOMY.FORGE_COST_LVL2
                 : CONFIG.ECONOMY.FORGE_COST_LVL1;
 
             if (this.scene.money >= forgeCost) {
-                this.scene.cardSys.tryForge();
+                this.scene.forge.tryForge();
                 // Button state will update on next tick or via event if we add more events
             }
         });
@@ -110,15 +111,15 @@ export class GameHUD {
     }
 
     private updateForgeBtn(money: number) {
-        const cardSys = this.scene.cardSys;
+        const forgeSys = this.scene.forge;
 
         // Determine cost based on slot
         let forgeCost: number = CONFIG.ECONOMY.FORGE_COST_LVL1;
-        if (cardSys && cardSys.forgeSlots[0] && cardSys.forgeSlots[0].level >= 2) {
+        if (forgeSys && forgeSys.forgeSlots[0] && forgeSys.forgeSlots[0].level >= 2) {
             forgeCost = CONFIG.ECONOMY.FORGE_COST_LVL2;
         }
 
-        const canForge = cardSys && cardSys.canForge();
+        const canForge = forgeSys && forgeSys.canForge();
         const hasMoney = money >= forgeCost;
 
         if (canForge && hasMoney) {

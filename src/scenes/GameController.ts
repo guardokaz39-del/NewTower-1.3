@@ -8,6 +8,7 @@ import { InspectorSystem } from '../InspectorSystem';
 import { UIManager } from '../UIManager';
 import { MetricsSystem } from '../MetricsSystem';
 import { IMapData } from '../MapData';
+import { EventEmitter } from '../Events';
 
 /**
  * Handles user actions and game controller logic:
@@ -27,7 +28,12 @@ export class GameController {
         private mapData: IMapData,
         private isBuildable: (col: number, row: number) => boolean,
         private cardSys: any, // CardSystem reference
-    ) { }
+        private events: EventEmitter,
+    ) {
+        this.events.on('CARD_DROPPED', (data: any) => {
+            this.handleCardDrop(data.card, data.x, data.y);
+        });
+    }
 
     private lastErrorTime: number = 0;
 
