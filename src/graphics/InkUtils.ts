@@ -114,4 +114,19 @@ export class InkUtils {
         ctx.fill();
         ctx.restore();
     }
+    /**
+     * Draws a polygon with wobbly lines
+     */
+    static drawSketchPoly(ctx: CanvasRenderingContext2D, points: { x: number, y: number }[], close: boolean = true, time: number = 0) {
+        if (points.length < 2) return;
+
+        for (let i = 0; i < points.length; i++) {
+            if (i === points.length - 1 && !close) break;
+
+            const p1 = points[i];
+            const p2 = points[(i + 1) % points.length];
+
+            this.drawWobbleLine(ctx, p1.x, p1.y, p2.x, p2.y, time);
+        }
+    }
 }

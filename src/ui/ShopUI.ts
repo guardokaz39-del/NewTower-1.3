@@ -182,14 +182,15 @@ export class ShopUI {
 
             // Подсветка выбора
             if (this.selectedSlot === idx) {
-                slot.style.border = '2px solid #00ffff';
-                slot.style.boxShadow = '0 0 15px rgba(0, 255, 255, 0.5)';
-                slot.style.background = 'rgba(255, 255, 255, 0.1)';
+                slot.classList.add('selected');
             } else {
-                slot.style.border = '1px solid #555';
-                slot.style.boxShadow = 'none';
-                slot.style.background = 'rgba(0, 0, 0, 0.3)';
+                slot.classList.remove('selected');
             }
+
+            // Clean inline styles that might persist if we swapped logic
+            slot.style.border = '';
+            slot.style.boxShadow = '';
+            slot.style.background = '';
 
             slot.style.cursor = 'pointer';
             slot.onclick = () => this.selectSlot(idx);

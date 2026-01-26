@@ -2,6 +2,8 @@ import { MapManager } from '../Map';
 import { CONFIG } from '../Config';
 import { INK_CONFIG } from '../graphics/InkConfig';
 import { InkUtils } from '../graphics/InkUtils';
+import { PaperTexture } from '../graphics/PaperTexture';
+import { InkWatercolor } from '../graphics/InkWatercolor';
 import { InkDecorRenderer } from './InkDecorRenderer';
 
 export class InkMapRenderer {
@@ -44,40 +46,47 @@ export class InkMapRenderer {
         const height = this.cacheCanvas.height;
         const TS = CONFIG.TILE_SIZE;
 
-        // 1. Paper Background
-        ctx.fillStyle = INK_CONFIG.PALETTE.PAPER;
-        ctx.fillRect(0, 0, width, height);
+        // 1. Paper Background (Procedural Texture)
+        const paperPattern = PaperTexture.generate(width, height);
+        ctx.drawImage(paperPattern, 0, 0);
 
-        // 2. Ground Details (Grass Tufts & Pebbles)
-        ctx.strokeStyle = 'rgba(93, 64, 55, 0.1)'; // Faint ink
-        ctx.fillStyle = 'rgba(93, 64, 55, 0.05)';
+        // 2. Watercolor Biomes (Ground)
+        // We iterate tiles and apply washes.
+        // To avoid excessive overlap darkness, we could group tiles, but for now tile-by-tile is fine for "chaotic" organic look.
 
         for (let y = 0; y < map.rows; y++) {
             for (let x = 0; x < map.cols; x++) {
-                // Ground detail only on non-path tiles
-                if (map.tiles[y][x] !== 1) {
+                if (map.tiles[y][x] !== 1) { // Ground
                     const seed = x * 101 + y * 13;
-                    if ((seed % 15) === 0) { // Much sparser placement (was 7)
+
+                    // Wash effect (Greenish for grass)
+                    InkWatercolor.drawRectWash(
+                        ctx,
+                        x * TS, y * TS, TS, TS,
+                        INK_CONFIG.PALETTE.WASH_GREEN,
+                        seed
+                    );
+
+                    // Details
+                    if ((seed % 15) === 0) {
                         this.drawGroundDetail(ctx, x * TS, y * TS, TS, seed);
                     }
                 }
             }
         }
 
-        // 3. Grid (Light sketches) - REINTRODUCED very faintly
+        // 3. Grid (Very faint pencil lines)
         ctx.lineWidth = 1;
-        ctx.strokeStyle = 'rgba(45, 27, 14, 0.05)'; // Very faint sepia
+        ctx.strokeStyle = 'rgba(45, 27, 14, 0.03)'; // Even fainter
 
-        // Vertical lines
         for (let x = 0; x <= map.cols; x++) {
             InkUtils.drawWobbleLine(ctx, x * TS, 0, x * TS, height);
         }
-        // Horizontal lines
         for (let y = 0; y <= map.rows; y++) {
             InkUtils.drawWobbleLine(ctx, 0, y * TS, width, y * TS);
         }
 
-        // 4. Path (Thick ink outlines + Wash)
+        // 4. Path (Thick ink outlines + Coffee Wash)
         ctx.lineWidth = 2;
         ctx.strokeStyle = INK_CONFIG.PALETTE.INK;
 
@@ -86,12 +95,16 @@ export class InkMapRenderer {
                 if (map.tiles[y][x] === 1) { // PATH
                     const px = x * TS;
                     const py = y * TS;
+                    const seed = x * 59 + y * 97;
 
-                    // Wash fill (simulating liquid pooling)
-                    ctx.save();
-                    ctx.fillStyle = 'rgba(45, 27, 14, 0.05)';
-                    ctx.fillRect(px, py, TS, TS);
-                    ctx.restore();
+                    // Coffee Wash for path (Brownish/Sepia)
+                    // We use a custom color derived from shadow/ink for the 'beaten path' look
+                    InkWatercolor.drawRectWash(
+                        ctx,
+                        px, py, TS, TS,
+                        '#8d6e63', // Light Brown 
+                        seed
+                    );
 
                     // Borders
                     const top = y > 0 && map.tiles[y - 1][x] !== 1;
@@ -109,7 +122,7 @@ export class InkMapRenderer {
             }
         }
 
-        // 5. Decorations (Trees, Rocks, etc.)
+        // 5. Decorations
         if (map.objects) {
             for (const obj of map.objects) {
                 const px = obj.x * TS;
@@ -118,7 +131,7 @@ export class InkMapRenderer {
             }
         }
 
-        // 6. Start/End Icons
+        // 6. Start/End
         if (map.waypoints.length > 0) {
             const start = map.waypoints[0];
             const end = map.waypoints[map.waypoints.length - 1];
@@ -127,23 +140,17 @@ export class InkMapRenderer {
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
             ctx.fillStyle = INK_CONFIG.PALETTE.INK;
-            ctx.fillText('⚡', start.x * TS + TS / 2, start.y * TS + TS / 2); // Start
-            ctx.fillText('X', end.x * TS + TS / 2, end.y * TS + TS / 2); // End
+            ctx.fillText('⚡', start.x * TS + TS / 2, start.y * TS + TS / 2);
+            ctx.fillText('X', end.x * TS + TS / 2, end.y * TS + TS / 2);
         }
 
-        // 7. Torches (Static Markings mostly, but can add glowing effect)
-        // We will just draw the torch bracket here on the cached map.
-        // The dynamic light is handled by InkLightingSystem.
-        // Similar logic to Map.ts drawTorches
+        // 7. Torches
         ctx.fillStyle = '#5d4037';
         for (let y = 0; y < map.rows; y++) {
             for (let x = 0; x < map.cols; x++) {
-                if (map.tiles[y][x] === 1) { // Path
-                    // Check if wall above
+                if (map.tiles[y][x] === 1) {
                     if (y > 0 && map.tiles[y - 1][x] !== 1 && (x + y * 7) % 4 === 0) {
-                        // Torch bracket
                         ctx.fillRect(x * TS + TS / 2 - 2, y * TS, 4, 8);
-                        // Small ink flame circle (placeholder for light)
                         ctx.beginPath();
                         ctx.strokeStyle = '#e65100';
                         ctx.lineWidth = 1;

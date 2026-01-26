@@ -6,7 +6,17 @@ export const INK_CONFIG = {
         WASH_BLUE: '#0288d1',// Ice/Magic
         WASH_GREEN: '#558b2f',// Nature/Poison
         WASH_GOLD: '#ffb300', // Gold/Special
-        SHADOW: 'rgba(45, 27, 14, 0.2)', // Hatching/Shadow color
+        SHADOW: 'rgba(45, 27, 14, 0.5)', // Hatching/Shadow color (Increased from 0.2 for visibility)
+    },
+    WATERCOLOR: {
+        OPACITY_LOW: 0.1,
+        OPACITY_MED: 0.3,
+        LAYERS: 3,
+        SPREAD: 8, // How far wash bleeds outside logic boundaries
+    },
+    PAPER_TEXTURE: {
+        GRAIN_INTENSITY: 0.05,
+        VIGNETTE_STRENGTH: 0.4,
     },
     LINE_WIDTH: {
         THIN: 1,

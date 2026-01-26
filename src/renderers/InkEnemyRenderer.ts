@@ -55,134 +55,113 @@ export class InkEnemyRenderer {
 
     private static drawArchetypeSketch(ctx: CanvasRenderingContext2D, archetype: string, color: string, time: number, enemy: Enemy) {
 
-        // STYLE: Top-Down Shadow Puppets
-        // View from above. Distinct silhouettes.
+        // STYLE: Top-Down Shadow Puppets using Ink Utils
 
+        // Setup style
         if (enemy.hitFlashTimer > 0) {
             ctx.fillStyle = '#ff0000';
             ctx.strokeStyle = '#ff0000';
-            ctx.globalAlpha = 0.8;
         } else {
             ctx.fillStyle = '#1a1a1a';
             ctx.strokeStyle = '#1a1a1a';
-            // Slight tint for variety
-            if (color && color !== '#e0e0e0') {
-                // Optional tint logic if needed
-            }
         }
-
         ctx.lineWidth = 2;
 
         if (archetype === 'SKELETON') {
-            // TOP-DOWN: Skull + Shoulders + Weapon poking out
-            ctx.beginPath();
-            // Head (Skull) - prominent circle
-            ctx.arc(4, 0, 7, 0, Math.PI * 2);
+            // Head
+            InkUtils.drawWobbleCircle(ctx, 4, 0, 7, time);
             ctx.fill();
+
+            // Shoulders
+            InkUtils.drawWobbleLine(ctx, 4, -8, 4, 8, time);
 
             // Commander Crown
             if (enemy.typeId === 'skeleton_commander') {
                 ctx.strokeStyle = '#ffd700'; // Gold
-                ctx.lineWidth = 2;
-                ctx.beginPath();
-                ctx.moveTo(0, -7);
-                ctx.lineTo(2, -12);
-                ctx.lineTo(4, -7);
-                ctx.lineTo(6, -12);
-                ctx.lineTo(8, -7);
-                ctx.stroke();
+                const crown = [{ x: 0, y: -7 }, { x: 2, y: -12 }, { x: 4, y: -7 }, { x: 6, y: -12 }, { x: 8, y: -7 }];
+                InkUtils.drawSketchPoly(ctx, crown, false, time);
+                ctx.strokeStyle = enemy.hitFlashTimer > 0 ? '#ff0000' : '#1a1a1a'; // Restore
             }
 
-            // Shoulders (Line/Bar)
-            ctx.beginPath();
-            ctx.lineWidth = 3;
-            ctx.moveTo(4, -8); ctx.lineTo(4, 8);
-            ctx.stroke();
+            // Weapon
+            InkUtils.drawWobbleLine(ctx, 4, -8, 20, -10, time);
 
-            // Weapon (Spear/Sword) held forward (left side relative to rotation)
-            ctx.lineWidth = 2;
-            ctx.beginPath();
-            ctx.moveTo(4, -8); // Shoulder
-            ctx.lineTo(20, -10); // Tip forward
-            ctx.stroke();
-
-            // Shield/Arm on other side
-            ctx.beginPath();
-            ctx.moveTo(4, 8);
-            ctx.lineTo(12, 10);
-            ctx.stroke();
+            // Shield arm
+            InkUtils.drawWobbleLine(ctx, 4, 8, 12, 10, time);
 
         } else if (archetype === 'WOLF' || archetype === 'SCOUT') {
-            // TOP-DOWN: Dart / Wedge shape
-            // Narrow nose forward, wide shoulders back
+            const body = [
+                { x: 20, y: 0 },
+                { x: -5, y: 8 },
+                { x: -2, y: 0 },
+                { x: -5, y: -8 }
+            ];
+
+            // Fill
             ctx.beginPath();
-            ctx.moveTo(20, 0);   // Nose
-            ctx.lineTo(-5, 8);   // Back Left
-            ctx.lineTo(-2, 0);   // Spine dip
-            ctx.lineTo(-5, -8);  // Back Right
+            ctx.moveTo(body[0].x, body[0].y);
+            body.forEach(p => ctx.lineTo(p.x, p.y));
             ctx.closePath();
             ctx.fill();
 
+            // Ink Outline
+            InkUtils.drawSketchPoly(ctx, body, true, time);
+
             // Tail
-            ctx.beginPath();
-            ctx.moveTo(-5, 0);
             const tailWag = Math.sin(time * 20) * 5;
-            ctx.lineTo(-15, tailWag);
-            ctx.stroke();
-            ctx.stroke();
+            InkUtils.drawWobbleLine(ctx, -5, 0, -15, tailWag, time);
 
         } else if (archetype === 'TROLL') {
-            // Heavy Blob Silhouette
-            ctx.beginPath();
             // Head
+            ctx.beginPath();
             ctx.arc(0, -9, 8, 0, Math.PI * 2);
-            // Body (Big circle)
+            ctx.fill();
+            InkUtils.drawWobbleCircle(ctx, 0, -9, 8, time);
+
+            // Body
+            ctx.beginPath();
             ctx.arc(0, 10, 16, 0, Math.PI * 2);
             ctx.fill();
+            InkUtils.drawWobbleCircle(ctx, 0, 10, 16, time + 1);
 
-            // Arms (thick stroke)
-            ctx.lineWidth = 5;
-            ctx.beginPath();
-            ctx.moveTo(-12, 0); ctx.lineTo(-24, 10); // Left Arm
-            ctx.moveTo(12, 0); ctx.lineTo(24, 10);   // Right Arm
-            ctx.stroke();
+            // Arms (Thick)
+            ctx.lineWidth = 4;
+            InkUtils.drawWobbleLine(ctx, -12, 0, -24, 10, time);
+            InkUtils.drawWobbleLine(ctx, 12, 0, 24, 10, time + 2);
 
-            // Armored Troll Shield?
+            // Armored
             if (enemy.id.includes('armored') || enemy.typeId === 'troll_armored') {
                 ctx.fillStyle = '#424242';
                 ctx.strokeStyle = '#fff';
-                ctx.lineWidth = 1;
-                ctx.beginPath();
-                ctx.rect(14, 0, 8, 18); // Shield on right arm
-                ctx.fill();
-                ctx.stroke();
+                const shield = [{ x: 14, y: 0 }, { x: 22, y: 0 }, { x: 22, y: 18 }, { x: 14, y: 18 }];
+                ctx.fillRect(14, 0, 8, 18);
+                InkUtils.drawSketchPoly(ctx, shield, true, time);
             }
 
         } else if (archetype === 'SPIDER' || archetype === 'BOSS') {
-            // Spider Silhouette
-            ctx.beginPath();
-            ctx.arc(0, 0, 12, 0, Math.PI * 2); // Body
-            ctx.arc(0, -12, 6, 0, Math.PI * 2); // Head
-            ctx.fill();
+            // Body
+            ctx.beginPath(); ctx.arc(0, 0, 12, 0, Math.PI * 2); ctx.fill();
+            InkUtils.drawWobbleCircle(ctx, 0, 0, 12, time);
 
-            // Legs (strokes)
+            // Head
+            ctx.beginPath(); ctx.arc(0, -12, 6, 0, Math.PI * 2); ctx.fill();
+            InkUtils.drawWobbleCircle(ctx, 0, -12, 6, time);
+
+            // Legs
             ctx.lineWidth = 2;
             for (let i = 0; i < 4; i++) {
                 const angleL = -Math.PI / 2 - (Math.PI / 6 * i);
                 const angleR = -Math.PI / 2 + (Math.PI / 6 * i);
                 const len = 28;
 
-                // Left legs
-                ctx.beginPath();
-                ctx.moveTo(-5, 0);
-                ctx.lineTo(Math.cos(angleL) * len, Math.sin(angleL) * len);
-                ctx.stroke();
+                // Draw shaky legs
+                const lx = Math.cos(angleL) * len;
+                const ly = Math.sin(angleL) * len;
+                InkUtils.drawWobbleLine(ctx, -5, 0, lx, ly, time + i);
 
-                // Right legs
-                ctx.beginPath();
-                ctx.moveTo(5, 0);
-                ctx.lineTo(Math.cos(angleR) * len, Math.sin(angleR) * len);
-                ctx.stroke();
+                const rx = Math.cos(angleR) * len;
+                const ry = Math.sin(angleR) * len;
+                InkUtils.drawWobbleLine(ctx, 5, 0, rx, ry, time + i + 4);
             }
         }
     }

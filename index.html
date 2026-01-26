@@ -9,78 +9,219 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=MedievalSharp&display=swap" rel="stylesheet">
     <style>
-        /* --- INK MODE STYLES --- */
+        /* --- INK MODE STYLES (Paper UI) --- */
         body.ink-mode {
             background: #f4e4bc url('https://www.transparenttextures.com/patterns/old-paper.png');
-            /* Old Paper Texture */
-            color: #3e2723;
+            color: #2d1b0e;
             font-family: 'MedievalSharp', cursive;
         }
 
+        /* Common Paper Panel Style */
         body.ink-mode .top-bar,
         body.ink-mode .ui-panel,
         body.ink-mode #hand {
-            background: rgba(255, 250, 240, 0.9);
+            background: #fff8e1 url('https://www.transparenttextures.com/patterns/cream-paper.png');
+            border: none;
+            box-shadow: 2px 3px 10px rgba(45, 27, 14, 0.4);
+            color: #2d1b0e;
+            position: relative;
+            transform: rotate(-0.5deg);
+            /* Slight organic tilt */
+        }
+
+        /* Fix Top Bar Sizing & alignment */
+        body.ink-mode .top-bar {
+            width: auto;
+            min-width: 400px;
+            max-width: 80vw;
+            padding: 5px 20px;
+            border-radius: 2px 255px 5px 25px / 255px 5px 225px 255px;
+            justify-content: center;
+            /* Combine transforms: Centering (-50%) + Tilt (-0.5deg) */
+            transform: translateX(-50%) rotate(-0.5deg);
+        }
+
+        /* Torn Edge Effect using border-image or simple rough border */
+        /* For simplicity and performance, we use a sketch-like border */
+        body.ink-mode .ui-panel,
+        body.ink-mode #hand {
             border: 2px solid #5d4037;
-            box-shadow: 0 4px 10px rgba(93, 64, 55, 0.3);
-            color: #3e2723;
+            border-radius: 2px 255px 5px 25px / 255px 5px 225px 255px;
+            /* Irregular radius */
+        }
+
+        /* Specific fix for top-bar border to match others if needed,
+           but we defined it above with sizing. Let's ensure it has the border too. */
+        body.ink-mode .top-bar {
+            border: 2px solid #5d4037;
+        }
+
+        /* PIN - Visual "Push Pin" */
+        body.ink-mode .top-bar::after,
+        body.ink-mode .ui-panel::after {
+            content: '';
+            position: absolute;
+            top: -10px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 16px;
+            height: 16px;
+            background: #c62828;
+            /* Red pin head */
+            border-radius: 50%;
+            box-shadow: 1px 2px 4px rgba(0, 0, 0, 0.5), inset -2px -2px 4px rgba(0, 0, 0, 0.2);
+            z-index: 10;
+        }
+
+        /* Pin shadow */
+        body.ink-mode .top-bar::before,
+        body.ink-mode .ui-panel::before {
+            content: '';
+            position: absolute;
+            top: -5px;
+            left: 50%;
+            margin-left: 2px;
+            width: 4px;
+            height: 4px;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 50%;
         }
 
         body.ink-mode .panel-title {
-            color: #5d4037;
-            border-bottom: 2px solid #8d6e63;
+            color: #3e2723;
+            border-bottom: 2px solid rgba(93, 64, 55, 0.3);
             font-family: 'MedievalSharp', cursive;
             letter-spacing: 1px;
+            text-transform: uppercase;
         }
 
         body.ink-mode .slot {
             border: 2px dashed #8d6e63;
             color: #5d4037;
             font-family: 'MedievalSharp', cursive;
+            background: rgba(255, 255, 255, 0.3);
         }
 
         body.ink-mode button {
             font-family: 'MedievalSharp', cursive;
             border: 2px solid #3e2723;
             text-transform: uppercase;
+            box-shadow: 1px 1px 3px rgba(0, 0, 0, 0.2);
+            border-radius: 255px 15px 225px 15px / 15px 225px 15px 255px;
         }
 
         body.ink-mode #shop-btn {
             background: #5d99c6;
-            /* Faded blue ink */
             color: #fff;
         }
 
         body.ink-mode #forge-btn {
             background: #d87c4a;
-            /* Faded orange ink */
             color: #fff;
         }
 
         body.ink-mode #start-wave-btn {
             background: #c62828;
             border: 3px double #fff;
-            box-shadow: 0 0 0 3px #c62828;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+            border-radius: 50% !important;
+            /* Keep circle */
         }
 
-        /* Ink Mode Cards */
+        /* Ink Mode Cards - Sketch Style */
         body.ink-mode .card {
-            border: 2px solid #3e2723;
-            background: #fff8e1;
-            box-shadow: 2px 2px 5px rgba(62, 39, 35, 0.4);
+            border: 2px solid #2d1b0e;
+            background: #fff;
+            box-shadow: 1px 2px 4px rgba(45, 27, 14, 0.3);
+            border-radius: 2px 10px 4px 8px;
+            /* Slightly irregular */
         }
 
-        body.ink-mode .card::after {
-            /* Paper texture overlay for cards */
-            content: "";
+        /* Remove colorful gradients in Ink Mode, replace with sketchy color washes */
+        /* We use pseudo-element for color wash */
+        body.ink-mode .card.type-fire {
+            background: #fffcf0;
+        }
+
+        body.ink-mode .card.type-ice {
+            background: #f0fbff;
+        }
+
+        body.ink-mode .card.type-sniper {
+            background: #f1f8e9;
+        }
+
+        body.ink-mode .card.type-multi {
+            background: #fff8e1;
+        }
+
+        body.ink-mode .card.type-minigun {
+            background: #f3e5f5;
+        }
+
+        body.ink-mode .card-icon {
+            filter: grayscale(100%) contrast(150%);
+            opacity: 0.8;
+        }
+
+        /* Add wash splash behind icon */
+        body.ink-mode .card::before {
+            content: '';
             position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: url('https://www.transparenttextures.com/patterns/cream-paper.png');
-            opacity: 0.3;
-            pointer-events: none;
+            top: 25%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            opacity: 0.2;
+            z-index: 0;
+            filter: blur(5px);
+        }
+
+        body.ink-mode .card.type-fire::before {
+            background: #c62828;
+        }
+
+        body.ink-mode .card.type-ice::before {
+            background: #0288d1;
+        }
+
+        body.ink-mode .card.type-sniper::before {
+            background: #558b2f;
+        }
+
+        body.ink-mode .card.type-multi::before {
+            background: #ffb300;
+        }
+
+        body.ink-mode .card.type-minigun::before {
+            background: #8e24aa;
+        }
+
+        /* IMPROVED CARD READABILITY */
+        body.ink-mode .card-stats {
+            background: rgba(255, 255, 255, 0.85);
+            /* Whiter background for contrast */
+            color: #000;
+            /* Pitch black text */
+            border-top: 1px solid rgba(0, 0, 0, 0.2);
+            padding: 6px 4px;
+            /* More padding */
+        }
+
+        body.ink-mode .card-stat-primary,
+        body.ink-mode .card-stat-line {
+            color: #000;
+            /* Pitch black */
+            text-shadow: none;
+            font-family: 'Segoe UI', sans-serif;
+            /* Cleaner font than Courier */
+            font-weight: 800;
+            /* Extra bold */
+            font-size: 10px;
+            /* Larger */
+            line-height: 1.2;
         }
 
         /* Default Mode */
@@ -268,11 +409,35 @@
             cursor: pointer;
         }
 
+        /* Default Neon Selection */
+        .slot.shop-slot.selected {
+            border: 2px solid #00ffff;
+            box-shadow: 0 0 15px rgba(0, 255, 255, 0.5);
+            background: rgba(255, 255, 255, 0.1);
+            transform: scale(1.05);
+        }
+
         .slot.shop-slot:hover {
             transform: scale(1.08);
             box-shadow: 0 0 20px rgba(255, 215, 0, 0.6), 0 4px 12px rgba(0, 0, 0, 0.4);
             border-color: #ffd700;
-            border-width: 3px;
+        }
+
+        /* Ink Mode Selection (Red Marker Circle) */
+        body.ink-mode .slot.shop-slot.selected {
+            border: 3px solid #d32f2f;
+            /* Red ink */
+            background: rgba(211, 47, 47, 0.1);
+            box-shadow: none;
+            border-radius: 255px 15px 225px 15px / 15px 225px 15px 255px;
+            /* Irregular circle */
+            transform: scale(1.02) rotate(-1deg);
+        }
+
+        body.ink-mode .slot.shop-slot:hover {
+            border-color: #d32f2f;
+            transform: scale(1.05);
+            box-shadow: 2px 2px 5px rgba(0, 0, 0, 0.2);
         }
 
         /* Кнопки */

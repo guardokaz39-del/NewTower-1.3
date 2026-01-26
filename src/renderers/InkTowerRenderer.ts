@@ -2,6 +2,8 @@ import { Tower } from '../Tower';
 import { CONFIG } from '../Config';
 import { InkUtils } from '../graphics/InkUtils';
 import { INK_CONFIG } from '../graphics/InkConfig';
+import { InkHatching } from '../graphics/InkHatching';
+import { VISUALS } from '../VisualConfig';
 
 /**
  * Renders towers as if they were hand-drawn sketches on the map.
@@ -62,14 +64,29 @@ export class InkTowerRenderer {
     private static drawActiveState(ctx: CanvasRenderingContext2D, tower: Tower, size: number) {
         const half = size / 2;
 
-        // 0. Drop Shadow (Soft ink wash)
+        // 0. Drop Shadow (Slanted Ink Smudge)
         ctx.save();
-        ctx.translate(tower.x + 4, tower.y + 4); // Offset
-        ctx.fillStyle = 'rgba(45, 27, 14, 0.2)'; // Faint ink
+        const lightAngle = VISUALS.LIGHTING.GLOBAL_LIGHT_ANGLE;
+        const shadowDist = 8;
+        // Shadow is offset opposite to light
+        const sx = tower.x + size / 2 + Math.cos(lightAngle + Math.PI) * shadowDist;
+        const sy = tower.y + size / 2 + Math.sin(lightAngle + Math.PI) * shadowDist;
+
+        ctx.translate(sx, sy);
+        ctx.rotate(lightAngle); // Rotate to align with light direction
+        ctx.fillStyle = 'rgba(45, 27, 14, 0.15)'; // Very faint ink wash
+
         ctx.beginPath();
-        // Ellipse shadow
-        ctx.ellipse(0, 0, size * 0.4, size * 0.25, 0, 0, Math.PI * 2);
+        // Elongated irregular shadow
+        ctx.ellipse(0, 0, size * 0.4, size * 0.2, 0, 0, Math.PI * 2);
         ctx.fill();
+
+        // Inner core of shadow (darker)
+        ctx.fillStyle = 'rgba(45, 27, 14, 0.15)';
+        ctx.beginPath();
+        ctx.ellipse(-2, 0, size * 0.25, size * 0.15, 0, 0, Math.PI * 2);
+        ctx.fill();
+
         ctx.restore();
 
         // 1. Base (Static Charcoal Sketch)
@@ -117,17 +134,18 @@ export class InkTowerRenderer {
     }
 
     private static drawBase(ctx: CanvasRenderingContext2D, x: number, y: number, size: number) {
+        // Base Outline
         ctx.strokeStyle = 'rgba(45, 27, 14, 0.4)'; // Faint ink
         ctx.lineWidth = 2;
-        InkUtils.drawWobbleCircle(ctx, x, y, size * 0.35, 0); // Inner ring
+        const radius = size * 0.35;
+        InkUtils.drawWobbleCircle(ctx, x, y, radius, 0); // Inner ring
 
-        // Hatching for shadow
-        ctx.beginPath();
-        for (let i = -10; i < 10; i += 4) {
-            ctx.moveTo(x + i, y + size / 3);
-            ctx.lineTo(x + i + 5, y + size / 2);
-        }
-        ctx.stroke();
+        // Dynamic Hatching (Volume)
+        // Assuming global light is roughly Top-Left (3/4 PI)
+        const lightAngle = Math.PI * 0.75;
+
+        const hatching = InkHatching.getCircularHatching(radius, lightAngle);
+        ctx.drawImage(hatching, x - radius, y - radius);
     }
 
     private static drawTurretSketch(ctx: CanvasRenderingContext2D, type: string, size: number) {
