@@ -98,10 +98,12 @@ export class InkTowerRenderer {
         ctx.rotate(tower.angle);
 
         // Recoil
-        if (tower.recoilFrames > 0) {
-            const recoil = Math.sin(tower.recoilFrames * 0.5) * tower.recoilIntensity;
+        // Recoil
+        if (tower.recoilTimer > 0) {
+            // 0.5 rad/frame * 60 fps = 30 rad/sec. Use *20-30 for similar speed.
+            const recoil = Math.sin(tower.recoilTimer * 20) * tower.recoilIntensity;
             ctx.translate(0, recoil);
-            tower.recoilFrames--;
+            // recoil timer decremented in WeaponSystem
         }
 
         // Determine style from cards
@@ -122,7 +124,7 @@ export class InkTowerRenderer {
         ctx.restore();
 
         // 3. Status / Heat (Unrotated)
-        if (type === 'minigun' && tower.spinupFrames > 0) {
+        if (type === 'minigun' && tower.spinupTime > 0) {
             this.drawHeatEffects(ctx, tower);
         }
 

@@ -24,7 +24,7 @@ export class WeaponSystem {
                 tower.overheatCooldown -= dt;
             } else {
                 tower.isOverheated = false;
-                tower.spinupFrames = 0; // Reset spinup after overheat
+                tower.spinupTime = 0; // Reset spinup after overheat
             }
             return; // Can't shoot while overheated
         }
@@ -33,10 +33,10 @@ export class WeaponSystem {
             tower.cooldown -= dt;
         }
 
-        // Decrement recoil (simulating frames)
-        if (tower.recoilFrames > 0) {
-            tower.recoilFrames -= dt * 60;
-            if (tower.recoilFrames < 0) tower.recoilFrames = 0;
+        // Decrement recoil (seconds)
+        if (tower.recoilTimer > 0) {
+            tower.recoilTimer -= dt;
+            if (tower.recoilTimer < 0) tower.recoilTimer = 0;
         }
 
         const stats = tower.getStats();
@@ -64,36 +64,33 @@ export class WeaponSystem {
                 // Increment spinup progress when firing
                 const spinupEffect = stats.effects.find(e => e.type === 'spinup');
                 if (spinupEffect) {
-                    tower.spinupFrames += dt;
+                    tower.spinupTime += dt;
 
                     // Check for overheat
-                    const maxSpinupSeconds = spinupEffect.maxSpinupSeconds || 7;
-                    const maxFrames = maxSpinupSeconds * 60;
-                    tower.maxHeat = maxFrames; // Sync for visual bar
+                    const maxSpinupSeconds = spinupEffect.maxSpinupSeconds || 5;
+                    tower.maxHeat = maxSpinupSeconds; // Sync for visual bar
 
                     // Check if tower has Ice card (for overheat extension)
                     const hasIceCard = tower.cards.some(c => c.type.id === 'ice');
                     const overheatExtension = hasIceCard ? (spinupEffect.overheatExtensionWithIce || 0) : 0;
-                    const overheatThreshold = maxFrames + overheatExtension;
+                    const overheatThreshold = maxSpinupSeconds + overheatExtension;
 
-                    if (tower.spinupFrames >= overheatThreshold) {
+                    if (tower.spinupTime >= overheatThreshold) {
                         tower.isOverheated = true;
-                        tower.overheatCooldown = spinupEffect.overheatDuration || 90;
-                        tower.spinupFrames = 0;
+                        tower.overheatCooldown = spinupEffect.overheatDuration || 1.5;
+                        tower.spinupTime = 0;
                     }
                 }
             }
         } else {
             // === SPINUP RESET / COOLING ===
             // No target - Start cooling down
-            if (tower.spinupFrames > 0) {
+            if (tower.spinupTime > 0) {
                 // Cool down rate: 
-                // User wants 1.5 seconds (90 frames) to cool down from max heat
-                // Max heat is dynamic (5s * 60 = 300 frames)
-                // Rate = 300 / 90 = 3.333
-
-                const coolRate = ((tower.maxHeat || 300) / 90) * dt;
-                tower.spinupFrames = Math.max(0, tower.spinupFrames - coolRate);
+                // User wants 1.5 seconds to cool down from max heat
+                // Rate = MaxHeat / 1.5
+                const coolRate = (tower.maxHeat / 1.5) * dt;
+                tower.spinupTime = Math.max(0, tower.spinupTime - coolRate);
             }
             if (tower.isOverheated) {
                 tower.isOverheated = false;
@@ -234,14 +231,14 @@ export class WeaponSystem {
 
             // Trigger recoil for critical hits
             if (p.isCrit) {
-                tower.recoilFrames = 10;
+                tower.recoilTimer = 0.2; // 0.2s duration (was 10 frames)
                 tower.recoilIntensity = 3;
             }
         }
 
         // Minigun vibration (constant while firing)
         if (stats.projectileType === 'minigun') {
-            tower.recoilFrames = 5;
+            tower.recoilTimer = 0.1; // 0.1s duration (was 5 frames)
             // tower.recoilIntensity = 0.5; // OLD: Caused constant shaking
             // Only purely visual recoil for the tower itself, do not trigger screen shake here if possible
             // But if recoilFrames is used for screen shake, we need to be careful.

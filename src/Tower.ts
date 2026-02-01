@@ -29,13 +29,13 @@ export class Tower {
     public costSpent: number = 0;
 
     // Spinup state (for Minigun cards)
-    public spinupFrames: number = 0;        // Frames spent firing continuously
+    public spinupTime: number = 0;        // Seconds spent firing continuously
     public maxHeat: number = 5;             // Max seconds before overheat (default 5s)
     public isOverheated: boolean = false;   // Whether tower is overheated
-    public overheatCooldown: number = 0;    // Frames remaining in overheat lockout
+    public overheatCooldown: number = 0;    // Seconds remaining in overheat lockout
 
     // Visual state (Phase 3)
-    public recoilFrames: number = 0;        // Recoil animation timer
+    public recoilTimer: number = 0;        // Recoil animation timer (seconds)
     public recoilIntensity: number = 0;     // Recoil strength
 
     constructor(c: number, r: number) {
@@ -133,10 +133,10 @@ export class Tower {
         }
 
         // === SPINUP MECHANIC ===
-        // Find spinup effect and apply bonuses based on current spinupFrames
+        // Find spinup effect and apply bonuses based on current spinupTime
         const spinupEffect = allEffects.find(e => e.type === 'spinup');
         if (spinupEffect) {
-            const spinupSeconds = this.spinupFrames; // already in seconds
+            const spinupSeconds = this.spinupTime; // already in seconds
 
             // Apply damage bonus
             if (spinupEffect.spinupSteps) {

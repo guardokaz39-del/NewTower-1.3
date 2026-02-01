@@ -41,11 +41,9 @@ export class SpriteProjectileRenderer {
                 ctx.save();
                 ctx.translate(projectile.x, projectile.y);
 
-                // Rotate if needed
-                if (type === 'ice' || type === 'sniper') {
-                    const angle = Math.atan2(projectile.vy, projectile.vx);
-                    ctx.rotate(angle);
-                }
+                // Rotate if needed (always rotate towards velocity for correct orientation)
+                const angle = Math.atan2(projectile.vy, projectile.vx);
+                ctx.rotate(angle);
 
                 ctx.drawImage(img, -size / 2, -size / 2);
 

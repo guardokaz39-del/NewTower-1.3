@@ -45,10 +45,10 @@ export class EnemyRenderer {
         const breatheScale = 1.0 + Math.sin(breathePhase) * 0.03;
         ctx.scale(breatheScale, breatheScale);
 
-        // 3. Movement arc (vertical bob)
-        const walkCycle = (Date.now() * 0.005) % (Math.PI * 2);
-        const verticalBob = Math.abs(Math.sin(walkCycle)) * 2;
-        ctx.translate(0, -verticalBob);
+        // 3. Movement arc (vertical bob) - DELEGATED to specific renderers to ensure sync with legs
+        // const walkCycle = (Date.now() * 0.005) % (Math.PI * 2);
+        // const verticalBob = Math.abs(Math.sin(walkCycle)) * 2;
+        // ctx.translate(0, -verticalBob);
 
         // -- VISUAL STACK --
 

@@ -14,7 +14,7 @@ export class TowerRenderer {
         } else {
             TowerRenderer.drawActiveState(ctx, tower, size);
             // Draw Heat Haze (outside rotation context to rise UP)
-            if (tower.spinupFrames > 0) {
+            if (tower.spinupTime > 0) {
                 // We need to confirm it's minigun, but drawActiveState encapsulates that logic mostly.
                 // Actually, drawActiveState draws the bar, let's look closer.
                 // Helper method call in drawActiveState is better.
@@ -104,10 +104,10 @@ export class TowerRenderer {
             ctx.scale(scaleMultiplier, scaleMultiplier);
 
             // Recoil offset
-            if (tower.recoilFrames > 0) {
-                const recoilOffset = Math.sin(tower.recoilFrames * 0.5) * tower.recoilIntensity;
+            if (tower.recoilTimer > 0) {
+                const recoilOffset = Math.sin(tower.recoilTimer * 20) * tower.recoilIntensity;
                 ctx.translate(0, recoilOffset);
-                tower.recoilFrames--;
+                // tower.recoilTimer reduced in WeaponSystem
             }
 
             ctx.drawImage(turretImg, -halfSize, -halfSize);
@@ -126,7 +126,7 @@ export class TowerRenderer {
             TowerRenderer.drawLevelVisuals(ctx, tower, cardLevel, mainCard);
 
             // 5. Minigun Overheat Bar & Heat Haze
-            if (turretName === 'turret_minigun' && tower.spinupFrames > 0) {
+            if (turretName === 'turret_minigun' && tower.spinupTime > 0) {
                 TowerRenderer.drawOverheatBar(ctx, tower);
                 TowerRenderer.drawHeatHaze(ctx, tower);
             }
@@ -241,8 +241,8 @@ export class TowerRenderer {
 
     private static drawOverheatBar(ctx: CanvasRenderingContext2D, tower: Tower) {
         // Calculate heat percentage
-        const maxFrames = tower.maxHeat || 420;
-        let pct = tower.spinupFrames / maxFrames;
+        const maxTime = tower.maxHeat || 5;
+        let pct = tower.spinupTime / maxTime;
         if (pct > 1) pct = 1;
 
         // Visual flash if overheated
