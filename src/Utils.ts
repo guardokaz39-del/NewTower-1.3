@@ -43,6 +43,30 @@ export function generateDefaultWaves(count: number = 10): IWaveConfig[] {
     return waves;
 }
 
+/**
+ * Проверяет и нормализует конфигурацию волны для безопасности
+ * Обеспечивает обратную совместимость со старыми сохранениями
+ */
+export function normalizeWaveConfig(wave: any): IWaveConfig {
+    if (!wave || !wave.enemies || !Array.isArray(wave.enemies)) {
+        return { enemies: [] };
+    }
+
+    return {
+        enemies: wave.enemies.map((group: any) => ({
+            type: group.type || 'GRUNT',
+            count: Math.max(1, parseInt(group.count) || 1),
+            spawnPattern: (['normal', 'random', 'swarm'].includes(group.spawnPattern))
+                ? group.spawnPattern
+                : 'normal',
+            // Сохраняем старые поля для совместимости
+            speed: group.speed,
+            spawnRate: group.spawnRate
+        }))
+    };
+}
+
+
 export function serializeMap(map: MapManager): IMapData {
     const simpleTiles: number[][] = [];
     for (let y = 0; y < map.rows; y++) {
@@ -87,7 +111,18 @@ export function getSavedMaps(): Record<string, IMapData> {
     try {
         const raw = localStorage.getItem('NEWTOWER_MAPS');
         if (!raw) return {};
-        return JSON.parse(raw);
+
+        const maps = JSON.parse(raw);
+
+        // Нормализация всех волн во всех картах для обратной совместимости
+        Object.keys(maps).forEach(mapName => {
+            const mapData = maps[mapName];
+            if (mapData.waves && Array.isArray(mapData.waves)) {
+                mapData.waves = mapData.waves.map(normalizeWaveConfig);
+            }
+        });
+
+        return maps;
     } catch (e) {
         console.error('Failed to load maps', e);
         return {};

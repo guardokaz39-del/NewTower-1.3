@@ -1,8 +1,17 @@
 import { IGameScene } from './scenes/IGameScene';
 import { CONFIG } from './Config';
-import { IWaveConfig } from './MapData';
+import { IWaveConfig, SpawnPattern } from './MapData';
 import { SoundManager, SoundPriority } from './SoundManager';
 import { EventBus, Events } from './EventBus';
+
+/**
+ * Структура для хранения метаданных о враге в очереди спавна
+ */
+interface SpawnQueueEntry {
+    type: string;
+    pattern: SpawnPattern;
+    baseInterval: number;
+}
 
 /**
  * Manages wave logic, spawning enemies, and tracking wave progress.
@@ -10,8 +19,13 @@ import { EventBus, Events } from './EventBus';
 export class WaveManager {
     private scene: IGameScene;
     public isWaveActive: boolean = false;
-    private enemiesToSpawn: string[] = [];
+
+    // Новая система с метаданными вместо простого массива строк
+    private spawnQueue: SpawnQueueEntry[] = [];
     private spawnTimer: number = 0;
+    private currentPattern: SpawnPattern = 'normal';
+    private currentBaseInterval: number = 40;
+    private currentIndex: number = 0; // Индекс текущего врага в очереди
 
     // Card reward tracking - track last wave number that received a card
     private lastCardGivenForWave: number = 0;
@@ -53,20 +67,26 @@ export class WaveManager {
     public update() {
         if (!this.isWaveActive) return;
 
-        // Спавн врагов
-        if (this.enemiesToSpawn.length > 0) {
+        // Спавн врагов из очереди
+        if (this.spawnQueue.length > 0) {
             this.spawnTimer++;
-            // Спавним чуть быстрее (каждые 40 кадров вместо 60)
-            if (this.spawnTimer >= 40) {
-                const type = this.enemiesToSpawn.shift()!;
-                this.scene.spawnEnemy(type);
+
+            // Динамический интервал в зависимости от паттерна
+            const requiredDelay = this.getNextSpawnDelay();
+
+            if (this.spawnTimer >= requiredDelay) {
+                const entry = this.spawnQueue.shift()!;
+                this.scene.spawnEnemy(entry.type);
 
                 // Sound: Boss Spawn
-                if (type.toUpperCase() === 'SPIDER' || type.toUpperCase() === 'TANK') {
+                if (entry.type.toUpperCase() === 'SPIDER' || entry.type.toUpperCase() === 'TANK') {
                     SoundManager.play('boss_spawn', SoundPriority.HIGH);
                 }
 
                 this.spawnTimer = 0;
+
+                // Обновить паттерн для следующего врага
+                this.updateCurrentPattern();
             }
         } else {
             // Если очередь пуста И врагов на карте нет -> победа в волне
@@ -112,7 +132,8 @@ export class WaveManager {
     }
 
     private generateWave(waveNum: number) {
-        this.enemiesToSpawn = [];
+        this.spawnQueue = [];
+        this.currentIndex = 0;
 
         let waveConfig: IWaveConfig | null = null;
 
@@ -137,16 +158,111 @@ export class WaveManager {
             }
         }
 
-        // Разбор конфига и заполнение очереди
+        // Разбор конфига и заполнение очереди с метаданными
         if (waveConfig && waveConfig.enemies) {
-            waveConfig.enemies.forEach((entry) => {
-                for (let i = 0; i < entry.count; i++) {
-                    this.enemiesToSpawn.push(entry.type);
+            waveConfig.enemies.forEach((group) => {
+                // Миграция и получение паттерна
+                const migrated = this.migrateGroupConfig(group);
+                const baseInterval = this.getBaseIntervalFromRate(group.spawnRate);
+
+                for (let i = 0; i < migrated.count; i++) {
+                    this.spawnQueue.push({
+                        type: migrated.type,
+                        pattern: migrated.pattern,
+                        baseInterval: baseInterval
+                    });
                 }
             });
         }
 
         // Перемешиваем врагов в волне, чтобы было веселее
-        this.enemiesToSpawn.sort(() => Math.random() - 0.5);
+        this.spawnQueue.sort(() => Math.random() - 0.5);
+
+        // Инициализируем паттерн первого врага
+        if (this.spawnQueue.length > 0) {
+            this.currentPattern = this.spawnQueue[0].pattern;
+            this.currentBaseInterval = this.spawnQueue[0].baseInterval;
+        }
+    }
+
+    /**
+     * Мигрирует старые конфигурации к новому формату
+     * Безопасно обрабатывает отсутствующие поля
+     */
+    private migrateGroupConfig(group: any): { type: string; count: number; pattern: SpawnPattern } {
+        // Если уже есть новое поле - используем его
+        if (group.spawnPattern) {
+            return {
+                type: group.type,
+                count: group.count,
+                pattern: group.spawnPattern as SpawnPattern
+            };
+        }
+
+        // Миграция из старого формата
+        // Эвристика: если было много врагов с fast - делаем swarm
+        let defaultPattern: SpawnPattern = 'normal';
+        if (group.spawnRate === 'fast' && group.count > 15) {
+            defaultPattern = 'swarm';
+        }
+
+        return {
+            type: group.type,
+            count: group.count,
+            pattern: defaultPattern
+        };
+    }
+
+    /**
+     * Конвертирует старый spawnRate в базовый интервал
+     */
+    private getBaseIntervalFromRate(rate?: 'fast' | 'medium' | 'slow'): number {
+        switch (rate) {
+            case 'fast': return 25;
+            case 'slow': return 60;
+            case 'medium':
+            default: return 40;
+        }
+    }
+
+    /**
+     * Вычисляет следующий интервал спавна в зависимости от паттерна
+     */
+    private getNextSpawnDelay(): number {
+        const baseInterval = Math.max(5, this.currentBaseInterval);
+
+        switch (this.currentPattern) {
+            case 'normal':
+                // Фиксированный интервал
+                return baseInterval;
+
+            case 'random':
+                // Рандомизация ±30% от базового
+                const variance = baseInterval * 0.3;
+                const randomDelay = baseInterval + (Math.random() - 0.5) * 2 * variance;
+                return Math.max(5, Math.floor(randomDelay));
+
+            case 'swarm':
+                // Очень короткие интервалы (10-25% от базового)
+                const swarmBase = baseInterval * 0.15;
+                const swarmVariance = swarmBase * 0.5;
+                const swarmDelay = swarmBase + Math.random() * swarmVariance;
+                return Math.max(3, Math.floor(swarmDelay));
+
+            default:
+                console.warn('[WaveManager] Unknown spawn pattern:', this.currentPattern);
+                return baseInterval;
+        }
+    }
+
+    /**
+     * Обновляет текущий паттерн для следующего врага в очереди
+     */
+    private updateCurrentPattern(): void {
+        if (this.spawnQueue.length > 0) {
+            const next = this.spawnQueue[0];
+            this.currentPattern = next.pattern;
+            this.currentBaseInterval = next.baseInterval;
+        }
     }
 }

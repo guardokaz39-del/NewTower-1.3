@@ -230,10 +230,16 @@ export class GameScene extends BaseScene implements IGameScene {
             // Update tower visual states
             this.gameState.towers.forEach((t) => t.updateBuilding(this.effects));
 
-            this.weaponSystem.update(this.gameState.towers, this.gameState.enemies, this.gameState.projectiles, this.gameState.projectilePool, this.effects);
+            // ИСПРАВЛЕНИЕ ШАГ 1: Дубликат weaponSystem.update() закомментирован
+            // Система оружия уже обновлена выше (строки 222-228)
+            // Раскомментировать эту строку для отката изменений:
+            // this.weaponSystem.update(this.gameState.towers, this.gameState.enemies, this.gameState.projectiles, this.gameState.projectilePool, this.effects);
             this.collision.update(this.gameState.projectiles, this.gameState.enemies);
             this.entityManager.updateEnemies();
-            this.entityManager.updateProjectiles();
+            // ИСПРАВЛЕНИЕ ШАГ 2: Дубликат updateProjectiles() закомментирован
+            // Снаряды уже обновлены выше (строка 219)
+            // Раскомментировать эту строку для отката изменений:
+            // this.entityManager.updateProjectiles();
             this.effects.update();
 
             // Update enemy counter in HUD
@@ -241,7 +247,10 @@ export class GameScene extends BaseScene implements IGameScene {
         }
         // Update shake (once per frame, not per loop)
         this.gameState.updateShake();
-        this.effects.update();
+        // ИСПРАВЛЕНИЕ ШАГ 3: Дубликат effects.update() закомментирован
+        // Эффекты уже обновлены в цикле выше (строка 237)
+        // Раскомментировать эту строку для отката изменений:
+        // this.effects.update();
     }
 
     public draw(ctx: CanvasRenderingContext2D) {

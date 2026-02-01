@@ -182,20 +182,39 @@ export const CONFIG = {
     } as const,
 
     WAVES: [
-        [{ type: 'GRUNT', count: 10, interval: 90 }],
-        [{ type: 'SCOUT', count: 10, interval: 40 }],
-        [
-            { type: 'GRUNT', count: 15, interval: 30 },
-            { type: 'TANK', count: 2, interval: 150 },
-        ],
-        [
-            { type: 'TANK', count: 5, interval: 100 },
-            { type: 'SCOUT', count: 15, interval: 20 },
-        ],
-        [
-            { type: 'GRUNT', count: 30, interval: 20 },
-            { type: 'BOSS', count: 1, interval: 300 },
-        ],
+        // Волна 1: Обычный режим для обучения
+        {
+            enemies: [
+                { type: 'GRUNT', count: 10, spawnPattern: 'normal' }
+            ]
+        },
+        // Волна 2: Рандомный режим для непредсказуемости
+        {
+            enemies: [
+                { type: 'SCOUT', count: 12, spawnPattern: 'random' }
+            ]
+        },
+        // Волна 3: Комбинация обычного и роя
+        {
+            enemies: [
+                { type: 'GRUNT', count: 15, spawnPattern: 'normal' },
+                { type: 'TANK', count: 2, spawnPattern: 'normal' }
+            ]
+        },
+        // Волна 4: Рой скаутов + танки рандомно
+        {
+            enemies: [
+                { type: 'SCOUT', count: 20, spawnPattern: 'swarm' },
+                { type: 'TANK', count: 3, spawnPattern: 'random' }
+            ]
+        },
+        // Волна 5: Финальная волна с боссом
+        {
+            enemies: [
+                { type: 'GRUNT', count: 25, spawnPattern: 'random' },
+                { type: 'BOSS', count: 1, spawnPattern: 'normal' }
+            ]
+        }
     ],
 };
 

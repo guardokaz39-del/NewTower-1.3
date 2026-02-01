@@ -1,4 +1,4 @@
-import { IWaveConfig } from './MapData';
+import { IWaveConfig, SpawnPattern } from './MapData';
 import { CONFIG } from './Config';
 import { UIUtils } from './UIUtils';
 
@@ -71,6 +71,7 @@ export class WaveEditor {
         // I created UIUtils.createButton to return the button, so I can apply extra styles.
         // Let's rewrite it slightly.
         const btnSave = UIUtils.createButton(buttons, 'Save & Close', () => {
+            if (!this.validateWaves()) return;
             this.onSave(this.waves);
             this.destroy();
         }, { background: '#4caf50', border: 'none', padding: '5px 10px', borderRadius: '4px' });
@@ -149,46 +150,28 @@ export class WaveEditor {
                     group.count = parseInt((e.target as HTMLInputElement).value) || 1;
                 };
 
-                // Speed dropdown
-                const speedSelect = document.createElement('select');
-                speedSelect.style.width = '60px';
-                speedSelect.style.fontSize = '12px';
-                const speeds = [
-                    { value: '0.5', label: '0.5x' },
-                    { value: '0.7', label: '0.7x' },
-                    { value: '1.0', label: '1.0x' },
-                    { value: '1.5', label: '1.5x' },
-                    { value: '2.0', label: '2.0x' },
-                ];
-                speeds.forEach(({ value, label }) => {
-                    const opt = document.createElement('option');
-                    opt.value = value;
-                    opt.innerText = label;
-                    if (parseFloat(value) === (group.speed || 1.0)) opt.selected = true;
-                    speedSelect.appendChild(opt);
-                });
-                speedSelect.onchange = (e) => {
-                    group.speed = parseFloat((e.target as HTMLSelectElement).value);
-                };
+                // Spawn Pattern dropdown - режим появления врагов
+                const patternSelect = document.createElement('select');
+                patternSelect.style.width = '100px';
+                patternSelect.style.fontSize = '12px';
+                patternSelect.title = 'Режим появления врагов';
 
-                // Spawn Rate dropdown
-                const spawnSelect = document.createElement('select');
-                spawnSelect.style.width = '70px';
-                spawnSelect.style.fontSize = '12px';
-                const spawnRates: Array<{ value: 'fast' | 'medium' | 'slow'; label: string }> = [
-                    { value: 'fast', label: 'Fast' },
-                    { value: 'medium', label: 'Medium' },
-                    { value: 'slow', label: 'Slow' },
+                const patterns: Array<{ value: SpawnPattern; label: string }> = [
+                    { value: 'normal', label: '⏱️ Обычный' },
+                    { value: 'random', label: '🎲 Рандом' },
+                    { value: 'swarm', label: '🐝 Рой' }
                 ];
-                spawnRates.forEach(({ value, label }) => {
+
+                patterns.forEach(({ value, label }) => {
                     const opt = document.createElement('option');
                     opt.value = value;
-                    opt.innerText = label;
-                    if (value === (group.spawnRate || 'medium')) opt.selected = true;
-                    spawnSelect.appendChild(opt);
+                    opt.textContent = label;
+                    if (value === (group.spawnPattern || 'normal')) opt.selected = true;
+                    patternSelect.appendChild(opt);
                 });
-                spawnSelect.onchange = (e) => {
-                    group.spawnRate = (e.target as HTMLSelectElement).value as 'fast' | 'medium' | 'slow';
+
+                patternSelect.onchange = (e) => {
+                    group.spawnPattern = (e.target as HTMLSelectElement).value as SpawnPattern;
                 };
 
                 UIUtils.createButton(groupRow, '-', () => {
@@ -199,8 +182,7 @@ export class WaveEditor {
                 groupRow.appendChild(typeSelect);
                 groupRow.appendChild(document.createTextNode('x'));
                 groupRow.appendChild(countInput);
-                groupRow.appendChild(speedSelect);
-                groupRow.appendChild(spawnSelect);
+                groupRow.appendChild(patternSelect);
 
                 groupsDiv.appendChild(groupRow);
             });
@@ -217,6 +199,33 @@ export class WaveEditor {
     }
 
     // styleBtn removed
+
+    /**
+     * Валидация конфигурации волн перед сохранением
+     */
+    private validateWaves(): boolean {
+        for (const wave of this.waves) {
+            if (!wave.enemies || wave.enemies.length === 0) {
+                alert('Каждая волна должна содержать хотя бы одну группу врагов!');
+                return false;
+            }
+
+            for (const group of wave.enemies) {
+                if (!group.type || group.count < 1) {
+                    alert('Некорректная конфигурация группы врагов!');
+                    return false;
+                }
+
+                // Валидация нового поля spawnPattern
+                if (group.spawnPattern &&
+                    !['normal', 'random', 'swarm'].includes(group.spawnPattern)) {
+                    alert('Некорректный режим появления!');
+                    return false;
+                }
+            }
+        }
+        return true;
+    }
 
     public destroy() {
         if (this.container && this.container.parentNode) {

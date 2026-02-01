@@ -1,10 +1,16 @@
+// Режимы появления врагов из портала
+export type SpawnPattern = 'normal' | 'random' | 'swarm';
+
 // Структура одной волны
 export interface IWaveConfig {
     enemies: {
         type: string;
         count: number;
+        // @deprecated Старые поля - не используются, сохранены для совместимости
         speed?: number; // 0.5, 1.0, 1.5, 2.0 etc (multiplier)
         spawnRate?: 'fast' | 'medium' | 'slow'; // spawn delay
+        // Новое поле - режим появления группы врагов
+        spawnPattern?: SpawnPattern;
     }[]; // Кто и сколько
 }
 
