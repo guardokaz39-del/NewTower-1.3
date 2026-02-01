@@ -2,7 +2,6 @@ import { IMapData } from './MapData';
 import { FogRenderer } from './FogRenderer';
 import { FogStructure, buildFogStructures } from './FogStructure';
 import { CONFIG } from './Config';
-import { InkFogRenderer } from './graphics/InkFogRenderer';
 
 /**
  * Fog System - manages layered fog with density and structure-based animation
@@ -18,7 +17,6 @@ import { InkFogRenderer } from './graphics/InkFogRenderer';
 export class FogSystem {
     private mapData: IMapData;
     private renderer: FogRenderer;
-    private inkRenderer: InkFogRenderer;
     private structures: FogStructure[] = [];
     private time: number = 0;
     private dirty: boolean = true;
@@ -36,12 +34,6 @@ export class FogSystem {
 
         // Create standard renderer
         this.renderer = new FogRenderer(
-            mapData.width * 64, // Assuming TILE_SIZE = 64
-            mapData.height * 64
-        );
-
-        // Create ink renderer
-        this.inkRenderer = new InkFogRenderer(
             mapData.width * 64, // Assuming TILE_SIZE = 64
             mapData.height * 64
         );
@@ -74,13 +66,9 @@ export class FogSystem {
 
         const t = (dt > 0) ? (this.time += dt * 60) : 0;
 
-        // Only animate if dt > 0 (game mode)
-        if (CONFIG.VISUAL_STYLE === 'INK') {
-            this.inkRenderer.render(this.structures, t);
-        } else {
-            if (dt > 0 || this.time === 0) { // Render Sprite logic
-                this.renderer.render(this.structures, this.time);
-            }
+        // Render Sprite logic
+        if (dt > 0 || this.time === 0) {
+            this.renderer.render(this.structures, this.time);
         }
     }
 
@@ -89,11 +77,7 @@ export class FogSystem {
      */
     public draw(ctx: CanvasRenderingContext2D): void {
         ctx.save();
-        if (CONFIG.VISUAL_STYLE === 'INK') {
-            ctx.drawImage(this.inkRenderer.getCanvas(), 0, 0);
-        } else {
-            ctx.drawImage(this.renderer.getCanvas(), 0, 0);
-        }
+        ctx.drawImage(this.renderer.getCanvas(), 0, 0);
         ctx.restore();
     }
 

@@ -20,31 +20,10 @@ window.addEventListener('DOMContentLoaded', () => {
         const game = new Game('game-canvas');
         game.start();
 
-        // Theme Switcher Logic
+        // Theme Switcher Logic Removed (Ink Mode deprecated)
         const themeBtn = document.getElementById('theme-btn');
         if (themeBtn) {
-            themeBtn.addEventListener('click', () => {
-                // Toggle Config
-                if (CONFIG.VISUAL_STYLE === 'SPRITE') {
-                    CONFIG.VISUAL_STYLE = 'INK';
-                    document.body.classList.add('ink-mode');
-                    themeBtn.innerText = '✒️'; // Pen icon for Ink mode
-                    themeBtn.style.background = '#8d6e63';
-                } else {
-                    CONFIG.VISUAL_STYLE = 'SPRITE';
-                    document.body.classList.remove('ink-mode');
-                    themeBtn.innerText = '🎨'; // Palette icon for Sprite mode
-                    themeBtn.style.background = '#444';
-                }
-                console.log(`Visual Style Switched to: ${CONFIG.VISUAL_STYLE}`);
-            });
-
-            // Set initial state
-            if (CONFIG.VISUAL_STYLE === 'INK') {
-                document.body.classList.add('ink-mode');
-                themeBtn.innerText = '✒️';
-                themeBtn.style.background = '#8d6e63';
-            }
+            themeBtn.style.display = 'none'; // Hide the button
         }
 
         console.log('✅ Игра готова. Нажмите ⚔️, чтобы начать волну.');

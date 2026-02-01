@@ -1,8 +1,6 @@
 import { Assets } from './Assets';
 import { RendererFactory } from './RendererFactory';
-import { InkParticles } from './graphics/InkParticles';
 import { CONFIG } from './Config';
-import { INK_CONFIG } from './graphics/InkConfig';
 
 export interface IEffect {
     type: 'explosion' | 'text' | 'particle' | 'scan' | 'debris' | 'screen_flash' | 'muzzle_flash' | 'scale_pop';
@@ -90,15 +88,10 @@ export class EffectSystem {
             this.ctx.globalAlpha = progress;
 
             if (e.type === 'explosion') {
-                if (CONFIG.VISUAL_STYLE === 'INK' || CONFIG.USE_NEW_RENDERER) { // Use Ink Splatter
-                    // @ts-ignore
-                    InkParticles.drawSplatter(this.ctx, e.x, e.y, e.radius || 30, progress, e.color || INK_CONFIG.PALETTE.INK);
-                } else {
-                    this.ctx.fillStyle = e.color || 'orange';
-                    this.ctx.beginPath();
-                    this.ctx.arc(e.x, e.y, e.radius || 30, 0, Math.PI * 2);
-                    this.ctx.fill();
-                }
+                this.ctx.fillStyle = e.color || 'orange';
+                this.ctx.beginPath();
+                this.ctx.arc(e.x, e.y, e.radius || 30, 0, Math.PI * 2);
+                this.ctx.fill();
             } else if (e.type === 'text') {
                 const fontSize = e.fontSize || 16;
                 this.ctx.fillStyle = e.color || '#fff';
@@ -109,23 +102,11 @@ export class EffectSystem {
                 this.ctx.lineWidth = fontSize > 20 ? 3 : 2;
                 this.ctx.strokeText(e.text || '', e.x, e.y);
             } else if (e.type === 'particle') {
-                if (CONFIG.VISUAL_STYLE === 'INK' || CONFIG.USE_NEW_RENDERER) {
-                    // Ink Dot
-                    this.ctx.fillStyle = e.color || '#000';
-                    this.ctx.globalAlpha = Math.min(1, progress * 1.2); // Fade out faster
-                    this.ctx.beginPath();
-                    // Irregular dot
-                    const r = e.radius || 2;
-                    const wobble = Math.sin(e.x * 0.1) * 0.5;
-                    this.ctx.arc(e.x, e.y, r + wobble, 0, Math.PI * 2);
-                    this.ctx.fill();
-                } else {
-                    // Standard Spark
-                    this.ctx.fillStyle = e.color || '#fff';
-                    this.ctx.beginPath();
-                    this.ctx.arc(e.x, e.y, e.radius || 2, 0, Math.PI * 2);
-                    this.ctx.fill();
-                }
+                // Standard Spark
+                this.ctx.fillStyle = e.color || '#fff';
+                this.ctx.beginPath();
+                this.ctx.arc(e.x, e.y, e.radius || 2, 0, Math.PI * 2);
+                this.ctx.fill();
             } else if (e.type === 'debris') {
                 // Осколок (квадрат), который крутится и падает
                 this.ctx.translate(e.x, e.y);

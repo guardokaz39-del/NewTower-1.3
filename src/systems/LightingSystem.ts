@@ -1,5 +1,4 @@
 import { CONFIG } from '../Config';
-import { InkLightingSystem } from '../graphics/InkLightingSystem';
 
 export interface ILight {
     x: number;
@@ -19,9 +18,6 @@ export class LightingSystem {
     private lights: ILight[] = [];
     public ambientLight: number = 0.9; // 0 = Pitch Black, 1 = Full Brightness
 
-    // [NEW] Ink implementation
-    private inkSystem: InkLightingSystem;
-
     constructor(width: number, height: number, optimization: boolean = false) {
         this.width = width;
         this.height = height;
@@ -34,9 +30,6 @@ export class LightingSystem {
         this.canvas.width = Math.floor(width / this.scale);
         this.canvas.height = Math.floor(height / this.scale);
         this.ctx = this.canvas.getContext('2d', { alpha: true })!;
-
-        // Init Ink System
-        this.inkSystem = new InkLightingSystem(width, height);
     }
 
     public resize(width: number, height: number) {
@@ -44,13 +37,10 @@ export class LightingSystem {
         this.height = height;
         this.canvas.width = Math.floor(width / this.scale);
         this.canvas.height = Math.floor(height / this.scale);
-
-        this.inkSystem.resize(width, height);
     }
 
     public clear() {
         this.lights = [];
-        this.inkSystem.clear();
     }
 
     public addLight(x: number, y: number, radius: number, color: string, intensity: number = 1.0) {
@@ -62,9 +52,6 @@ export class LightingSystem {
             color,
             intensity
         });
-
-        // Ink system (full resolution)
-        this.inkSystem.addLight(x, y, radius, color, intensity);
     }
 
     /**
@@ -72,7 +59,6 @@ export class LightingSystem {
      */
     public enableGlobalDarkness(darknessLevel: number = 0.7) {
         this.ambientLight = 1 - darknessLevel; // e.g., 0.7 darkness = 0.3 ambient
-        this.inkSystem.ambientLight = this.ambientLight; // Sync ambient
     }
 
     /**
@@ -83,14 +69,6 @@ export class LightingSystem {
     }
 
     public render(targetCtx: CanvasRenderingContext2D) {
-        // Dispatch based on config
-        if (CONFIG.VISUAL_STYLE === 'INK') {
-            // Make sure ambient light is synced before render
-            this.inkSystem.ambientLight = this.ambientLight;
-            this.inkSystem.render(targetCtx);
-            return;
-        }
-
         // Logic for SPRITE style (Original)
         const w = this.canvas.width;
         const h = this.canvas.height;

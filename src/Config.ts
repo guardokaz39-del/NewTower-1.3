@@ -1,9 +1,11 @@
 import type { ICardTypeConfig, IEnemyTypeConfig } from './types';
+import { ENEMY_CONFIG, ENEMY_TYPES } from './config/Enemies';
+import { TOWER_CONFIG, TARGETING_MODES } from './config/Towers';
+import { WAVE_CONFIG, ECONOMY_CONFIG } from './config/Levels';
 
 export const CONFIG = {
     // Configuration flags for safe refactoring
     USE_NEW_RENDERER: true, // Toggle this to enable new modular renderers
-    VISUAL_STYLE: 'SPRITE' as 'SPRITE' | 'INK', // 'SPRITE' | 'INK' - Styling mode
 
     TILE_SIZE: 64,
 
@@ -36,40 +38,11 @@ export const CONFIG = {
         HAND_LIMIT: 7,
     },
 
-    ECONOMY: {
-        WAVE_CLEAR_REWARD: 2,
-        WAVE_BASE_REWARD: 20,          // NEW: Base reward for completing a wave
-        WAVE_SCALING_FACTOR: 2,        // NEW: Additional reward per wave number (+2 per wave)
-        DROP_CHANCE: 0.15,
-        EARLY_WAVE_BONUS: 15,          // Reduced from 30 to 15
-        PERFECT_WAVE_BONUS: 10,        // NEW: Bonus for no enemy leaks
-        TOWER_COST: 55,
-        FORGE_COST_LVL1: 50,           // LVL1→2 forge cost
-        FORGE_COST_LVL2: 65,           // LVL2→3 forge cost (was FORGE_COST: 50)
-        SHOP_COST: 100,
-        SHOP_REROLL_COST: 25,          // Increased from 15 to 25
-        SELL_REFUND: 0.5,
-        CARD_SELL_PRICES: [0, 5, 10, 25], // Index = level (0 unused, 1-3 are actual prices)
-    },
+    ECONOMY: ECONOMY_CONFIG,
 
-    TOWER: {
-        BASE_RANGE: 120,
-        BASE_DMG: 5,
-        BASE_CD: 0.9, // 54 / 60 = 0.9 seconds
-        BUILD_TIME: 1.0, // 60 / 60 = 1.0 second
-        MAX_CARDS: 3,
-        BARREL_LENGTH: 22,
-        TURN_SPEED: 9.0, // 0.15 * 60 = 9.0 radians per second
-        AIM_TOLERANCE: 0.1,
-    },
+    TOWER: TOWER_CONFIG,
 
-    TARGETING_MODES: {
-        FIRST: { id: 'first', name: 'Первый', icon: '🏃', desc: 'Ближе к цели' },
-        CLOSEST: { id: 'closest', name: 'Ближайший', icon: '📍', desc: 'Рядом с башней' },
-        STRONGEST: { id: 'strongest', name: 'Сильный', icon: '💪', desc: 'Макс. здоровье' },
-        WEAKEST: { id: 'weakest', name: 'Слабый', icon: '💔', desc: 'Мин. здоровье' },
-        LAST: { id: 'last', name: 'Последний', icon: '🐢', desc: 'Дальше от цели' },
-    },
+    TARGETING_MODES: TARGETING_MODES,
 
     UI: {
         HP_BAR_WIDTH: 40,
@@ -86,136 +59,11 @@ export const CONFIG = {
         MINIGUN: { id: 'minigun', name: 'Пулемёт', icon: '⚡', color: '#9c27b0', desc: 'Быстрая стрельба, урон растёт' },
     } as Readonly<Record<string, ICardTypeConfig>>,
 
-    ENEMY: { BASE_HP: 25, HP_GROWTH: 1.2 },
+    ENEMY: ENEMY_CONFIG,
 
-    ENEMY_TYPES: {
-        GRUNT: {
-            id: 'grunt',
-            name: 'Скелет',
-            symbol: '💀',
-            hpMod: 1.2,
-            speed: 90, // 1.5 * 60 = 90
-            reward: 4,
-            color: '#e0e0e0',
-            desc: 'Обычный скелет',
-            archetype: 'SKELETON',
-            scale: 1.0,
-        },
-        SCOUT: {
-            id: 'scout',
-            name: 'Волк',
-            symbol: '🐺',
-            hpMod: 0.85,
-            speed: 168, // 2.8 * 60 = 168
-            reward: 2,
-            color: '#795548',
-            desc: 'Быстрый хищник',
-            archetype: 'WOLF',
-            scale: 0.9,
-        },
-        TANK: {
-            id: 'tank',
-            name: 'Тролль',
-            symbol: '👹',
-            hpMod: 3.65,
-            speed: 48, // 0.8 * 60 = 48
-            reward: 10,
-            color: '#558b2f',
-            desc: 'Тяжелый танк',
-            archetype: 'TROLL',
-            scale: 1.2,
-        },
-        BOSS: {
-            id: 'boss',
-            name: 'Паучиха',
-            symbol: '🕷️',
-            hpMod: 25.0,
-            speed: 36, // 0.6 * 60 = 36
-            reward: 175,
-            color: '#311b92',
-            desc: 'Матка роя',
-            archetype: 'SPIDER',
-            scale: 1.8,
-        },
-        // --- NEW VARIANTS ---
-        SKELETON_COMMANDER: {
-            id: 'skeleton_commander',
-            name: 'Командир',
-            symbol: '👑',
-            hpMod: 2.5,
-            speed: 96, // 1.6 * 60 = 96
-            reward: 8,
-            color: '#ffd700',
-            desc: 'Лидер скелетов',
-            archetype: 'SKELETON',
-            scale: 1.2,
-            props: ['prop_helmet', 'prop_weapon'],
-            tint: '#ffd700'
-        },
-        SPIDER_POISON: {
-            id: 'spider_poison',
-            name: 'Ядовитый',
-            symbol: '🧪',
-            hpMod: 1.4,
-            speed: 132, // 2.2 * 60 = 132
-            reward: 6,
-            color: '#76ff03',
-            desc: 'Ядовитый паук',
-            archetype: 'SPIDER',
-            scale: 0.7,
-            tint: '#76ff03'
-        },
-        TROLL_ARMORED: {
-            id: 'troll_armored',
-            name: 'Латник',
-            symbol: '🛡️',
-            hpMod: 7.0,
-            speed: 42, // 0.7 * 60 = 42
-            reward: 15,
-            color: '#424242',
-            desc: 'Бронированный тролль',
-            archetype: 'TROLL',
-            scale: 1.3,
-            props: ['prop_shield'],
-            tint: '#616161'
-        }
-    } as const,
+    ENEMY_TYPES: ENEMY_TYPES,
 
-    WAVES: [
-        // Волна 1: Обычный режим для обучения
-        {
-            enemies: [
-                { type: 'GRUNT', count: 10, spawnPattern: 'normal' }
-            ]
-        },
-        // Волна 2: Рандомный режим для непредсказуемости
-        {
-            enemies: [
-                { type: 'SCOUT', count: 12, spawnPattern: 'random' }
-            ]
-        },
-        // Волна 3: Комбинация обычного и роя
-        {
-            enemies: [
-                { type: 'GRUNT', count: 15, spawnPattern: 'normal' },
-                { type: 'TANK', count: 2, spawnPattern: 'normal' }
-            ]
-        },
-        // Волна 4: Рой скаутов + танки рандомно
-        {
-            enemies: [
-                { type: 'SCOUT', count: 20, spawnPattern: 'swarm' },
-                { type: 'TANK', count: 3, spawnPattern: 'random' }
-            ]
-        },
-        // Волна 5: Финальная волна с боссом
-        {
-            enemies: [
-                { type: 'GRUNT', count: 25, spawnPattern: 'random' },
-                { type: 'BOSS', count: 1, spawnPattern: 'normal' }
-            ]
-        }
-    ],
+    WAVES: WAVE_CONFIG,
 };
 
 /**
