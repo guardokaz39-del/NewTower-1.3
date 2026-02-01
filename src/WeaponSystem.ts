@@ -1,20 +1,20 @@
 import { Tower } from './Tower';
 import { Enemy } from './Enemy';
 import { Projectile } from './Projectile';
-import { ObjectPool } from './Utils';
 import { CONFIG } from './Config';
 import { EffectSystem } from './EffectSystem';
 import { SoundManager, SoundPriority } from './SoundManager';
+import { ProjectileSystem } from './systems/ProjectileSystem';
 
 export class WeaponSystem {
 
-    public update(towers: Tower[], enemies: Enemy[], projectiles: Projectile[], pool: ObjectPool<Projectile>, dt: number, effects?: EffectSystem) {
+    public update(towers: Tower[], enemies: Enemy[], projectileSystem: ProjectileSystem, dt: number, effects?: EffectSystem) {
         towers.forEach(tower => {
-            this.processTower(tower, enemies, projectiles, pool, dt, effects);
+            this.processTower(tower, enemies, projectileSystem, dt, effects);
         });
     }
 
-    private processTower(tower: Tower, enemies: Enemy[], projectiles: Projectile[], pool: ObjectPool<Projectile>, dt: number, effects?: EffectSystem) {
+    private processTower(tower: Tower, enemies: Enemy[], projectileSystem: ProjectileSystem, dt: number, effects?: EffectSystem) {
         if (tower.isBuilding) return;
         if (tower.cards.length === 0) return;
 
@@ -57,7 +57,7 @@ export class WeaponSystem {
             const angleDiff = Math.abs(this.getShortestAngleDifference(tower.angle, desiredAngle));
 
             if (tower.cooldown <= 0 && angleDiff < CONFIG.TOWER.AIM_TOLERANCE) {
-                this.fire(tower, target, stats, projectiles, pool, effects);
+                this.fire(tower, target, stats, projectileSystem, effects);
                 tower.cooldown = stats.cd;
 
                 // === SPINUP MECHANIC ===
@@ -161,7 +161,7 @@ export class WeaponSystem {
         return diff;
     }
 
-    private fire(tower: Tower, target: { x: number, y: number }, stats: any, projectiles: Projectile[], pool: ObjectPool<Projectile>, effects?: EffectSystem) {
+    private fire(tower: Tower, target: { x: number, y: number }, stats: any, projectileSystem: ProjectileSystem, effects?: EffectSystem) {
         // Muzzle Math
         const barrelLen = CONFIG.TOWER.BARREL_LENGTH;
         const muzzleX = tower.x + Math.cos(tower.angle) * barrelLen;
@@ -207,7 +207,6 @@ export class WeaponSystem {
                 // but travel in different directions.
                 // Or we can slightly offset the origin if it's a wide bank of guns.
                 // Let's keep origin same, vary velocity vector implies target varies OR we just calculate velocity manually in Projectile.
-
                 // Currently Projectile.init calculates angle to target. 
                 // We need to override this or create a virtual target for the spread shots.
 
@@ -218,16 +217,12 @@ export class WeaponSystem {
                 const virtualTarget = { x: muzzleX + vx, y: muzzleY + vy };
 
                 const finalDamage = Math.max(1, stats.damage * (stats.damageMultiplier || 1));
-                const p = pool.obtain();
-                p.init(muzzleX, muzzleY, virtualTarget, { ...stats, damage: finalDamage });
-                projectiles.push(p);
+                projectileSystem.spawn(muzzleX, muzzleY, virtualTarget, { ...stats, damage: finalDamage });
             }
         } else {
             // Single shot
             const finalDamage = Math.max(1, stats.damage * (stats.damageMultiplier || 1));
-            const p = pool.obtain();
-            p.init(muzzleX, muzzleY, target, { ...stats, damage: finalDamage });
-            projectiles.push(p);
+            const p = projectileSystem.spawn(muzzleX, muzzleY, target, { ...stats, damage: finalDamage });
 
             // Trigger recoil for critical hits
             if (p.isCrit) {

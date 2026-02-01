@@ -21,10 +21,10 @@ export class GameState {
     // Entity collections
     public enemies: Enemy[] = [];
     public towers: Tower[] = [];
-    public projectiles: Projectile[] = [];
+    // public projectiles: Projectile[] = []; // MOVED to ProjectileSystem
 
     // Object pools
-    public projectilePool: ObjectPool<Projectile>;
+    // public projectilePool: ObjectPool<Projectile>; // MOVED to ProjectileSystem
     public enemyPool: ObjectPool<Enemy>;
 
     // Selection state
@@ -38,8 +38,29 @@ export class GameState {
     private eventBus: EventBus = EventBus.getInstance();
 
     constructor() {
-        this.projectilePool = new ObjectPool(() => new Projectile());
+        // this.projectilePool = new ObjectPool(() => new Projectile());
         this.enemyPool = new ObjectPool(() => new Enemy());
+    }
+
+
+
+    // === Reset (for restart) ===
+    public reset(): void {
+        this.wave = 0;
+        this.lives = CONFIG.PLAYER.START_LIVES;
+        this.money = CONFIG.PLAYER.START_MONEY;
+        this.paused = false;
+        this.isRunning = true;
+        this.timeScale = 1.0;
+        this.frames = 0;
+        this.shakeTimer = 0;
+        this.shakeIntensity = 0;
+        this.selectedTower = null;
+
+        // Clear entities
+        this.enemies = [];
+        this.towers = [];
+        // this.projectiles = []; // MOVED
     }
 
     // === Money Management ===
@@ -119,24 +140,5 @@ export class GameState {
     // === Game Over ===
     public endGame(): void {
         this.isRunning = false;
-    }
-
-    // === Reset (for restart) ===
-    public reset(): void {
-        this.wave = 0;
-        this.lives = CONFIG.PLAYER.START_LIVES;
-        this.money = CONFIG.PLAYER.START_MONEY;
-        this.paused = false;
-        this.isRunning = true;
-        this.timeScale = 1.0;
-        this.frames = 0;
-        this.shakeTimer = 0;
-        this.shakeIntensity = 0;
-        this.selectedTower = null;
-
-        // Clear entities
-        this.enemies = [];
-        this.towers = [];
-        this.projectiles = [];
     }
 }

@@ -248,19 +248,7 @@ export class EntityManager {
 
     // === Projectile Management ===
 
-    /**
-     * Update all projectiles and cleanup dead ones
-     */
-    public updateProjectiles(dt: number): void {
-        for (let i = this.state.projectiles.length - 1; i >= 0; i--) {
-            const p = this.state.projectiles[i];
-            p.update(this.effects, dt);
-            if (!p.alive) {
-                this.state.projectiles.splice(i, 1);
-                this.state.projectilePool.free(p);
-            }
-        }
-    }
+    // Projectiles are now managed by ProjectileSystem
 
     // === Helper Methods ===
 

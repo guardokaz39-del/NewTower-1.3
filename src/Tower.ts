@@ -170,7 +170,7 @@ export class Tower {
         return {
             range: Math.round(range),
             dmg: damage,
-            cd: Math.round(attackSpeed),
+            cd: attackSpeed,
             speed,
             color,
             effects: allEffects,

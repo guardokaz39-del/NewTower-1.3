@@ -110,7 +110,7 @@ export class InspectorSystem {
         let statsHTML = '';
         statsHTML += `<div>⚔️ Урон: ${stats.dmg.toFixed(1)}</div>`;
         statsHTML += `<div>📏 Радиус: ${stats.range.toFixed(0)}</div>`;
-        statsHTML += `<div>⏱️ Скорость: ${(60 / stats.cd).toFixed(1)}/с</div>`;
+        statsHTML += `<div>⏱️ Скорость: ${(1 / stats.cd).toFixed(1)}/с</div>`;
         if (stats.pierce > 0) {
             statsHTML += `<div>🎯 Пробивание: ${stats.pierce}</div>`;
         }

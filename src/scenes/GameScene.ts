@@ -26,6 +26,7 @@ import { LightingSystem } from '../systems/LightingSystem';
 import { NotificationSystem } from '../systems/NotificationSystem';
 import { DayNightCycle } from '../DayNightCycle';
 import { AtmosphereSystem } from '../systems/AtmosphereSystem';
+import { ProjectileSystem } from '../systems/ProjectileSystem';
 
 import { GameController } from './GameController';
 import { GameState } from './GameState';
@@ -62,6 +63,7 @@ export class GameScene extends BaseScene implements IGameScene {
     public waveManager: WaveManager;
     public events: EventEmitter;
     public input: InputSystem;
+    public projectileSystem: ProjectileSystem;
     public effects: EffectSystem;
     public devConsole: DevConsole;
     public forge: ForgeSystem;
@@ -89,8 +91,8 @@ export class GameScene extends BaseScene implements IGameScene {
 
     public get enemies() { return this.gameState.enemies; }
     public get towers() { return this.gameState.towers; }
-    public get projectiles() { return this.gameState.projectiles; }
-    public get projectilePool() { return this.gameState.projectilePool; }
+    public get projectiles() { return this.projectileSystem.projectiles; }
+
     public get enemyPool() { return this.gameState.enemyPool; }
 
     constructor(game: Game, mapData: IMapData) {
@@ -118,6 +120,7 @@ export class GameScene extends BaseScene implements IGameScene {
         this.input = game.input;
 
         // Initialize systems
+        this.projectileSystem = new ProjectileSystem();
         this.weaponSystem = new WeaponSystem();
         this.metrics = new MetricsSystem();
         this.notifications = new NotificationSystem(this.effects, game.canvas);
@@ -227,14 +230,13 @@ export class GameScene extends BaseScene implements IGameScene {
             // Lighting doesn't need explicit update logic for now, just render
 
             // Update projectiles
-            this.entityManager.updateProjectiles(dt);
+            this.projectileSystem.update(dt, this.effects);
 
             // Update weapon system (tower shooting)
             this.weaponSystem.update(
                 this.gameState.towers,
                 this.gameState.enemies,
-                this.gameState.projectiles,
-                this.gameState.projectilePool,
+                this.projectileSystem,
                 dt,
                 this.effects
             );
@@ -242,7 +244,7 @@ export class GameScene extends BaseScene implements IGameScene {
             // Update tower visual states
             this.gameState.towers.forEach((t) => t.updateBuilding(this.effects, dt));
 
-            this.collision.update(this.gameState.projectiles, this.gameState.enemies);
+            this.collision.update(this.projectileSystem.projectiles, this.gameState.enemies);
             this.entityManager.updateEnemies(dt);
 
             this.effects.update(dt);
@@ -327,6 +329,7 @@ export class GameScene extends BaseScene implements IGameScene {
         this.drawTargetingModeTooltip(ctx);
 
         this.gameState.enemies.forEach((e) => e.draw(ctx));
+        this.projectileSystem.draw(ctx);
         // Draw effects
         this.effects.draw();
 

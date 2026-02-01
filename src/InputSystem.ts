@@ -21,6 +21,12 @@ export class InputSystem {
     constructor(game: Game) {
         this.game = game;
         this.canvas = game.canvas;
+
+        // Bind methods to context
+        this.onPointerMove = this.onPointerMove.bind(this);
+        this.onPointerDown = this.onPointerDown.bind(this);
+        this.onPointerUp = this.onPointerUp.bind(this);
+
         this.initListeners();
     }
 
@@ -28,73 +34,83 @@ export class InputSystem {
         // Prevent default touch actions (scrolling) on canvas
         this.canvas.style.touchAction = 'none';
 
-        this.canvas.addEventListener('pointermove', (e) => {
-            const rect = this.canvas.getBoundingClientRect();
-            const scaleX = this.canvas.width / rect.width;
-            const scaleY = this.canvas.height / rect.height;
+        this.canvas.addEventListener('pointermove', this.onPointerMove);
+        this.canvas.addEventListener('pointerdown', this.onPointerDown);
+        window.addEventListener('pointerup', this.onPointerUp);
+    }
 
-            this.mouseX = (e.clientX - rect.left) * scaleX;
-            this.mouseY = (e.clientY - rect.top) * scaleY;
+    public destroy() {
+        this.canvas.removeEventListener('pointermove', this.onPointerMove);
+        this.canvas.removeEventListener('pointerdown', this.onPointerDown);
+        window.removeEventListener('pointerup', this.onPointerUp);
+    }
 
-            this.hoverCol = Math.floor(this.mouseX / CONFIG.TILE_SIZE);
-            this.hoverRow = Math.floor(this.mouseY / CONFIG.TILE_SIZE);
+    private onPointerMove(e: PointerEvent) {
+        const rect = this.canvas.getBoundingClientRect();
+        const scaleX = this.canvas.width / rect.width;
+        const scaleY = this.canvas.height / rect.height;
 
-            const scene = this.game.currentScene;
-            if (scene instanceof GameScene) {
-                if (scene.cardSys && scene.cardSys.dragCard) {
-                    scene.cardSys.updateDrag(e.clientX, e.clientY);
-                }
+        this.mouseX = (e.clientX - rect.left) * scaleX;
+        this.mouseY = (e.clientY - rect.top) * scaleY;
+
+        this.hoverCol = Math.floor(this.mouseX / CONFIG.TILE_SIZE);
+        this.hoverRow = Math.floor(this.mouseY / CONFIG.TILE_SIZE);
+
+        const scene = this.game.currentScene;
+        if (scene instanceof GameScene) {
+            if (scene.cardSys && scene.cardSys.dragCard) {
+                scene.cardSys.updateDrag(e.clientX, e.clientY);
             }
-        });
+        }
+    }
 
-        this.canvas.addEventListener('pointerdown', (e) => {
-            SoundManager.resume();
-            if (e.isPrimary && e.button === 0) {
-                this.isMouseDown = true;
-                this.holdStartCol = this.hoverCol;
-                this.holdStartRow = this.hoverRow;
-                this.holdTimer = 0;
-
-                // Allow dragging outside canvas to be tracked if needed, 
-                // but for now relying on window.pointerup is fine.
-                // this.canvas.setPointerCapture(e.pointerId);
-            }
-        });
-
-        window.addEventListener('pointerup', (e) => {
-            if (this.isMouseDown) {
-                this.isMouseDown = false;
-                // this.canvas.releasePointerCapture(e.pointerId);
-            }
-
-            const scene = this.game.currentScene;
-            if (scene instanceof GameScene) {
-                // Если тащили карту
-                if (scene.cardSys.dragCard) {
-                    scene.cardSys.endDrag(e);
-                    return;
-                }
-
-                // CRITICAL FIX: Only process grid clicks if click was on the canvas
-                // Otherwise UI clicks (sell button, cards) will trigger grid click and deselect tower
-                const clickTarget = e.target as HTMLElement;
-                const clickedOnCanvas = clickTarget === this.canvas;
-
-                if (!clickedOnCanvas) {
-                    // Click was on a UI element, don't process as grid click
-                    this.holdTimer = 0;
-                    return;
-                }
-
-                // Если это был клик (не удержание)
-                if (this.holdTimer < this.HOLD_THRESHOLD) {
-                    // Вызов метода GameScene
-                    scene.handleGridClick(this.hoverCol, this.hoverRow);
-                }
-            }
-
+    private onPointerDown(e: PointerEvent) {
+        SoundManager.resume();
+        if (e.isPrimary && e.button === 0) {
+            this.isMouseDown = true;
+            this.holdStartCol = this.hoverCol;
+            this.holdStartRow = this.hoverRow;
             this.holdTimer = 0;
-        });
+
+            // Allow dragging outside canvas to be tracked if needed, 
+            // but for now relying on window.pointerup is fine.
+            // this.canvas.setPointerCapture(e.pointerId);
+        }
+    }
+
+    private onPointerUp(e: PointerEvent) {
+        if (this.isMouseDown) {
+            this.isMouseDown = false;
+            // this.canvas.releasePointerCapture(e.pointerId);
+        }
+
+        const scene = this.game.currentScene;
+        if (scene instanceof GameScene) {
+            // Если тащили карту
+            if (scene.cardSys.dragCard) {
+                scene.cardSys.endDrag(e);
+                return;
+            }
+
+            // CRITICAL FIX: Only process grid clicks if click was on the canvas
+            // Otherwise UI clicks (sell button, cards) will trigger grid click and deselect tower
+            const clickTarget = e.target as HTMLElement;
+            const clickedOnCanvas = clickTarget === this.canvas;
+
+            if (!clickedOnCanvas) {
+                // Click was on a UI element, don't process as grid click
+                this.holdTimer = 0;
+                return;
+            }
+
+            // Если это был клик (не удержание)
+            if (this.holdTimer < this.HOLD_THRESHOLD) {
+                // Вызов метода GameScene
+                scene.handleGridClick(this.hoverCol, this.hoverRow);
+            }
+        }
+
+        this.holdTimer = 0;
     }
 
     public update(dt: number) {

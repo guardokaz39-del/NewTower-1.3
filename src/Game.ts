@@ -72,6 +72,14 @@ export class Game {
         if (this.currentScene) {
             this.currentScene.onExit();
         }
+
+        // Destroy old input listeners to prevent duplication/leaks
+        if (this.input) {
+            this.input.destroy();
+        }
+        // Re-initialize input system for the new scene
+        this.input = new InputSystem(this);
+
         this.currentScene = newScene;
         this.currentScene.onEnter();
     }
