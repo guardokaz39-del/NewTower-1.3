@@ -78,21 +78,22 @@ export class Projectile {
         this.vx = Math.cos(angle) * stats.speed;
         this.vy = Math.sin(angle) * stats.speed;
 
-        this.life = 120; // 2 секунды жизни
-
+        this.life = 2.0; // 2 секунды жизни
         // Adjust life for sniper (faster = less time needed)
-        if (this.projectileType === 'sniper') this.life = 60;
+        if (this.projectileType === 'sniper') this.life = 1.0;
     }
 
-    public update(effects?: any) { // Type 'any' to avoid strict circular import issues if EffectSystem isn't imported, but normally it should be fine. Using any for safety here or import it.
+    public update(effects?: any, dt: number = 1) { // Type 'any' to avoid strict circular import issues if EffectSystem isn't imported, but normally it should be fine. Using any for safety here or import it.
         if (!this.alive) return;
 
-        this.x += this.vx;
-        this.y += this.vy;
-        this.life--;
+        this.x += this.vx * dt;
+        this.y += this.vy * dt;
+        this.life -= dt;
 
         // --- TRAIL EFFECTS ---
-        if (effects && this.life % 2 === 0) { // Spawn every 2 frames
+        // Spawn trail particles approx every ~0.03s (30 fps)
+        // Spawn trail particles approx every ~0.03s (30 fps)
+        if (effects && Math.random() < dt * 30) {
             const type = this.projectileType || 'standard';
 
             // Fire Trail (Smoke/Embers)
@@ -101,9 +102,9 @@ export class Projectile {
                     type: 'particle',
                     x: this.x + (Math.random() - 0.5) * 4,
                     y: this.y + (Math.random() - 0.5) * 4,
-                    vx: -this.vx * 0.2 + (Math.random() - 0.5),
-                    vy: -this.vy * 0.2 + (Math.random() - 0.5),
-                    life: 15 + Math.random() * 10,
+                    vx: -this.vx * 0.2 + (Math.random() - 0.5) * 60,
+                    vy: -this.vy * 0.2 + (Math.random() - 0.5) * 60,
+                    life: 0.25 + Math.random() * 0.15, // ~15-25 frames
                     radius: 2 + Math.random() * 2,
                     color: Math.random() > 0.5 ? 'rgba(255, 100, 0, 0.5)' : 'rgba(100, 100, 100, 0.3)'
                 });
@@ -114,9 +115,9 @@ export class Projectile {
                     type: 'particle',
                     x: this.x,
                     y: this.y,
-                    vx: (Math.random() - 0.5) * 0.5,
-                    vy: (Math.random() - 0.5) * 0.5,
-                    life: 20,
+                    vx: (Math.random() - 0.5) * 30, // 0.5 * 60
+                    vy: (Math.random() - 0.5) * 30,
+                    life: 0.35, // 20 frames
                     radius: 1.5,
                     color: '#e1f5fe'
                 });
@@ -133,7 +134,7 @@ export class Projectile {
                     y: this.y,
                     vx: 0,
                     vy: 0,
-                    life: 10,
+                    life: 0.16, // 10 frames
                     radius: 2,
                     color: this.color
                 });

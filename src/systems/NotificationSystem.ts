@@ -45,7 +45,7 @@ export class NotificationSystem {
             text: `WAVE ${waveNum}`,
             x: cx,
             y: cy,
-            life: 90,
+            life: 1.5, // 90 frames
             color: '#fff',
             fontSize: 48,
             vy: 0
@@ -57,7 +57,7 @@ export class NotificationSystem {
             text: 'INCOMING',
             x: cx,
             y: cy + 50,
-            life: 70,
+            life: 1.1, // 70 frames
             color: '#ff5722',
             fontSize: 24,
             vy: 0
@@ -89,10 +89,10 @@ export class NotificationSystem {
             text: 'WAVE CLEARED!',
             x: cx,
             y: cy - 30,
-            life: 80,
+            life: 1.3, // 80 frames
             color: '#ffd700',
             fontSize: 36,
-            vy: -0.5
+            vy: -30 // -0.5 * 60
         });
 
         // Gold screen flash
@@ -124,7 +124,7 @@ export class NotificationSystem {
             text: '⚠️ BOSS ⚠️',
             x: cx,
             y: cy - 100,
-            life: 120,
+            life: 2.0, // 120
             color: '#ff0000',
             fontSize: 42,
             vy: 0
@@ -136,7 +136,7 @@ export class NotificationSystem {
             text: bossName.toUpperCase(),
             x: cx,
             y: cy - 50,
-            life: 100,
+            life: 1.6, // 100
             color: '#fff',
             fontSize: 28,
             vy: 0
@@ -163,7 +163,7 @@ export class NotificationSystem {
 
         for (let i = 0; i < 30; i++) {
             const angle = Math.random() * Math.PI * 2;
-            const speed = 2 + Math.random() * 4;
+            const speed = (2 + Math.random() * 4) * 60; // Convert to px/sec
             const color = colors[Math.floor(Math.random() * colors.length)];
 
             this.effects.add({
@@ -171,8 +171,8 @@ export class NotificationSystem {
                 x: cx + (Math.random() - 0.5) * 100,
                 y: cy,
                 vx: Math.cos(angle) * speed,
-                vy: Math.sin(angle) * speed - 2, // Bias upward
-                life: 40 + Math.random() * 30,
+                vy: Math.sin(angle) * speed - 120, // Bias upward (2 * 60)
+                life: 0.6 + Math.random() * 0.5, // 40-70 frames
                 color: color,
                 radius: 3 + Math.random() * 3
             });

@@ -20,7 +20,7 @@ export const SNIPER_UPGRADES: Record<number, IUpgradeCard> = {
         visualOverrides: {
             projectileType: 'sniper',
             projectileColor: '#4caf50',
-            projectileSpeed: 15,
+            projectileSpeed: 900, // 15 * 60
         }
     },
     2: {

@@ -64,12 +64,12 @@ export class WaveManager {
         // this.scene.ui.update(); // EventBus handles UI
     }
 
-    public update() {
+    public update(dt: number) {
         if (!this.isWaveActive) return;
 
         // Спавн врагов из очереди
         if (this.spawnQueue.length > 0) {
-            this.spawnTimer++;
+            this.spawnTimer += dt;
 
             // Динамический интервал в зависимости от паттерна
             const requiredDelay = this.getNextSpawnDelay();
@@ -218,10 +218,10 @@ export class WaveManager {
      */
     private getBaseIntervalFromRate(rate?: 'fast' | 'medium' | 'slow'): number {
         switch (rate) {
-            case 'fast': return 25;
-            case 'slow': return 60;
+            case 'fast': return 0.4; // 25 / 60
+            case 'slow': return 1.0; // 60 / 60
             case 'medium':
-            default: return 40;
+            default: return 0.66; // 40 / 60
         }
     }
 
@@ -229,7 +229,8 @@ export class WaveManager {
      * Вычисляет следующий интервал спавна в зависимости от паттерна
      */
     private getNextSpawnDelay(): number {
-        const baseInterval = Math.max(5, this.currentBaseInterval);
+        // Minimum delay 0.05s (instead of 5 frames) to avoiding instant stacking but allow fast fire
+        const baseInterval = Math.max(0.05, this.currentBaseInterval);
 
         switch (this.currentPattern) {
             case 'normal':
@@ -240,14 +241,14 @@ export class WaveManager {
                 // Рандомизация ±30% от базового
                 const variance = baseInterval * 0.3;
                 const randomDelay = baseInterval + (Math.random() - 0.5) * 2 * variance;
-                return Math.max(5, Math.floor(randomDelay));
+                return Math.max(0.05, randomDelay);
 
             case 'swarm':
                 // Очень короткие интервалы (10-25% от базового)
                 const swarmBase = baseInterval * 0.15;
                 const swarmVariance = swarmBase * 0.5;
                 const swarmDelay = swarmBase + Math.random() * swarmVariance;
-                return Math.max(3, Math.floor(swarmDelay));
+                return Math.max(0.02, swarmDelay);
 
             default:
                 console.warn('[WaveManager] Unknown spawn pattern:', this.currentPattern);

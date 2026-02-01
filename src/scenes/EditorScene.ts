@@ -80,7 +80,7 @@ export class EditorScene extends BaseScene {
         if (this.mapsPanel.parentNode) this.mapsPanel.parentNode.removeChild(this.mapsPanel);
     }
 
-    public update() {
+    public update(dt: number) {
         // Don't update fog animation in editor - only static rendering
         const input = this.game.input;
 

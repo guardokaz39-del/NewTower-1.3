@@ -19,14 +19,14 @@ export const MINIGUN_UPGRADES: Record<number, IUpgradeCard> = {
                 type: 'spinup',
                 spinupDamagePerSecond: 3, // +3 damage per second
                 maxSpinupSeconds: 5, // 5 seconds
-                overheatDuration: 90, // 1.5 seconds (lockout)
-                overheatExtensionWithIce: 120, // +2 seconds with Ice card
+                overheatDuration: 1.5, // 90 / 60
+                overheatExtensionWithIce: 2, // 120 / 60
             }
         ],
         visualOverrides: {
             projectileType: 'minigun',
             projectileColor: '#fff',
-            projectileSpeed: 12,
+            projectileSpeed: 720, // 12 * 60
         }
     },
     2: {
@@ -41,8 +41,8 @@ export const MINIGUN_UPGRADES: Record<number, IUpgradeCard> = {
                 spinupDamagePerSecond: 3,
                 spinupCritPerSecond: 0.02, // +2% crit chance per second
                 maxSpinupSeconds: 5,
-                overheatDuration: 90,
-                overheatExtensionWithIce: 120,
+                overheatDuration: 1.5,
+                overheatExtensionWithIce: 2,
             }
         ]
     },
@@ -65,8 +65,8 @@ export const MINIGUN_UPGRADES: Record<number, IUpgradeCard> = {
                 ],
                 spinupCritPerSecond: 0.02, // +2% crit chance per second
                 maxSpinupSeconds: 5,
-                overheatDuration: 90,
-                overheatExtensionWithIce: 120,
+                overheatDuration: 1.5,
+                overheatExtensionWithIce: 2,
             }
         ]
     }

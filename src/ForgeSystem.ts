@@ -125,9 +125,9 @@ export class ForgeSystem {
                     type: 'particle',
                     x: effectX + (Math.random() - 0.5) * 80,
                     y: effectY + (Math.random() - 0.5) * 50,
-                    vx: (Math.random() - 0.5) * 6,
-                    vy: -(Math.random() * 4 + 1),
-                    life: 30 + Math.random() * 20,
+                    vx: (Math.random() - 0.5) * 360, // 6 * 60
+                    vy: -(Math.random() * 240 + 60), // 4+1 * 60
+                    life: 0.5 + Math.random() * 0.3, // 30-50 frames
                     radius: Math.random() * 4 + 2,
                     color: Math.random() > 0.5 ? '#ff9800' : '#ffeb3b', // Orange/Yellow sparks
                 });
@@ -166,7 +166,7 @@ export class ForgeSystem {
                 x: effectX,
                 y: effectY,
                 radius: 60,
-                life: 35,
+                life: 0.6,
                 color: '#ffd700', // Gold
             });
 
@@ -177,9 +177,9 @@ export class ForgeSystem {
                     type: 'particle',
                     x: effectX,
                     y: effectY,
-                    vx: Math.cos(angle) * 5,
-                    vy: Math.sin(angle) * 5,
-                    life: 40,
+                    vx: Math.cos(angle) * 300, // 5 * 60
+                    vy: Math.sin(angle) * 300,
+                    life: 0.65,
                     radius: 4,
                     color: '#ffd700',
                 });

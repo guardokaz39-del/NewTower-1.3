@@ -33,7 +33,7 @@ export class MenuScene extends BaseScene {
         this.mapSelectionContainer.style.display = 'none';
     }
 
-    public update() { }
+    public update(dt: number) { }
 
     public draw(ctx: CanvasRenderingContext2D) {
         ctx.fillStyle = '#111';

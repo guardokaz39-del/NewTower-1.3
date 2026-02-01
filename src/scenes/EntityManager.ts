@@ -161,7 +161,7 @@ export class EntityManager {
             type: 'scale_pop',
             x: enemy.x,
             y: enemy.y,
-            life: 12,
+            life: 0.2, // 12 frames
             enemySprite: `enemy_${archetype.toLowerCase()}`,
             enemyColor: enemyTypeConf?.color
         });
@@ -175,9 +175,9 @@ export class EntityManager {
             text: `+${reward}💰`,
             x: enemy.x,
             y: enemy.y,
-            life: 40,
+            life: 0.6, // 40 frames
             color: 'gold',
-            vy: -1.5,
+            vy: -90, // -1.5 * 60
         });
 
         // Coin particle burst
@@ -187,9 +187,9 @@ export class EntityManager {
                 type: 'particle',
                 x: enemy.x + (Math.random() - 0.5) * 20,
                 y: enemy.y + (Math.random() - 0.5) * 20,
-                vx: (Math.random() - 0.5) * 6,
-                vy: -(Math.random() * 4 + 2),
-                life: 25 + Math.floor(Math.random() * 15),
+                vx: (Math.random() - 0.5) * 360, // 6 * 60
+                vy: -(Math.random() * 240 + 120), // 4+2 * 60
+                life: 0.4 + Math.random() * 0.25, // 25-40 frames
                 radius: 3 + Math.random() * 2,
                 color: Math.random() > 0.3 ? '#ffd700' : '#ffeb3b',
             });
@@ -203,14 +203,14 @@ export class EntityManager {
                 type: 'debris',
                 x: enemy.x,
                 y: enemy.y,
-                vx: (Math.random() - 0.5) * 6,
-                vy: -(Math.random() * 3 + 1),
-                life: 25 + Math.floor(Math.random() * 10),
+                vx: (Math.random() - 0.5) * 360, // 6 * 60
+                vy: -(Math.random() * 180 + 60), // 3+1 * 60
+                life: 0.4 + Math.random() * 0.15, // 25
                 size: 2 + Math.random() * 3,
                 color: debrisColor,
                 rotation: Math.random() * Math.PI * 2,
-                vRot: (Math.random() - 0.5) * 0.3,
-                gravity: 0.25,
+                vRot: (Math.random() - 0.5) * 18, // 0.3 * 60
+                gravity: 900, // 15 * 60 (approx 0.25 * 60 * 60)
             });
         }
     }
@@ -228,11 +228,11 @@ export class EntityManager {
     /**
      * Update all enemies and handle death/finish
      */
-    public updateEnemies(): void {
+    public updateEnemies(dt: number): void {
         for (let i = this.state.enemies.length - 1; i >= 0; i--) {
             const e = this.state.enemies[i];
-            e.move();
-            e.update();
+            e.move(dt);
+            e.update(dt);
 
             if (!e.isAlive()) {
                 this.handleEnemyDeath(e);
@@ -251,10 +251,10 @@ export class EntityManager {
     /**
      * Update all projectiles and cleanup dead ones
      */
-    public updateProjectiles(): void {
+    public updateProjectiles(dt: number): void {
         for (let i = this.state.projectiles.length - 1; i >= 0; i--) {
             const p = this.state.projectiles[i];
-            p.update(this.effects);
+            p.update(this.effects, dt);
             if (!p.alive) {
                 this.state.projectiles.splice(i, 1);
                 this.state.projectilePool.free(p);
@@ -265,7 +265,7 @@ export class EntityManager {
     // === Helper Methods ===
 
     private showFloatingText(text: string, x: number, y: number, color: string = '#fff'): void {
-        this.effects.add({ type: 'text', text, x, y, life: 60, color, vy: -1 });
+        this.effects.add({ type: 'text', text, x, y, life: 1.0, color, vy: -60 });
     }
 
     /**

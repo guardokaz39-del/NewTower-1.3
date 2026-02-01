@@ -55,12 +55,12 @@ export const CONFIG = {
     TOWER: {
         BASE_RANGE: 120,
         BASE_DMG: 5,
-        BASE_CD: 54, // Increased for balance (was 45)
-        BUILD_TIME: 60,
+        BASE_CD: 0.9, // 54 / 60 = 0.9 seconds
+        BUILD_TIME: 1.0, // 60 / 60 = 1.0 second
         MAX_CARDS: 3,
         BARREL_LENGTH: 22,
-        TURN_SPEED: 0.15, // Radians per frame (~8.5 degrees)
-        AIM_TOLERANCE: 0.1, // ~5 degrees error allowed to shoot
+        TURN_SPEED: 9.0, // 0.15 * 60 = 9.0 radians per second
+        AIM_TOLERANCE: 0.1,
     },
 
     TARGETING_MODES: {
@@ -75,7 +75,7 @@ export const CONFIG = {
         HP_BAR_WIDTH: 40,
         HP_BAR_HEIGHT: 4,
         HP_BAR_OFFSET: -30,
-        FLOATING_TEXT_LIFE: 60,
+        FLOATING_TEXT_LIFE: 1.0, // 1 second
     },
 
     CARD_TYPES: {
@@ -94,7 +94,7 @@ export const CONFIG = {
             name: 'Скелет',
             symbol: '💀',
             hpMod: 1.2,
-            speed: 1.5,
+            speed: 90, // 1.5 * 60 = 90
             reward: 4,
             color: '#e0e0e0',
             desc: 'Обычный скелет',
@@ -106,7 +106,7 @@ export const CONFIG = {
             name: 'Волк',
             symbol: '🐺',
             hpMod: 0.85,
-            speed: 2.8,
+            speed: 168, // 2.8 * 60 = 168
             reward: 2,
             color: '#795548',
             desc: 'Быстрый хищник',
@@ -118,7 +118,7 @@ export const CONFIG = {
             name: 'Тролль',
             symbol: '👹',
             hpMod: 3.65,
-            speed: 0.8,
+            speed: 48, // 0.8 * 60 = 48
             reward: 10,
             color: '#558b2f',
             desc: 'Тяжелый танк',
@@ -130,7 +130,7 @@ export const CONFIG = {
             name: 'Паучиха',
             symbol: '🕷️',
             hpMod: 25.0,
-            speed: 0.6,
+            speed: 36, // 0.6 * 60 = 36
             reward: 175,
             color: '#311b92',
             desc: 'Матка роя',
@@ -143,7 +143,7 @@ export const CONFIG = {
             name: 'Командир',
             symbol: '👑',
             hpMod: 2.5,
-            speed: 1.6,
+            speed: 96, // 1.6 * 60 = 96
             reward: 8,
             color: '#ffd700',
             desc: 'Лидер скелетов',
@@ -157,7 +157,7 @@ export const CONFIG = {
             name: 'Ядовитый',
             symbol: '🧪',
             hpMod: 1.4,
-            speed: 2.2,
+            speed: 132, // 2.2 * 60 = 132
             reward: 6,
             color: '#76ff03',
             desc: 'Ядовитый паук',
@@ -170,7 +170,7 @@ export const CONFIG = {
             name: 'Латник',
             symbol: '🛡️',
             hpMod: 7.0,
-            speed: 0.7,
+            speed: 42, // 0.7 * 60 = 42
             reward: 15,
             color: '#424242',
             desc: 'Бронированный тролль',

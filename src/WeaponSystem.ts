@@ -8,20 +8,20 @@ import { SoundManager, SoundPriority } from './SoundManager';
 
 export class WeaponSystem {
 
-    public update(towers: Tower[], enemies: Enemy[], projectiles: Projectile[], pool: ObjectPool<Projectile>, effects?: EffectSystem) {
+    public update(towers: Tower[], enemies: Enemy[], projectiles: Projectile[], pool: ObjectPool<Projectile>, dt: number, effects?: EffectSystem) {
         towers.forEach(tower => {
-            this.processTower(tower, enemies, projectiles, pool, effects);
+            this.processTower(tower, enemies, projectiles, pool, dt, effects);
         });
     }
 
-    private processTower(tower: Tower, enemies: Enemy[], projectiles: Projectile[], pool: ObjectPool<Projectile>, effects?: EffectSystem) {
+    private processTower(tower: Tower, enemies: Enemy[], projectiles: Projectile[], pool: ObjectPool<Projectile>, dt: number, effects?: EffectSystem) {
         if (tower.isBuilding) return;
         if (tower.cards.length === 0) return;
 
         // Handle overheat cooldown
         if (tower.isOverheated) {
             if (tower.overheatCooldown > 0) {
-                tower.overheatCooldown--;
+                tower.overheatCooldown -= dt;
             } else {
                 tower.isOverheated = false;
                 tower.spinupFrames = 0; // Reset spinup after overheat
@@ -30,7 +30,13 @@ export class WeaponSystem {
         }
 
         if (tower.cooldown > 0) {
-            tower.cooldown--;
+            tower.cooldown -= dt;
+        }
+
+        // Decrement recoil (simulating frames)
+        if (tower.recoilFrames > 0) {
+            tower.recoilFrames -= dt * 60;
+            if (tower.recoilFrames < 0) tower.recoilFrames = 0;
         }
 
         const stats = tower.getStats();
@@ -45,7 +51,7 @@ export class WeaponSystem {
             const desiredAngle = Math.atan2(dy, dx);
 
             // Apply semi-smooth rotation
-            tower.angle = this.rotateTowards(tower.angle, desiredAngle, CONFIG.TOWER.TURN_SPEED);
+            tower.angle = this.rotateTowards(tower.angle, desiredAngle, CONFIG.TOWER.TURN_SPEED * dt);
 
             // 3. Fire only if aimed close enough
             const angleDiff = Math.abs(this.getShortestAngleDifference(tower.angle, desiredAngle));
@@ -58,7 +64,7 @@ export class WeaponSystem {
                 // Increment spinup progress when firing
                 const spinupEffect = stats.effects.find(e => e.type === 'spinup');
                 if (spinupEffect) {
-                    tower.spinupFrames++;
+                    tower.spinupFrames += dt;
 
                     // Check for overheat
                     const maxSpinupSeconds = spinupEffect.maxSpinupSeconds || 7;
@@ -86,7 +92,7 @@ export class WeaponSystem {
                 // Max heat is dynamic (5s * 60 = 300 frames)
                 // Rate = 300 / 90 = 3.333
 
-                const coolRate = (tower.maxHeat || 300) / 90;
+                const coolRate = ((tower.maxHeat || 300) / 90) * dt;
                 tower.spinupFrames = Math.max(0, tower.spinupFrames - coolRate);
             }
             if (tower.isOverheated) {
@@ -171,23 +177,23 @@ export class WeaponSystem {
                 x: muzzleX,
                 y: muzzleY,
                 radius: 15,
-                life: 5,
+                life: 0.08,
             });
 
             // === SHELL CASING EFFECT ===
             // Eject shell perpendicular to fire angle
             const ejectAngle = tower.angle + Math.PI / 2 + (Math.random() - 0.5) * 0.5;
-            const ejectSpeed = 2 + Math.random() * 2;
+            const ejectSpeed = (2 + Math.random() * 2) * 60; // Convert to px/sec
             effects.add({
                 type: 'debris',
                 x: tower.x, // Eject from tower center/breech
                 y: tower.y,
                 vx: Math.cos(ejectAngle) * ejectSpeed,
                 vy: Math.sin(ejectAngle) * ejectSpeed,
-                gravity: 0.2, // Now valid for debris
+                gravity: 720, // 12 * 60 (Acceleration: px/sec^2)
                 rotation: Math.random() * Math.PI,
-                vRot: (Math.random() - 0.5) * 0.5,
-                life: 60,
+                vRot: (Math.random() - 0.5) * 30, // 0.5 * 60 (rad/sec)
+                life: 1.0, // 60 frames -> 1.0 second
                 color: '#ffd700', // Gold shell
                 size: 3,
             });

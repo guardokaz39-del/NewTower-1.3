@@ -69,7 +69,7 @@ describe('WaveManager', () => {
 
         // Simulate many frames
         for (let i = 0; i < 100; i++) {
-            waveManager.update();
+            waveManager.update(1);
         }
 
         // If there are enemies in CONFIG for wave 1, spawnEnemy should be called

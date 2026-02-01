@@ -23,7 +23,7 @@ export const FIRE_UPGRADES: Record<number, IUpgradeCard> = {
         visualOverrides: {
             projectileType: 'fire',
             projectileColor: '#f44336',
-            projectileSpeed: 6,
+            projectileSpeed: 360, // 6 * 60
         }
     },
     2: {

@@ -181,7 +181,7 @@ export class GameScene extends BaseScene implements IGameScene {
         this.gameController.handleKeyDown(e);
     };
 
-    public update() {
+    public update(dt: number) {
         if (!this.gameState.isRunning) return;
         if (this.gameState.paused) return;
 
@@ -201,12 +201,14 @@ export class GameScene extends BaseScene implements IGameScene {
         // Modulate speed: Night passes 50% faster, Day is normal
         const speedMultiplier = isNight ? 1.5 : 1.0;
 
+        // Update DayTime
+        // Warning: this relies on loops count. We should probably use dt.
+        // But for now keeping loops based 
         this.dayTime += 0.0005 * loops * speedMultiplier;
 
         // Update DayNightCycle system
-        const deltaTime = (1 / 60) * loops; // Approximate deltaTime
-        this.dayNightCycle.update(deltaTime);
-        this.atmosphere.update(deltaTime);
+        // Pass real dt (accumulated per loop if we loop, but here we pass dt * loops roughly?)
+        // Actually, if we loop 2 times with dt, we advance 2 * dt time. Correct.
 
         // Oscillate between 0.5 (Darkest evening) and 0.95 (Brightest day)
         // Math.sin goes -1 to 1. 
@@ -214,13 +216,18 @@ export class GameScene extends BaseScene implements IGameScene {
         const brightness = 0.75 + currentSin * 0.20;
         this.lighting.ambientLight = brightness;
 
+        // delta frames is NOT used anymore for logic, everything uses dt (seconds)
+        // const delta = dt * 60; 
+
         for (let l = 0; l < loops; l++) {
-            this.waveManager.update();
-            this.fog.update(0.016);
+            this.dayNightCycle.update(dt);
+            this.atmosphere.update(dt);
+            this.waveManager.update(dt);
+            this.fog.update(dt);
             // Lighting doesn't need explicit update logic for now, just render
 
             // Update projectiles
-            this.entityManager.updateProjectiles();
+            this.entityManager.updateProjectiles(dt);
 
             // Update weapon system (tower shooting)
             this.weaponSystem.update(
@@ -228,23 +235,17 @@ export class GameScene extends BaseScene implements IGameScene {
                 this.gameState.enemies,
                 this.gameState.projectiles,
                 this.gameState.projectilePool,
+                dt,
                 this.effects
             );
 
             // Update tower visual states
-            this.gameState.towers.forEach((t) => t.updateBuilding(this.effects));
+            this.gameState.towers.forEach((t) => t.updateBuilding(this.effects, dt));
 
-            // ИСПРАВЛЕНИЕ ШАГ 1: Дубликат weaponSystem.update() закомментирован
-            // Система оружия уже обновлена выше (строки 222-228)
-            // Раскомментировать эту строку для отката изменений:
-            // this.weaponSystem.update(this.gameState.towers, this.gameState.enemies, this.gameState.projectiles, this.gameState.projectilePool, this.effects);
             this.collision.update(this.gameState.projectiles, this.gameState.enemies);
-            this.entityManager.updateEnemies();
-            // ИСПРАВЛЕНИЕ ШАГ 2: Дубликат updateProjectiles() закомментирован
-            // Снаряды уже обновлены выше (строка 219)
-            // Раскомментировать эту строку для отката изменений:
-            // this.entityManager.updateProjectiles();
-            this.effects.update();
+            this.entityManager.updateEnemies(dt);
+
+            this.effects.update(dt);
 
             // Update enemy counter in HUD
             this.ui.hud.updateEnemyCounter(this.gameState.enemies.length);

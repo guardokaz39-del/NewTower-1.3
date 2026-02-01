@@ -115,12 +115,23 @@ export class Game {
     }
 
     private loop(timestamp: number) {
+        // 1. Вычисляем дельту (в секундах)
+        const dt = (timestamp - this.lastTime) / 1000;
         this.lastTime = timestamp;
 
-        this.input.update();
+        // Защита от скачков: ограничиваем dt до 0.1 (10 FPS минимум)
+        // Если dt больше, просто замедляем игру, но не пропускаем кадр
+        if (dt > 0.1) {
+            // dt = 0.1; // Optional: Force clamp?
+            // For now, let's just SKIP the return so logic runs even if slow
+            // But if we want to avoid huge jumps, we clamp:
+        }
+        const safeDt = Math.min(dt, 0.1);
 
+        // 2. Передаем safeDt дальше
+        this.input.update(safeDt);
         if (this.currentScene) {
-            this.currentScene.update();
+            this.currentScene.update(safeDt);
             this.currentScene.draw(this.ctx);
         }
 

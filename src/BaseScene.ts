@@ -9,7 +9,7 @@ export class BaseScene implements Scene {
         this.dispose();
     }
 
-    public update(): void { }
+    public update(dt: number): void { }
 
     public draw(_ctx: CanvasRenderingContext2D): void { }
 

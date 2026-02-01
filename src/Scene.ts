@@ -6,7 +6,7 @@ export interface Scene {
     onExit(): void;
 
     // Обновление логики (60 раз в сек)
-    update(): void;
+    update(dt: number): void;
 
     // Отрисовка
     draw(ctx: CanvasRenderingContext2D): void;

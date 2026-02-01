@@ -76,9 +76,9 @@ export class CollisionSystem {
                 type: 'particle',
                 x: target.x,
                 y: target.y,
-                vx: (Math.random() - 0.5) * (p.isCrit ? 8 : 4),
-                vy: (Math.random() - 0.5) * (p.isCrit ? 8 : 4),
-                life: p.isCrit ? 30 : 20,
+                vx: (Math.random() - 0.5) * (p.isCrit ? 480 : 240), // 8/4 * 60
+                vy: (Math.random() - 0.5) * (p.isCrit ? 480 : 240),
+                life: p.isCrit ? 0.5 : 0.35, // 30/20 frames
                 color: p.color, // Use projectile color (tower type)
                 radius: p.isCrit ? 4 : 2,
             });
@@ -91,7 +91,7 @@ export class CollisionSystem {
                 type: 'screen_flash',
                 x: 0,
                 y: 0,
-                life: 8,
+                life: 0.15,
                 flashColor: 'rgba(255, 255, 255, ',
             });
 
@@ -101,10 +101,10 @@ export class CollisionSystem {
                 text: 'CRIT!',
                 x: target.x,
                 y: target.y - 30,
-                life: 35,
+                life: 0.6,
                 color: '#ff0',
                 fontSize: 28,
-                vy: -2,
+                vy: -120,
             });
 
             // Enlarged damage number
@@ -113,10 +113,10 @@ export class CollisionSystem {
                 text: Math.floor(p.damage).toString(),
                 x: target.x + 15,
                 y: target.y - 10,
-                life: 30,
+                life: 0.5,
                 color: '#ffd700',
                 fontSize: 22,
-                vy: -1.5,
+                vy: -90,
             });
         }
         // === END CRIT EFFECTS ===
@@ -136,7 +136,7 @@ export class CollisionSystem {
                 x: target.x,
                 y: target.y,
                 radius: splash.splashRadius || splash.radius,
-                life: 15,
+                life: 0.25,
                 color: 'rgba(255, 100, 0, 0.5)',
             });
 
@@ -153,7 +153,9 @@ export class CollisionSystem {
         const slow = p.effects.find((ef) => ef.type === 'slow');
         if (slow) {
             const damageBonus = slow.damageToSlowed || 1.0;
-            target.applyStatus('slow', slow.slowDuration || slow.dur || 60, slow.slowPower || slow.power || 0.4, damageBonus);
+            // Default 60 frames -> 1.0 second. Assuming slow.dur/slowDuration are already converted in Card files, 
+            // but fallback must be 1.0, not 60.
+            target.applyStatus('slow', slow.slowDuration || slow.dur || 1.0, slow.slowPower || slow.power || 0.4, damageBonus);
         }
     }
 
@@ -172,7 +174,7 @@ export class CollisionSystem {
                 x: deathX,
                 y: deathY,
                 radius: killingProjectile.explosionRadius,
-                life: 20,
+                life: 0.35,
                 color: 'rgba(255, 69, 0, 0.8)',
             });
 
@@ -211,7 +213,7 @@ export class CollisionSystem {
                         const slowEffect = killingProjectile.effects.find((ef: any) => ef.type === 'slow');
                         if (slowEffect) {
                             const damageBonus = slowEffect.damageToSlowed || 1.0;
-                            neighbor.applyStatus('slow', slowEffect.slowDuration || slowEffect.dur || 60, slowEffect.slowPower || slowEffect.power || 0.4, damageBonus);
+                            neighbor.applyStatus('slow', slowEffect.slowDuration || slowEffect.dur || 1.0, slowEffect.slowPower || slowEffect.power || 0.4, damageBonus);
                         }
                     }
                 }

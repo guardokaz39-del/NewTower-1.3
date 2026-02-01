@@ -18,13 +18,13 @@ export const ICE_UPGRADES: Record<number, IUpgradeCard> = {
             {
                 type: 'slow',
                 slowPower: 0.30, // 30% slow
-                slowDuration: 180, // 3 seconds at 60 FPS
+                slowDuration: 3, // 180 / 60
             }
         ],
         visualOverrides: {
             projectileType: 'ice',
             projectileColor: '#00bcd4',
-            projectileSpeed: 10,
+            projectileSpeed: 600, // 10 * 60
         }
     },
     2: {
@@ -37,7 +37,7 @@ export const ICE_UPGRADES: Record<number, IUpgradeCard> = {
             {
                 type: 'slow',
                 slowPower: 0.45, // 45% slow
-                slowDuration: 270, // 4.5 seconds at 60 FPS
+                slowDuration: 4.5, // 270 / 60
                 damageToSlowed: 1.20, // +20% damage to slowed enemies
             }
         ]
@@ -52,7 +52,7 @@ export const ICE_UPGRADES: Record<number, IUpgradeCard> = {
             {
                 type: 'slow',
                 slowPower: 0.75, // 75% slow
-                slowDuration: 360, // 6 seconds at 60 FPS
+                slowDuration: 6, // 360 / 60
                 damageToSlowed: 1.40, // +40% damage to slowed enemies
             },
             {

@@ -48,19 +48,28 @@ export class EffectSystem {
         return this.effects;
     }
 
-    public update() {
+    public update(dt: number) {
         this.effects.forEach((e) => {
-            e.life--;
+            e.life -= dt;
 
             if (e.type === 'particle' || e.type === 'text' || e.type === 'debris') {
-                if (e.vx) e.x += e.vx;
-                if (e.vy) e.y += e.vy;
+                if (e.vx) e.x += e.vx * dt;
+                if (e.vy) e.y += e.vy * dt;
 
                 // Gravity for debris
+                // Gravity for debris
                 if (e.type === 'debris') {
-                    if (e.gravity) e.vy = (e.vy || 0) + e.gravity;
-                    if (e.vx) e.vx *= 0.98;
-                    if (e.rotation !== undefined && e.vRot) e.rotation += e.vRot;
+                    if (e.gravity) e.vy = (e.vy || 0) + e.gravity * dt;
+                    if (e.vx) {
+                        // Drag: 0.98 per frame approx means ~30% remaining after 1 sec
+                        // pow(0.3, dt) is a good approximation for framerate independent damping
+                        e.vx *= Math.pow(0.3, dt);
+                    }
+                    // Rotation
+                    if (e.rotation !== undefined && e.vRot) {
+                        // Assuming vRot is now passed in radians/sec
+                        e.rotation += e.vRot * dt;
+                    }
                 }
             }
         });

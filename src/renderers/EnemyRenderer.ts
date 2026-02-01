@@ -46,7 +46,7 @@ export class EnemyRenderer {
         ctx.scale(breatheScale, breatheScale);
 
         // 3. Movement arc (vertical bob)
-        const walkCycle = (Date.now() * 0.01) % (Math.PI * 2);
+        const walkCycle = (Date.now() * 0.005) % (Math.PI * 2);
         const verticalBob = Math.abs(Math.sin(walkCycle)) * 2;
         ctx.translate(0, -verticalBob);
 

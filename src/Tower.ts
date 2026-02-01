@@ -30,7 +30,7 @@ export class Tower {
 
     // Spinup state (for Minigun cards)
     public spinupFrames: number = 0;        // Frames spent firing continuously
-    public maxHeat: number = 300;           // Max frames before overheat (default 5s)
+    public maxHeat: number = 5;             // Max seconds before overheat (default 5s)
     public isOverheated: boolean = false;   // Whether tower is overheated
     public overheatCooldown: number = 0;    // Frames remaining in overheat lockout
 
@@ -57,7 +57,7 @@ export class Tower {
         let range = CONFIG.TOWER.BASE_RANGE;
         let damage = CONFIG.TOWER.BASE_DMG;
         let attackSpeed = CONFIG.TOWER.BASE_CD;
-        let speed = 8;
+        let speed = 480; // 8 * 60
         let color = VISUALS.PROJECTILES.STANDARD;
         let critChance = 0;
         let pierce = 0;
@@ -102,7 +102,7 @@ export class Tower {
             if (upgrade?.visualOverrides) {
                 projectileType = upgrade.visualOverrides.projectileType || 'standard';
                 color = upgrade.visualOverrides.projectileColor || VISUALS.PROJECTILES.STANDARD;
-                speed = upgrade.visualOverrides.projectileSpeed || 8;
+                speed = upgrade.visualOverrides.projectileSpeed || 480;
             } else if (mainCard.type.id === 'multi') {
                 // Fallback for multishot (no visual overrides needed, it modifies count)
                 projectileType = 'split';
@@ -136,7 +136,7 @@ export class Tower {
         // Find spinup effect and apply bonuses based on current spinupFrames
         const spinupEffect = allEffects.find(e => e.type === 'spinup');
         if (spinupEffect) {
-            const spinupSeconds = this.spinupFrames / 60; // Convert frames to seconds
+            const spinupSeconds = this.spinupFrames; // already in seconds
 
             // Apply damage bonus
             if (spinupEffect.spinupSteps) {
@@ -197,19 +197,20 @@ export class Tower {
         return card || null;
     }
 
-    updateBuilding(effects: EffectSystem) {
+    updateBuilding(effects: EffectSystem, dt: number) {
         if (this.isBuilding) {
-            this.buildProgress++;
+            this.buildProgress += dt;
 
-            // Spawn dust particles during construction (every 10 frames)
-            if (this.buildProgress % 10 === 0) {
+            // Spawn dust particles during construction (every ~0.15s)
+            // Using a hacky random check for now to avoid storing another timer
+            if (Math.random() < dt * 6) { // Approx 6 times per second
                 effects.add({
                     type: 'particle',
                     x: this.x + (Math.random() - 0.5) * 30,
                     y: this.y + 15,
-                    vx: (Math.random() - 0.5) * 2,
-                    vy: -Math.random() * 2,
-                    life: 20 + Math.random() * 10,
+                    vx: (Math.random() - 0.5) * 120, // ~2 px/frame -> 120 px/sec
+                    vy: -Math.random() * 120,
+                    life: 0.3 + Math.random() * 0.15, // ~20 frames -> 0.3s
                     color: '#a69060',
                     radius: 2 + Math.random() * 2
                 });
@@ -225,16 +226,16 @@ export class Tower {
                         type: 'particle',
                         x: this.x,
                         y: this.y,
-                        vx: Math.cos(angle) * 3,
-                        vy: Math.sin(angle) * 3 - 1,
-                        life: 25 + Math.random() * 10,
+                        vx: Math.cos(angle) * 180, // 3 px/frame -> 180 px/sec
+                        vy: Math.sin(angle) * 180 - 60, // gravity effect approximately
+                        life: 0.4 + Math.random() * 0.15,
                         color: '#c0a060',
                         radius: 3 + Math.random() * 2
                     });
                 }
 
                 // Flash effect
-                effects.add({ type: 'explosion', x: this.x, y: this.y, radius: 25, life: 15, color: '#ffd700' });
+                effects.add({ type: 'explosion', x: this.x, y: this.y, radius: 25, life: 0.25, color: '#ffd700' });
             }
         }
     }

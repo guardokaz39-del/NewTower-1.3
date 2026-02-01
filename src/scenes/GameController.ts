@@ -189,6 +189,6 @@ export class GameController {
     // === Helper Methods ===
 
     public showFloatingText(text: string, x: number, y: number, color: string = '#fff'): void {
-        this.effects.add({ type: 'text', text, x, y, life: 60, color, vy: -1 });
+        this.effects.add({ type: 'text', text, x, y, life: 1.0, color, vy: -60 });
     }
 }

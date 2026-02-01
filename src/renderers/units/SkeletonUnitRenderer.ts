@@ -14,8 +14,9 @@ export class SkeletonUnitRenderer implements UnitRenderer {
     private static readonly HEAD_RADIUS = 5.5;
 
     drawBody(ctx: CanvasRenderingContext2D, enemy: Enemy, scale: number, rotation: number): void {
-        const time = Date.now() * 0.005;
-        const walkCycle = time * (enemy.baseSpeed * 2);
+        const time = Date.now() * 0.001; // Use seconds
+        // baseSpeed is ~90 px/sec. 90 * 0.15 = 13.5 rad/sec (~2 steps/sec)
+        const walkCycle = time * (enemy.baseSpeed * 0.15);
         const isMoving = !enemy.finished && enemy.currentHealth > 0;
 
         let facing: 'DOWN' | 'UP' | 'SIDE' = 'SIDE';

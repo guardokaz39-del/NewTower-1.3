@@ -16,7 +16,7 @@ export class InputSystem {
     private holdTimer: number = 0;
     private holdStartCol: number = -1;
     private holdStartRow: number = -1;
-    private readonly HOLD_THRESHOLD: number = 12;
+    private readonly HOLD_THRESHOLD: number = 0.2; // 0.2 seconds (was 12 frames)
 
     constructor(game: Game) {
         this.game = game;
@@ -97,7 +97,7 @@ export class InputSystem {
         });
     }
 
-    public update() {
+    public update(dt: number) {
         const scene = this.game.currentScene;
 
         if (this.isMouseDown && scene instanceof GameScene) {
@@ -107,7 +107,7 @@ export class InputSystem {
                     this.hoverRow === this.holdStartRow &&
                     this.hoverCol !== -1
                 ) {
-                    this.holdTimer++;
+                    this.holdTimer += dt;
                     if (this.holdTimer >= this.HOLD_THRESHOLD) {
                         // Вызов строительства
                         scene.startBuildingTower(this.hoverCol, this.hoverRow);

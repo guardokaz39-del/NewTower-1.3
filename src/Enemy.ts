@@ -88,7 +88,7 @@ export class Enemy {
         if (this.currentHealth < 0) this.currentHealth = 0;
 
         // Visual Feedback: Hit Flash
-        this.hitFlashTimer = 5; // 5 frames ~ 80ms
+        this.hitFlashTimer = 0.08; // ~5 frames at 60fps
 
         // Track what killed this enemy
         if (!this.isAlive() && projectile) {
@@ -97,12 +97,12 @@ export class Enemy {
     }
 
     // ИСПРАВЛЕНИЕ: метод стал public
-    public move(): void {
+    public move(dt: number): void {
         let speedMod = 1;
         const slow = this.statuses.find((s) => s.type === 'slow');
         if (slow) speedMod -= slow.power;
 
-        const currentSpeed = Math.max(0, this.baseSpeed * speedMod);
+        const currentSpeed = Math.max(0, this.baseSpeed * speedMod * dt); // Apply delta time
 
         if (this.pathIndex >= this.path.length) {
             this.finished = true;
@@ -151,10 +151,10 @@ export class Enemy {
         }
     }
 
-    public update(): void {
+    public update(dt: number): void {
         // Update status durations
         this.statuses = this.statuses.filter((s) => {
-            s.duration--;
+            s.duration -= dt;
             return s.duration > 0;
         });
 
@@ -164,7 +164,7 @@ export class Enemy {
         }
 
         // Update flash timer
-        if (this.hitFlashTimer > 0) this.hitFlashTimer--;
+        if (this.hitFlashTimer > 0) this.hitFlashTimer -= dt;
     }
 
     public draw(ctx: CanvasRenderingContext2D) {
