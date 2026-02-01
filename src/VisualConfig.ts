@@ -6,20 +6,36 @@
 export const VISUALS = {
     ENVIRONMENT: {
         GRASS: {
-            // Dark Fantasy grass (чуть светлее для читаемости)
-            MAIN: '#3d5233',      // Темно-зеленый (был #3a4a2f - слишком темный)
-            VAR_1: '#4d6343',     // Вариация светлее
-            VAR_2: '#2d4223',     // Вариация темнее
-            BIOLUM: '#4dd0e1',    // Биолюминесценция (cyan) - акцент!
+            // Живая трава (средняя зелень) - ФАЗА 2: Обновлено
+            BASE: '#6b9e4a',         // Средне-зелёный (основа)
+            LIGHT: '#7ab55a',        // Светлая вариация
+            DARK: '#5a8839',         // Тёмная вариация (тени)
+            BLADE: '#8bc34a',        // Травинки (яркие)
+            DETAIL: '#757575',       // Камешки
+            FLOWER: '#ffeb3b',       // Мелкие цветочки
+
+            // Биолюминесценция (БЕЗ ИЗМЕНЕНИЙ - для Фазы 4)
+            BIOLUM: '#4dd0e1',       // Cyan bioluminescence
+
+            // LEGACY - для совместимости со старым кодом
+            MAIN: '#6b9e4a',         // = BASE (fallback)
+            VAR_1: '#7ab55a',        // = LIGHT (fallback)
+            VAR_2: '#5a8839',        // = DARK (fallback)
         },
         PATH: {
-            // Techno Path (окисленный металл - ОСВЕТЛЕН для лучшей видимости)
-            MAIN: '#5a5a62',      // Светлый металл (было #4a4a52 - слишком темный)
-            GRID: '#222',         // Швы между плитами
-            RIVET: '#6a6a70',     // Заклепки 
-            GLOW: '#00ffcc',      // Неоновая подсветка
-            BORDER: '#2a2a30',    // Darker border (almost black/grey) for flush look
-            DETAIL: '#a1887f',    // Legacy 
+            // Каменная дорога (ФАЗА 1: Обновлено)
+            STONE_BASE: '#c5b8a1',       // Светлый бежевый камень
+            STONE_LIGHT: '#d4c5a9',      // Светлая вариация
+            STONE_DARK: '#b6a890',       // Тёмная вариация
+            CRACK: '#8b7e6a',            // Трещины (тёмно-коричневый)
+            EDGE: '#9a8d7a',             // Края между плитами
+            MOSS: '#7a8f63',             // Мох (опционально)
+
+            // LEGACY - для совместимости со старым кодом
+            MAIN: '#c5b8a1',             // = STONE_BASE (fallback)
+            DETAIL: '#8b7e6a',           // = CRACK (fallback)
+            GRID: '#9a8d7a',             // = EDGE (fallback)
+            BORDER: '#9a8d7a',           // = EDGE (fallback)
         },
         DECOR: {
             TREE: {

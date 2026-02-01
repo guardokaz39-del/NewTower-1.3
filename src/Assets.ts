@@ -1,6 +1,8 @@
 import { CONFIG } from './Config';
 import { VISUALS } from './VisualConfig';
 import { ProceduralPatterns } from './ProceduralPatterns';
+import { ProceduralRoad } from './renderers/ProceduralRoad';
+import { ProceduralGrass } from './renderers/ProceduralGrass';
 
 export class Assets {
     // Хранилище изображений
@@ -22,23 +24,31 @@ export class Assets {
 
     // ГЛАВНЫЙ МЕТОД ЗАГРУЗКИ
     public static async loadAll(): Promise<void> {
-        console.log('Assets: Start loading...');
+        console.log('\n╔════════════════════════════════════════╗');
+        console.log('║   ASSETS: Начало загрузки ресурсов    ║');
+        console.log('╚════════════════════════════════════════╝\n');
 
         this.loadStats = { attempted: 0, loaded: 0, failed: 0, procedural: 0 };
 
         if (this.USE_EXTERNAL_ASSETS) {
+            console.log('[1/2] Попытка загрузить внешние PNG ассеты...');
             try {
                 await this.loadExternalAssets();
-                console.log(`Assets: External loading complete! Loaded: ${this.loadStats.loaded}, Failed: ${this.loadStats.failed}`);
+                console.log(`✓ Внешние PNG: загружено ${this.loadStats.loaded}, не найдено ${this.loadStats.failed}\n`);
             } catch (error) {
-                console.warn('Assets: External asset loading had errors, using fallbacks', error);
+                console.warn('⚠ Ошибки при загрузке PNG, используем процедурные', error);
             }
         }
 
         // Генерируем процедурные текстуры для недостающих ассетов
+        console.log('[2/2] Генерация процедурных текстур для недостающих ассетов...');
         this.generateFallbackTextures();
 
-        console.log(`Assets: Loading complete! Total: ${Object.keys(this.images).length} assets (${this.loadStats.loaded} PNG, ${this.loadStats.procedural} procedural)`);
+        console.log('\n╔════════════════════════════════════════╗');
+        console.log(`║   ИТОГО: ${Object.keys(this.images).length} ассетов загружено           ║`);
+        console.log(`║   PNG: ${this.loadStats.loaded} | Процедурных: ${this.loadStats.procedural}          ║`);
+        console.log('╚════════════════════════════════════════╝\n');
+
         return Promise.resolve();
     }
 
@@ -147,7 +157,8 @@ export class Assets {
         // === КРИТИЧНЫЕ АССЕТЫ (приоритет для PNG) ===
 
         // Tiles - окружение (поддерживают варианты для разнообразия)
-        loadTasks.push(this.loadImage('grass', 'tiles/grass.png', 5));  // до 5 вариантов
+        // ФАЗА 2: Отключено - используем только процедурную генерацию grass_0...grass_3
+        // loadTasks.push(this.loadImage('grass', 'tiles/grass.png', 5));  // до 5 вариантов
         loadTasks.push(this.loadImage('path', 'tiles/path.png', 3));
 
         // Fog tiles (0-15) - без вариантов, т.к. используются для битмаскинга
@@ -257,36 +268,13 @@ export class Assets {
     private static generateProceduralAsset(name: string): void {
         // Вызываем старую систему процедурной генерации
         if (name.startsWith('grass_')) {
-            // Phase 3: Layered grass generation - VARIANTS
+            // ФАЗА 2: Обновлено - простая зеленая трава (по запросу пользователя)
             const variantIdx = parseInt(name.split('_')[1]);
 
-            this.generateLayeredTexture(name, CONFIG.TILE_SIZE, {
-                // Layer 1: Solid base (Gradient caused banding grid effect - SEMI-FIXED)
-                base: (ctx, w, h) => {
-                    ctx.fillStyle = VISUALS.ENVIRONMENT.GRASS.MAIN;
-                    ctx.fillRect(0, 0, w, h);
-
-                    // Add very subtle noise instead of gradient
-                    for (let i = 0; i < 5; i++) {
-                        ctx.fillStyle = `rgba(0,0,0,${Math.random() * 0.05})`;
-                        ctx.fillRect(Math.random() * w, Math.random() * h, Math.random() * w / 2, Math.random() * h / 2);
-                    }
-                },
-                // Layer 2: Organic veins (Deterministic based on variant)
-                pattern: (ctx, w, h) => {
-                    ProceduralPatterns.organicVeins(ctx, w, h, 0.1, variantIdx * 100);
-                },
-                // Layer 3: Bioluminescent spots (Deterministic)
-                highlight: (ctx, w, h) => {
-                    ProceduralPatterns.biolumSpots(
-                        ctx,
-                        w,
-                        h,
-                        VISUALS.ENVIRONMENT.GRASS.BIOLUM,
-                        0.05, // Reduced from 25% to 5% for subtler effect
-                        42 + variantIdx * 50    // Детерминированный seed
-                    );
-                }
+            this.generateTexture(name, CONFIG.TILE_SIZE, (ctx, w, h) => {
+                // Просто зелёный квадрат БЕЗ деталей
+                ctx.fillStyle = '#6b9e4a'; // Средний зелёный
+                ctx.fillRect(0, 0, w, h);
             });
 
             // IMPORTANT: Register as variant for 'grass'
@@ -303,6 +291,7 @@ export class Assets {
             if (name === 'grass_0') {
                 this.images['grass'] = this.images[name];
             }
+
 
         } else if (name === 'path') {
             this.generateTexture('path', CONFIG.TILE_SIZE, (ctx, w, h) => {
@@ -350,23 +339,9 @@ export class Assets {
 
     // --- СТАРАЯ СИСТЕМА ПРОЦЕДУРНОЙ ГЕНЕРАЦИИ (оставляем для fallback) ---
     private static generateAllTextures() {
-        // Окружение - Phase 3: Layered grass (CORRECTED)
-        this.generateLayeredTexture('grass', CONFIG.TILE_SIZE, {
-            base: (ctx, w, h) => {
-                const gradient = ctx.createLinearGradient(0, 0, 0, h);
-                gradient.addColorStop(0, VISUALS.ENVIRONMENT.GRASS.VAR_1);
-                gradient.addColorStop(1, VISUALS.ENVIRONMENT.GRASS.MAIN);
-                ctx.fillStyle = gradient;
-                ctx.fillRect(0, 0, w, h);
-            },
-            pattern: (ctx, w, h) => {
-                ProceduralPatterns.organicVeins(ctx, w, h, 0.1); // Тоньше
-            },
-            highlight: (ctx, w, h) => {
-                ProceduralPatterns.biolumSpots(ctx, w, h, VISUALS.ENVIRONMENT.GRASS.BIOLUM, 0.25, 42); // Больше
-            }
-            // Perlin noise убран
-        });
+        // ФАЗА 2: Старая генерация 'grass' УДАЛЕНА
+        // Используем только современную систему grass_0...grass_3 (см. generateProceduralAsset)
+
 
         this.generateTexture('path', CONFIG.TILE_SIZE, (ctx, w, h) => {
             ctx.fillStyle = VISUALS.ENVIRONMENT.PATH.MAIN;
@@ -718,140 +693,27 @@ export class Assets {
     }
 
     /**
-     * Generate Path Tiles with Bitmasking (Phase 2 + Phase 4)
+     * Generate Path Tiles with Bitmasking
      * Creates 16 variants (0-15) for smooth path connections
-     * Phase 4: Adds techno texture (grid, rivets, neon glow)
+     * ФАЗА 1: Обновлено - использует ProceduralRoad для каменной текстуры
      */
     private static generatePathTiles() {
         const TS = CONFIG.TILE_SIZE;
 
+
+
         // Generate 16 bitmask variations (0-15)
         for (let i = 0; i < 16; i++) {
             this.generateTexture(`path_${i}`, TS, (ctx, w, h) => {
-                const NORTH = (i & 1) !== 0;
-                const WEST = (i & 2) !== 0;
-                const EAST = (i & 4) !== 0;
-                const SOUTH = (i & 8) !== 0;
-
-                ctx.clearRect(0, 0, w, h);
-
-                // Phase 4: Metallic gradient base (slightly darker gradient)
-                const gradient = ctx.createLinearGradient(0, 0, w, h);
-                gradient.addColorStop(0, VISUALS.ENVIRONMENT.PATH.MAIN); // #5a5a62
-                gradient.addColorStop(1, '#4a4a52'); // Darker shade
-                ctx.fillStyle = gradient;
-
-                // Dynamic dimensions (same as fog)
-                const cX = Math.floor(w / 4);
-                const cY = Math.floor(h / 4);
-                const cW = Math.floor(w / 2);
-                const cH = Math.floor(h / 2);
-                const arcRadius = Math.floor(cW / 2);
-
-                // Draw Center
-                ctx.fillRect(cX, cY, cW, cH);
-
-                // NORTH
-                if (NORTH) {
-                    ctx.fillRect(cX, 0, cW, cY);
-                } else {
-                    ctx.beginPath();
-                    ctx.arc(w / 2, cY, arcRadius, Math.PI, 0);
-                    ctx.fill();
+                // Использовать ProceduralRoad для каменной текстуры
+                try {
+                    ProceduralRoad.draw(ctx, 0, 0, i);
+                } catch (error) {
+                    console.error(`[Assets] ProceduralRoad.draw failed for path_${i}:`, error);
+                    // Fallback - простой камень
+                    ctx.fillStyle = VISUALS.ENVIRONMENT.PATH.STONE_BASE || '#c5b8a1';
+                    ctx.fillRect(0, 0, w, h);
                 }
-
-                // SOUTH
-                if (SOUTH) {
-                    ctx.fillRect(cX, cY + cH, cW, h - (cY + cH));
-                } else {
-                    ctx.beginPath();
-                    ctx.arc(w / 2, cY + cH, arcRadius, 0, Math.PI);
-                    ctx.fill();
-                }
-
-                // WEST
-                if (WEST) {
-                    ctx.fillRect(0, cY, cX, cH);
-                } else {
-                    ctx.beginPath();
-                    ctx.arc(cX, h / 2, arcRadius, Math.PI * 0.5, Math.PI * 1.5);
-                    ctx.fill();
-                }
-
-                // EAST
-                if (EAST) {
-                    ctx.fillRect(cX + cW, cY, w - (cX + cW), cH);
-                } else {
-                    ctx.beginPath();
-                    ctx.arc(cX + cW, h / 2, arcRadius, Math.PI * 1.5, Math.PI * 0.5);
-                    ctx.fill();
-                }
-
-                // Fill corners if both adjacent sides are connected
-                if (NORTH && WEST) ctx.fillRect(0, 0, cX, cY);
-                if (NORTH && EAST) ctx.fillRect(cX + cW, 0, w - (cX + cW), cY);
-                if (SOUTH && WEST) ctx.fillRect(0, cY + cH, cX, h - (cY + cH));
-                if (SOUTH && EAST) ctx.fillRect(cX + cW, cY + cH, w - (cX + cW), h - (cY + cH));
-
-                // === PHASE 4: TECHNO TEXTURE ===
-
-                // 1. Grid Lines (швы между плитами)
-                ctx.strokeStyle = VISUALS.ENVIRONMENT.PATH.GRID; // #222
-                ctx.lineWidth = 2;
-                ctx.beginPath();
-                // Vertical center line
-                ctx.moveTo(w / 2, 0);
-                ctx.lineTo(w / 2, h);
-                // Horizontal center line
-                ctx.moveTo(0, h / 2);
-                ctx.lineTo(w, h / 2);
-                ctx.stroke();
-
-                // 2. Rivets (reduced to corners/sparse)
-                ctx.fillStyle = VISUALS.ENVIRONMENT.PATH.RIVET;
-                const rivetSize = 1.5; // Slightly smaller
-                // Draw only near corners/intersections (2x2 grid, offset)
-                const rOffset = w / 4;
-                for (let rx = 1; rx <= 3; rx += 2) { // 1, 3 -> 2 rivets horizontally
-                    for (let ry = 1; ry <= 3; ry += 2) { // 1, 3 -> 2 rivets vertically
-                        const x = rx * rOffset;
-                        const y = ry * rOffset;
-                        ctx.beginPath();
-                        ctx.arc(x, y, rivetSize, 0, Math.PI * 2);
-                        ctx.fill();
-                    }
-                }
-
-                // 3. Neon Glow (toned down)
-                // Используем индекс битмаска как seed
-                const hasNeon = ((i * 73) % 100) < 20; // 20% вероятность
-                if (hasNeon) {
-                    ctx.save();
-                    ctx.shadowBlur = 4; // Decreased from 8
-                    ctx.shadowColor = VISUALS.ENVIRONMENT.PATH.GLOW;
-                    ctx.strokeStyle = VISUALS.ENVIRONMENT.PATH.GLOW;
-                    ctx.lineWidth = 1; // Thinner lines
-                    ctx.globalAlpha = 0.2; // Much more subtle (was 0.6)
-
-                    // Неоновая линия по центру (случайно горизонтальная или вертикальная)
-                    ctx.beginPath();
-                    if ((i * 137) % 2 === 0) {
-                        // Горизонтальная
-                        ctx.moveTo(cX, h / 2);
-                        ctx.lineTo(cX + cW, h / 2);
-                    } else {
-                        // Вертикальная
-                        ctx.moveTo(w / 2, cY);
-                        ctx.lineTo(w / 2, cY + cH);
-                    }
-                    ctx.stroke();
-                    ctx.restore();
-                }
-
-                // 4. Border for visibility (уже был, оставляем)
-                ctx.strokeStyle = VISUALS.ENVIRONMENT.PATH.BORDER; // #787880
-                ctx.lineWidth = 1;
-                ctx.stroke();
             });
         }
     }

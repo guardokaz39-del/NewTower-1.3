@@ -224,7 +224,8 @@ export class MapManager {
                 if (fallback) {
                     ctx.drawImage(fallback, x, y);
                 } else {
-                    ctx.fillStyle = '#ded29e';
+                    ctx.fillStyle = '#c5b8a1'; // ФАЗА 1: Каменный fallback
+
                     ctx.fillRect(x, y, CONFIG.TILE_SIZE, CONFIG.TILE_SIZE);
                 }
             }

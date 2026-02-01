@@ -289,31 +289,23 @@ export class GameScene extends BaseScene implements IGameScene {
         // Draw map and fog
         // Draw map and fog
         RendererFactory.drawMap(ctx, this.map);
+        // Torches
         this.map.drawTorches(ctx, this.gameState.frames); // [NEW] Draw torches with time
 
         // === PHASE 6: VIGNETTE (Cinematic Polish) ===
         // Draw a subtle dark gradient at the edges
-        const w = this.game.canvas.width;
-        const h = this.game.canvas.height;
-        // Use center of screen, not 0,0 (which is top left)
-        // Draw OVER everything except UI? No, map.draw is world.
-        // We want vignette over the map.
-
-        ctx.save();
-        // Reset transform to draw screen-space overlay (if map used translate)
-        // Wait, map.draw doesn't use global translate, but camera might? 
-        // Current implementation seems to draw map at screen coords.
-        // Let's assume identity transform is mostly preserved or we reset it.
-        // Actually, let's just draw it.
-
-        const gradient = ctx.createRadialGradient(w / 2, h / 2, h * 0.45, w / 2, h / 2, h * 0.9);
-        gradient.addColorStop(0, 'rgba(0,0,0,0)');
-        gradient.addColorStop(1, 'rgba(0,0,0,0.6)'); // Darker edges (0.6)
-
-        ctx.fillStyle = gradient;
-        ctx.fillRect(0, 0, w, h);
-        ctx.restore();
+        // const w = this.game.canvas.width;
+        // const h = this.game.canvas.height;
+        //
+        // ctx.save();
+        // const gradient = ctx.createRadialGradient(w / 2, h / 2, h * 0.45, w / 2, h / 2, h * 0.9);
+        // gradient.addColorStop(0, 'rgba(0,0,0,0)');
+        // gradient.addColorStop(1, 'rgba(0,0,0,0.6)');
+        // ctx.fillStyle = gradient;
+        // ctx.fillRect(0, 0, w, h);
+        // ctx.restore();
         // === END VIGNETTE ===
+
         this.fog.draw(ctx);
 
         // Draw path preview
@@ -338,52 +330,9 @@ export class GameScene extends BaseScene implements IGameScene {
         if (this.game.canvas.width !== this.lighting['width'] || this.game.canvas.height !== this.lighting['height']) {
             this.lighting.resize(this.game.canvas.width, this.game.canvas.height);
         }
-
         // Reset lights
         this.lighting.clear();
-
-        // Add dynamic lights
-        // 1. Projectiles
-        this.gameState.projectiles.forEach(p => {
-            // Use p.stats.color to determine light color?
-            // Simple mapping:
-            // Fire -> Red/Orange
-            // Ice -> Cyan
-            // Sniper -> Green
-            // Standard -> Yellow
-            let color = '#ffffff';
-            let radius = 30;
-            const type = p.projectileType || 'standard';
-
-            if (type === 'fire') { color = '#ff5722'; radius = 50; }
-            else if (type === 'ice') { color = '#00bcd4'; radius = 40; }
-            else if (type === 'sniper') { color = '#4caf50'; radius = 20; }
-            else if (type === 'minigun') { color = '#e040fb'; radius = 25; }
-            else { color = '#ffeb3b'; radius = 30; }
-
-            this.lighting.addLight(p.x, p.y, radius, color, 0.6);
-        });
-
-        // 2. Towers (Muzzle flash is effect, but maybe tower itself emits faint light?)
-        this.gameState.towers.forEach(t => {
-            // Minigun overheat glow
-            if (t.spinupFrames > 0) {
-                const intensity = Math.min(1, t.spinupFrames / (t.maxHeat || 420));
-                if (intensity > 0.3) {
-                    this.lighting.addLight(t.x, t.y, 40 * intensity, '#ff0000', intensity * 0.5);
-                }
-            }
-        });
-
-        // 3. Effects (Explosions)
-        this.effects.activeEffects.forEach(e => {
-            if (e.type === 'explosion') {
-                this.lighting.addLight(e.x, e.y, e.radius * 2, e.color || '#ff9800', 0.8);
-            } else if (e.type === 'muzzle_flash') {
-                this.lighting.addLight(e.x, e.y, e.radius * 3, '#ffff00', 0.9);
-            }
-        });
-
+        // Add dynamic lights...
         this.lighting.render(ctx);
 
         // Draw atmosphere effects (sunlight, moonlight, stars, etc)

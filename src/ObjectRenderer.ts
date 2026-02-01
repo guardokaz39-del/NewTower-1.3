@@ -1,5 +1,6 @@
 import { CONFIG } from './Config';
 import { VISUALS } from './VisualConfig';
+import { ProceduralGrass } from './renderers/ProceduralGrass';
 
 /**
  * ObjectRenderer - programmatic rendering for map objects
@@ -236,47 +237,64 @@ export class ObjectRenderer {
 
     /**
      * Draw flowering grass (1 tile) - grass colored with varied flowers
+     * ФАЗА 3: Обновлено - использует ProceduralGrass для фона
      */
     private static drawFlowers(ctx: CanvasRenderingContext2D, x: number, y: number, TS: number): void {
-        // Grass background (SAME as normal grass - no yellow!)
-        ctx.fillStyle = '#8bc34a';
-        ctx.fillRect(x, y, TS, TS);
+        // ШАГ 1: Использовать ProceduralGrass для фона
+        // ВАЖНО: Это создаёт идентичный фон с обычной травой
 
-        // Subtle grid like grass tiles
-        ctx.strokeStyle = 'rgba(0, 0, 0, 0.05)';
-        ctx.lineWidth = 1;
-        ctx.strokeRect(x, y, TS, TS);
-
-        // Deterministic seed for this tile
+        // Детерминированный seed для этого тайла
         const seed = x * 73 + y * 137;
 
-        // More flowers with varied sizes
-        const flowerColors = ['#e91e63', '#9c27b0', '#2196f3', '#ff9800', '#f44336', '#fff'];
-        const flowerCount = 10 + (seed % 8); // 10-17 flowers
+        // Рендерим живую траву как фон
+        try {
+            ProceduralGrass.draw(ctx, x, y, TS, seed);
+        } catch (error) {
+            console.error('[ObjectRenderer] ProceduralGrass.draw failed:', error);
+            // Fallback - простой градиент
+            const gradient = ctx.createLinearGradient(x, y, x, y + TS);
+            gradient.addColorStop(0, VISUALS.ENVIRONMENT.GRASS.LIGHT);
+            gradient.addColorStop(1, VISUALS.ENVIRONMENT.GRASS.BASE);
+            ctx.fillStyle = gradient;
+            ctx.fillRect(x, y, TS, TS);
+        }
+
+        // ШАГ 2: МНОГО мелких цветов поверх травы
+        const flowerCount = 20 + (seed % 11); // 20-30 (было 10-17)
+
+        // Расширенная палитра (7 цветов, добавлен жёлтый)
+        const flowerColors = [
+            '#e91e63', // Розовый
+            '#9c27b0', // Фиолетовый
+            '#2196f3', // Синий
+            '#ff9800', // Оранжевый
+            '#ffeb3b', // Жёлтый (НОВЫЙ)
+            '#f44336', // Красный
+            '#fff'     // Белый
+        ];
 
         for (let i = 0; i < flowerCount; i++) {
+            // Детерминированные позиции
             const fx = x + ((seed * 7 + i * 13) % TS);
             const fy = y + ((seed * 11 + i * 19) % TS);
+
+            // Размер: 1.0-1.8px (меньше чем было 1.5-3px)
+            const flowerSize = 1.0 + ((seed + i * 7) % 8) * 0.1; // 1.0-1.8px
+
+            // Цвет из палитры
             const colorIdx = (seed + i * 3) % flowerColors.length;
-            const flowerSize = 1.5 + ((seed + i * 7) % 10) * 0.15; // Varied sizes
 
-            // Flower petals (4-6 petals randomly)
-            const petalCount = 4 + ((seed + i) % 3);
+            // УПРОЩЁННАЯ ГЕОМЕТРИЯ: Простой кружок (вместо лепестков)
+            // Внешний круг (цвет)
             ctx.fillStyle = flowerColors[colorIdx];
-            for (let p = 0; p < petalCount; p++) {
-                const angle = (p / petalCount) * Math.PI * 2;
-                const petalDist = 2 + flowerSize;
-                const petalX = fx + Math.cos(angle) * petalDist;
-                const petalY = fy + Math.sin(angle) * petalDist;
-                ctx.beginPath();
-                ctx.arc(petalX, petalY, flowerSize, 0, Math.PI * 2);
-                ctx.fill();
-            }
-
-            // Center (varied color - yellow or white)
-            ctx.fillStyle = ((seed + i) % 2 === 0) ? '#ffd54f' : '#fff';
             ctx.beginPath();
-            ctx.arc(fx, fy, flowerSize * 0.8, 0, Math.PI * 2);
+            ctx.arc(fx, fy, flowerSize, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Внутренний блик (белый центр)
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
+            ctx.beginPath();
+            ctx.arc(fx, fy, flowerSize * 0.5, 0, Math.PI * 2);
             ctx.fill();
         }
     }
