@@ -32,6 +32,7 @@ import { GameController } from './GameController';
 import { GameState } from './GameState';
 import { EntityManager } from './EntityManager';
 import { RendererFactory } from '../RendererFactory';
+import { EnemyRenderer } from '../renderers/EnemyRenderer';
 
 /**
  * Main game scene - REFACTORED VERSION
@@ -341,7 +342,12 @@ export class GameScene extends BaseScene implements IGameScene {
         // Reset lights
         this.lighting.clear();
         // Add dynamic lights...
+        // Add dynamic lights...
         this.lighting.render(ctx);
+
+        // === EMISSIVE PASS (Glowing Eyes through Fog/Darkness) ===
+        // Draw this AFTER lighting so it "pops"
+        this.gameState.enemies.forEach((e) => EnemyRenderer.drawEmissive(ctx, e));
 
         // Draw atmosphere effects (sunlight, moonlight, stars, etc)
         this.atmosphere.draw(ctx);

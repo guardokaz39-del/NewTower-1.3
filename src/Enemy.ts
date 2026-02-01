@@ -170,4 +170,12 @@ export class Enemy {
     public draw(ctx: CanvasRenderingContext2D) {
         RendererFactory.drawEnemy(ctx, this);
     }
+
+    public drawSprite(ctx: CanvasRenderingContext2D) {
+        RendererFactory.drawEnemySprite(ctx, this);
+    }
+
+    public drawUI(ctx: CanvasRenderingContext2D) {
+        RendererFactory.drawEnemyUI(ctx, this);
+    }
 }

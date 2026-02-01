@@ -3,15 +3,19 @@ import { CONFIG, getEnemyType } from '../Config';
 import type { Enemy } from '../Enemy';
 import { UnitRenderer, DefaultUnitRenderer } from './units/UnitRenderer';
 import { SkeletonUnitRenderer } from './units/SkeletonUnitRenderer';
+import { HellhoundUnitRenderer } from './units/HellhoundUnitRenderer';
+import { OrcUnitRenderer } from './units/OrcUnitRenderer';
 
 export class EnemyRenderer {
     // Registry of specific renderers (Singleton/Stateless instances)
     private static defaultRenderer: UnitRenderer = new DefaultUnitRenderer();
     private static renderers: Record<string, UnitRenderer> = {
         'SKELETON': new SkeletonUnitRenderer(),
+        'HELLHOUND': new HellhoundUnitRenderer(),
+        'ORC': new OrcUnitRenderer(),
     };
 
-    static draw(ctx: CanvasRenderingContext2D, enemy: Enemy) {
+    static drawSprite(ctx: CanvasRenderingContext2D, enemy: Enemy) {
         const safeType = enemy.typeId ? enemy.typeId.toLowerCase() : 'grunt';
         const typeConf = getEnemyType(safeType.toUpperCase()) || getEnemyType('GRUNT');
 
@@ -37,7 +41,6 @@ export class EnemyRenderer {
             const dx = next.x * CONFIG.TILE_SIZE + CONFIG.TILE_SIZE / 2 - enemy.x;
             const dy = next.y * CONFIG.TILE_SIZE + CONFIG.TILE_SIZE / 2 - enemy.y;
             moveAngle = Math.atan2(dy, dx);
-            // ctx.rotate moved to individual renderers to support Upright perspective
         }
 
         // 2. Breathing (pulsation)
@@ -45,16 +48,7 @@ export class EnemyRenderer {
         const breatheScale = 1.0 + Math.sin(breathePhase) * 0.03;
         ctx.scale(breatheScale, breatheScale);
 
-        // 3. Movement arc (vertical bob) - DELEGATED to specific renderers to ensure sync with legs
-        // const walkCycle = (Date.now() * 0.005) % (Math.PI * 2);
-        // const verticalBob = Math.abs(Math.sin(walkCycle)) * 2;
-        // ctx.translate(0, -verticalBob);
-
         // -- VISUAL STACK --
-
-        // 0. RIM LIGHT
-        // Disabled per user request (white circle issue)
-        // EnemyRenderer.drawRimLight(ctx, tint || baseColor, scale);
 
         // 1. Shadow Layer
         EnemyRenderer.drawShadow(ctx, scale);
@@ -64,7 +58,6 @@ export class EnemyRenderer {
         try {
             renderer.drawBody(ctx, enemy, scale, moveAngle);
         } catch (e) {
-            // Fail-safe: fallback to default if custom renderer crashes
             console.error(`Renderer failed for ${archetype}`, e);
             EnemyRenderer.defaultRenderer.drawBody(ctx, enemy, scale, moveAngle);
         }
@@ -84,9 +77,24 @@ export class EnemyRenderer {
         // 3.5. Status Particles Layer
         EnemyRenderer.drawStatusEffects(ctx, enemy);
 
-        // 4. UI Layer (HP Bar)
-        EnemyRenderer.drawHealthBar(ctx, enemy, scale);
+        ctx.restore();
+    }
 
+    static drawUI(ctx: CanvasRenderingContext2D, enemy: Enemy) {
+        const safeType = enemy.typeId ? enemy.typeId.toLowerCase() : 'grunt';
+        const typeConf = getEnemyType(safeType.toUpperCase()) || getEnemyType('GRUNT');
+        const scale = typeConf?.scale || 1.0;
+
+        ctx.save();
+        ctx.translate(enemy.x, enemy.y);
+        // Breathing effect also affects UI position slightly if we scaled context, 
+        // but typically UI should maybe NOT oscillate?
+        // Original code DID oscillate UI because it was inside the breatheScale.
+        // Let's keep it simple and stable for UI, or replicate if strictly needed.
+        // User asked for "HP Bars bright and clear". Stability is better.
+        // I will NOT apply breatheScale to UI for better readability.
+
+        EnemyRenderer.drawHealthBar(ctx, enemy, scale);
         ctx.restore();
     }
 
@@ -156,6 +164,32 @@ export class EnemyRenderer {
 
             ctx.fillStyle = hpColor;
             ctx.fillRect(-barWidth / 2, barY, barWidth * hpPercent, barHeight);
+        }
+    }
+    static drawEmissive(ctx: CanvasRenderingContext2D, enemy: Enemy) {
+        const safeType = enemy.typeId ? enemy.typeId.toLowerCase() : 'grunt';
+        const typeConf = getEnemyType(safeType.toUpperCase()) || getEnemyType('GRUNT');
+        const scale = typeConf?.scale || 1.0;
+        const archetype = typeConf?.archetype || 'SKELETON';
+
+        const renderer = EnemyRenderer.renderers[archetype] || EnemyRenderer.defaultRenderer;
+        if (renderer.drawEmissive) {
+            ctx.save();
+            ctx.translate(enemy.x, enemy.y);
+
+            // Re-calculate moveAngle (Duplicate logic, but necessary for correct pose)
+            const path = enemy.path;
+            const pathIndex = enemy.pathIndex;
+            let moveAngle = 0;
+            if (path && pathIndex < path.length - 1) {
+                const next = path[pathIndex];
+                const dx = next.x * CONFIG.TILE_SIZE + CONFIG.TILE_SIZE / 2 - enemy.x;
+                const dy = next.y * CONFIG.TILE_SIZE + CONFIG.TILE_SIZE / 2 - enemy.y;
+                moveAngle = Math.atan2(dy, dx);
+            }
+
+            renderer.drawEmissive(ctx, enemy, scale, moveAngle);
+            ctx.restore();
         }
     }
 }

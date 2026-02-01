@@ -243,4 +243,12 @@ export class Tower {
     draw(ctx: CanvasRenderingContext2D) {
         RendererFactory.drawTower(ctx, this);
     }
+
+    drawSprite(ctx: CanvasRenderingContext2D) {
+        RendererFactory.drawTowerSprite(ctx, this);
+    }
+
+    drawUI(ctx: CanvasRenderingContext2D) {
+        RendererFactory.drawTowerUI(ctx, this);
+    }
 }

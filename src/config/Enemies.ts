@@ -20,27 +20,27 @@ export const ENEMY_TYPES: Record<string, IEnemyTypeConfig> = {
     },
     SCOUT: {
         id: 'scout',
-        name: 'Волк',
-        symbol: '🐺',
+        name: 'Адская Гончая',
+        symbol: '🐕',
         hpMod: 0.85,
         speed: 168, // 2.8 * 60 = 168
         reward: 2,
-        color: '#795548',
-        desc: 'Быстрый хищник',
-        archetype: 'WOLF',
-        scale: 0.9,
+        color: '#212121', // Dark fur color
+        desc: 'Быстрый хищник из преисподней',
+        archetype: 'HELLHOUND',
+        scale: 0.8,
     },
     TANK: {
         id: 'tank',
-        name: 'Тролль',
-        symbol: '👹',
+        name: 'Воевода Орков',
+        symbol: '👹', // Or maybe 🛡️? Sticking with ogre/oni usually works for Orcs, or use custom unicode if preferred.
         hpMod: 3.65,
-        speed: 48, // 0.8 * 60 = 48
+        speed: 68, // Decreased by ~20% from 48
         reward: 10,
         color: '#558b2f',
-        desc: 'Тяжелый танк',
-        archetype: 'TROLL',
-        scale: 1.2,
+        desc: 'Живой таран в тяжелой броне',
+        archetype: 'ORC',
+        scale: 1.3,
     },
     BOSS: {
         id: 'boss',

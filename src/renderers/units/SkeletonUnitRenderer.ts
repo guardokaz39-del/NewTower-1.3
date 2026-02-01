@@ -29,6 +29,11 @@ export class SkeletonUnitRenderer implements UnitRenderer {
 
         ctx.save();
 
+        // Hit Flash Effect
+        if (enemy.hitFlashTimer > 0) {
+            ctx.filter = 'brightness(1000%)';
+        }
+
         if (facing === 'SIDE') {
             // Flip for Left Facing
             if (Math.abs(rotation) > Math.PI / 2) {

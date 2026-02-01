@@ -17,6 +17,12 @@ export interface UnitRenderer {
      * @param rotation Rotation in radians (direction of movement)
      */
     drawBody(ctx: CanvasRenderingContext2D, enemy: Enemy, scale: number, rotation: number): void;
+
+    /**
+     * Optional: Draw glowing parts (eyes, runes) that should pierce through fog/darkness.
+     * Drawn in a separate pass after lighting.
+     */
+    drawEmissive?(ctx: CanvasRenderingContext2D, enemy: Enemy, scale: number, rotation: number): void;
 }
 
 /**

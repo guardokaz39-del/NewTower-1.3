@@ -35,12 +35,25 @@ export class FogRenderer {
     /**
      * Render fog structures
      */
-    public render(structures: FogStructure[], time: number): void {
+    /**
+     * Render fog structures with dual-layer noise and light masking
+     */
+    public render(structures: FogStructure[], time: number, lights: { x: number, y: number, radius: number }[] = []): void {
         const ctx = this.ctx;
-        ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+        const width = this.canvas.width;
+        const height = this.canvas.height;
 
+        // Clear canvas
+        ctx.clearRect(0, 0, width, height);
+
+        // 1. Draw Dual-Layer Fog
         for (const structure of structures) {
             this.renderStructure(structure, time);
+        }
+
+        // 2. Apply Light Masks (Cut holes)
+        if (lights.length > 0) {
+            this.applyLightMasks(lights);
         }
     }
 
@@ -51,73 +64,92 @@ export class FogRenderer {
         for (const tile of structure.tiles) {
             if (tile.density === 0) continue;
 
-            // Calculate drift offset using noise
-            const noiseX = this.noise.noise2D(
-                time * this.DRIFT_SPEED + structure.noiseOffsetX,
-                0
-            );
-            const noiseY = this.noise.noise2D(
-                0,
-                time * this.DRIFT_SPEED + structure.noiseOffsetY
-            );
+            const cx = tile.x * TS + TS / 2;
+            const cy = tile.y * TS + TS / 2;
+            const baseRadius = TS * 1.5; // Larger radius for volumetric feel
 
-            const driftX = noiseX * this.MAX_DRIFT;
-            const driftY = noiseY * this.MAX_DRIFT;
-
-            // Calculate rotation (subtle swirl effect)
-            const rotation = this.noise.noise2D(
-                time * this.ROTATION_SPEED + structure.noiseOffsetRot,
-                tile.x * this.NOISE_SCALE + tile.y * this.NOISE_SCALE
-            ) * this.MAX_ROTATION;
-
-            // Tile center with drift
-            const cx = tile.x * TS + TS / 2 + driftX;
-            const cy = tile.y * TS + TS / 2 + driftY;
-
-            // Calculate alpha based on density (1-5 -> 20%-100%)
-            const alpha = tile.density * this.BASE_ALPHA;
-
-            // Draw fog cloud with gradient
-            // Increased radius for better overlap and blending
-            const radius = TS * 1.1; // Increased from 0.85 to 1.1
+            // Base opacity based on density (0.2 to 1.0)
+            const densityAlpha = Math.min(tile.density * 0.2, 1.0);
 
             ctx.save();
             ctx.translate(cx, cy);
-            ctx.rotate(rotation);
-            ctx.translate(-cx, -cy);
 
-            // Outer gradient (soft edges, wider spread)
-            const gradient = ctx.createRadialGradient(
-                cx, cy, 0,
-                cx, cy, radius
-            );
+            // --- Layer 1: Base Fog (Slow, Heavy) ---
+            // Scale 1.0, Speed 0.5x
+            const drift1X = this.noise.noise2D(time * 0.0006 + structure.noiseOffsetX, 0) * (TS * 0.4);
+            const drift1Y = this.noise.noise2D(0, time * 0.0006 + structure.noiseOffsetY) * (TS * 0.4);
+            const rot1 = this.noise.noise2D(time * 0.0002, tile.x * 0.01) * 0.1;
 
-            gradient.addColorStop(0, `rgba(${this.FOG_COLOR.r}, ${this.FOG_COLOR.g}, ${this.FOG_COLOR.b}, ${alpha})`);
-            gradient.addColorStop(0.5, `rgba(${this.FOG_COLOR.r}, ${this.FOG_COLOR.g}, ${this.FOG_COLOR.b}, ${alpha * 0.8})`);
-            gradient.addColorStop(0.8, `rgba(${this.FOG_COLOR.r}, ${this.FOG_COLOR.g}, ${this.FOG_COLOR.b}, ${alpha * 0.4})`);
-            gradient.addColorStop(1, `rgba(${this.FOG_COLOR.r}, ${this.FOG_COLOR.g}, ${this.FOG_COLOR.b}, 0)`);
+            ctx.save();
+            ctx.translate(drift1X, drift1Y);
+            ctx.rotate(rot1);
 
-            ctx.fillStyle = gradient;
+            const grad1 = ctx.createRadialGradient(0, 0, 0, 0, 0, baseRadius);
+            grad1.addColorStop(0, `rgba(${this.FOG_COLOR.r}, ${this.FOG_COLOR.g}, ${this.FOG_COLOR.b}, ${densityAlpha * 0.6})`);
+            grad1.addColorStop(1, `rgba(${this.FOG_COLOR.r}, ${this.FOG_COLOR.g}, ${this.FOG_COLOR.b}, 0)`);
+
+            ctx.fillStyle = grad1;
             ctx.beginPath();
-            ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+            ctx.arc(0, 0, baseRadius, 0, Math.PI * 2);
             ctx.fill();
+            ctx.restore();
 
-            // Add detail layer for higher densities
-            if (tile.density >= 3) {
-                const detailNoise = this.noise.noise2D(
-                    cx * 0.02 + time * 0.0002,
-                    cy * 0.02
-                );
-                const detailAlpha = (detailNoise * 0.5 + 0.5) * alpha * 0.3;
+            // --- Layer 2: Mist (Fast, Light) ---
+            // Scale 0.5, Speed 1.5x, Opposite direction
+            const drift2X = this.noise.noise2D(time * 0.0018 + structure.noiseOffsetX + 100, 100) * (TS * 0.2) * -1;
+            const drift2Y = this.noise.noise2D(100, time * 0.0018 + structure.noiseOffsetY + 100) * (TS * 0.2) * -1;
+            // Higher frequency rotation
+            const rot2 = this.noise.noise2D(time * 0.0008, tile.y * 0.02) * 0.2;
 
-                ctx.fillStyle = `rgba(${this.FOG_COLOR.r - 20}, ${this.FOG_COLOR.g - 20}, ${this.FOG_COLOR.b - 20}, ${detailAlpha})`;
-                ctx.beginPath();
-                ctx.arc(cx, cy, radius * 0.6, 0, Math.PI * 2);
-                ctx.fill();
-            }
+            ctx.save();
+            ctx.translate(drift2X, drift2Y);
+            ctx.rotate(rot2);
+
+            // Smaller, more transparent mist patches
+            const mistRadius = baseRadius * 0.7;
+            const mistAlpha = densityAlpha * 0.3;
+
+            const grad2 = ctx.createRadialGradient(0, 0, 0, 0, 0, mistRadius);
+            grad2.addColorStop(0, `rgba(${this.FOG_COLOR.r + 20}, ${this.FOG_COLOR.g + 20}, ${this.FOG_COLOR.b + 20}, ${mistAlpha})`);
+            grad2.addColorStop(1, `rgba(${this.FOG_COLOR.r}, ${this.FOG_COLOR.g}, ${this.FOG_COLOR.b}, 0)`);
+
+            ctx.fillStyle = grad2;
+            ctx.beginPath();
+            ctx.arc(0, 0, mistRadius, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.restore();
 
             ctx.restore();
         }
+    }
+
+    private applyLightMasks(lights: { x: number, y: number, radius: number }[]): void {
+        const ctx = this.ctx;
+
+        ctx.save();
+        // Cut out holes in the fog
+        ctx.globalCompositeOperation = 'destination-out';
+
+        for (const light of lights) {
+            // Flicker effect: radius +/- 5%
+            const flicker = 0.95 + Math.random() * 0.1;
+            const r = light.radius * flicker;
+
+            // Soft cutout using gradient
+            const grad = ctx.createRadialGradient(light.x, light.y, 0, light.x, light.y, r);
+            // Inner: completely transparent (removed fog)
+            // Outer: fade to original fog
+            grad.addColorStop(0, 'rgba(0, 0, 0, 1)');
+            grad.addColorStop(0.5, 'rgba(0, 0, 0, 0.8)');
+            grad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+
+            ctx.fillStyle = grad;
+            ctx.beginPath();
+            ctx.arc(light.x, light.y, r, 0, Math.PI * 2);
+            ctx.fill();
+        }
+
+        ctx.restore();
     }
 
     /**

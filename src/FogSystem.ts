@@ -58,7 +58,10 @@ export class FogSystem {
     /**
      * Update fog animation
      */
-    public update(dt: number = 0.016): void {
+    /**
+     * Update fog animation
+     */
+    public update(dt: number = 0.016, lights: { x: number, y: number, radius: number }[] = []): void {
         // Rebuild structures if data changed
         if (this.dirty) {
             this.buildStructures();
@@ -68,7 +71,7 @@ export class FogSystem {
 
         // Render Sprite logic
         if (dt > 0 || this.time === 0) {
-            this.renderer.render(this.structures, this.time);
+            this.renderer.render(this.structures, this.time, lights);
         }
     }
 

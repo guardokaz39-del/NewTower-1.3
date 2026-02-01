@@ -4,25 +4,38 @@ import { VISUALS } from '../VisualConfig';
 import type { Tower } from '../Tower';
 
 export class TowerRenderer {
-    static draw(ctx: CanvasRenderingContext2D, tower: Tower) {
+    static drawSprite(ctx: CanvasRenderingContext2D, tower: Tower) {
         const size = CONFIG.TILE_SIZE;
         const drawX = tower.col * size;
         const drawY = tower.row * size;
 
         if (tower.isBuilding) {
-            TowerRenderer.drawBuildingState(ctx, tower, drawX, drawY, size);
+            TowerRenderer.drawBuildingSprite(ctx, tower, drawX, drawY, size);
         } else {
-            TowerRenderer.drawActiveState(ctx, tower, size);
-            // Draw Heat Haze (outside rotation context to rise UP)
-            if (tower.spinupTime > 0) {
-                // We need to confirm it's minigun, but drawActiveState encapsulates that logic mostly.
-                // Actually, drawActiveState draws the bar, let's look closer.
-                // Helper method call in drawActiveState is better.
+            TowerRenderer.drawActiveSprite(ctx, tower, size);
+        }
+    }
+
+    static drawUI(ctx: CanvasRenderingContext2D, tower: Tower) {
+        const size = CONFIG.TILE_SIZE;
+        const drawX = tower.col * size;
+        const drawY = tower.row * size;
+
+        if (tower.isBuilding) {
+            TowerRenderer.drawBuildingUI(ctx, tower, drawX, drawY, size);
+        } else {
+            // Overheat bar for Minigun
+            let turretName = 'turret_standard';
+            const mainCard = tower.cards[0];
+            if (mainCard && mainCard.type.id === 'minigun') turretName = 'turret_minigun';
+
+            if (turretName === 'turret_minigun' && tower.spinupTime > 0) {
+                TowerRenderer.drawOverheatBar(ctx, tower);
             }
         }
     }
 
-    private static drawBuildingState(ctx: CanvasRenderingContext2D, tower: Tower, drawX: number, drawY: number, size: number) {
+    private static drawBuildingSprite(ctx: CanvasRenderingContext2D, tower: Tower, drawX: number, drawY: number, size: number) {
         // Enhanced building animation - base emerges from below with opacity
         const pct = tower.buildProgress / tower.maxBuildProgress;
         const emergeOffset = (1 - pct) * 15; // Starts 15px below, rises to 0
@@ -61,8 +74,11 @@ export class TowerRenderer {
         ctx.arc(tower.x, tower.y, size * 0.35, 0, Math.PI * 2);
         ctx.stroke();
         ctx.restore();
+    }
 
+    private static drawBuildingUI(ctx: CanvasRenderingContext2D, tower: Tower, drawX: number, drawY: number, size: number) {
         // Progress bar
+        const pct = tower.buildProgress / tower.maxBuildProgress;
         const barWidth = size - 10;
         ctx.fillStyle = VISUALS.TOWER.BUILDING.BAR_BG;
         ctx.fillRect(drawX + 5, drawY + size - 10, barWidth, 5);
@@ -70,7 +86,7 @@ export class TowerRenderer {
         ctx.fillRect(drawX + 5, drawY + size - 10, barWidth * pct, 5);
     }
 
-    private static drawActiveState(ctx: CanvasRenderingContext2D, tower: Tower, size: number) {
+    private static drawActiveSprite(ctx: CanvasRenderingContext2D, tower: Tower, size: number) {
         // 1. Draw Base
         const halfSize = size / 2;
         const baseImg = Assets.get('base_default');
@@ -125,9 +141,8 @@ export class TowerRenderer {
             // Level-based visual effects (outside rotation context)
             TowerRenderer.drawLevelVisuals(ctx, tower, cardLevel, mainCard);
 
-            // 5. Minigun Overheat Bar & Heat Haze
+            // 5. Heat Haze for Minigun (Visual FX)
             if (turretName === 'turret_minigun' && tower.spinupTime > 0) {
-                TowerRenderer.drawOverheatBar(ctx, tower);
                 TowerRenderer.drawHeatHaze(ctx, tower);
             }
         }
