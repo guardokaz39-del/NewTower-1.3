@@ -1,18 +1,15 @@
 import { Enemy } from './Enemy';
 import { Projectile } from './Projectile';
 import { EffectSystem } from './EffectSystem';
-import { DebugSystem } from './DebugSystem';
 import { SoundManager, SoundPriority } from './SoundManager';
 import { SpatialGrid } from './SpatialGrid';
 
 export class CollisionSystem {
     private effects: EffectSystem;
-    private debug: DebugSystem;
     private enemyGrid: SpatialGrid<Enemy>;
 
-    constructor(effects: EffectSystem, debug: DebugSystem) {
+    constructor(effects: EffectSystem) {
         this.effects = effects;
-        this.debug = debug;
         // Initialize grid with screen dimensions, 128px cells
         this.enemyGrid = new SpatialGrid<Enemy>(window.innerWidth, window.innerHeight, 128);
     }

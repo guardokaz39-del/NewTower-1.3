@@ -8,7 +8,9 @@ import { CardSystem, ICard } from '../CardSystem';
 import { EventEmitter } from '../Events';
 import { InputSystem } from '../InputSystem';
 import { EffectSystem } from '../EffectSystem';
-import { DebugSystem } from '../DebugSystem';
+// import { DebugSystem } from '../DebugSystem';
+import { DevConsole } from '../ui/DevConsole';
+import { Logger, LogChannel } from '../utils/Logger';
 import { Tower } from '../Tower';
 import { SoundManager } from '../SoundManager';
 import { WaveManager } from '../WaveManager';
@@ -61,7 +63,7 @@ export class GameScene extends BaseScene implements IGameScene {
     public events: EventEmitter;
     public input: InputSystem;
     public effects: EffectSystem;
-    public debug: DebugSystem;
+    public devConsole: DevConsole;
     public forge: ForgeSystem;
     public collision: CollisionSystem;
     public inspector: InspectorSystem;
@@ -137,8 +139,10 @@ export class GameScene extends BaseScene implements IGameScene {
         this.ui = new UIManager(this);
         this.cardSys = new CardSystem(this, startingCards);
         this.forge = new ForgeSystem(this);
-        this.debug = new DebugSystem(this);
-        this.collision = new CollisionSystem(this.effects, this.debug);
+        this.devConsole = new DevConsole(this);
+        this.collision = new CollisionSystem(this.effects); // Debug removed
+
+        Logger.info(LogChannel.GAME, 'GameScene Initialized');
         this.inspector = new InspectorSystem(this);
         this.bestiary = new BestiarySystem(this);
 

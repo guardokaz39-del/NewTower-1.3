@@ -1,12 +1,15 @@
 import { Game } from './Game';
 import { getSavedMaps, deleteMapFromStorage } from './Utils';
 import { CONFIG } from './Config';
+import { CrashHandler } from './CrashHandler';
 
 // Expose utils to window for EditorScene
 (window as any).getSavedMaps = getSavedMaps;
 (window as any).deleteMapFromStorage = deleteMapFromStorage;
 
 window.addEventListener('DOMContentLoaded', () => {
+    new CrashHandler();
+
     const canvas = document.getElementById('game-canvas');
     if (!canvas) {
         console.error('❌ ОШИБКА: Canvas не найден!');
