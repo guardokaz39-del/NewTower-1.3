@@ -30,6 +30,10 @@ export class NotificationSystem {
         bus.on(Events.WAVE_COMPLETED, (wave: number) => {
             this.showWaveClear(wave);
         });
+
+        bus.on(Events.ENEMY_IMMUNE, (data: { x: number, y: number }) => {
+            this.showImmune(data.x, data.y);
+        });
     }
 
     /**
@@ -195,6 +199,19 @@ export class NotificationSystem {
             color: color,
             fontSize: 32,
             vy: -0.5
+        });
+    }
+
+    public showImmune(x: number, y: number) {
+        this.effects.add({
+            type: 'text',
+            text: 'IMMUNE',
+            x: x,
+            y: y - 20, // Slight offset up
+            life: 0.6,
+            color: '#ffd700', // Gold
+            fontSize: 16, // Smaller than boss text
+            vy: -50 // Float up fast
         });
     }
 }

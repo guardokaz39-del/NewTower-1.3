@@ -28,7 +28,7 @@ export interface IEnemyTypeConfig {
     color: string;
     desc: string;
     // Modular Visuals
-    archetype?: 'SKELETON' | 'WOLF' | 'TROLL' | 'SPIDER' | 'HELLHOUND' | 'ORC';
+    archetype?: 'SKELETON' | 'WOLF' | 'TROLL' | 'SPIDER' | 'HELLHOUND' | 'ORC' | 'WRAITH' | 'GOBLIN' | 'SKELETON_COMMANDER';
     scale?: number;
     props?: string[]; // IDs of props
     tint?: string;    // Hex color override

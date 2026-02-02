@@ -5,6 +5,11 @@ import { UnitRenderer, DefaultUnitRenderer } from './units/UnitRenderer';
 import { SkeletonUnitRenderer } from './units/SkeletonUnitRenderer';
 import { HellhoundUnitRenderer } from './units/HellhoundUnitRenderer';
 import { OrcUnitRenderer } from './units/OrcUnitRenderer';
+import { WraithUnitRenderer } from './units/WraithUnitRenderer';
+import { GoblinUnitRenderer } from './units/GoblinUnitRenderer';
+
+import { SpiderUnitRenderer } from './units/SpiderUnitRenderer';
+import { SkeletonCommanderUnitRenderer } from './units/SkeletonCommanderUnitRenderer';
 
 export class EnemyRenderer {
     // Registry of specific renderers (Singleton/Stateless instances)
@@ -13,6 +18,10 @@ export class EnemyRenderer {
         'SKELETON': new SkeletonUnitRenderer(),
         'HELLHOUND': new HellhoundUnitRenderer(),
         'ORC': new OrcUnitRenderer(),
+        'WRAITH': new WraithUnitRenderer(),
+        'GOBLIN': new GoblinUnitRenderer(),
+        'SPIDER': new SpiderUnitRenderer(),
+        'SKELETON_COMMANDER': new SkeletonCommanderUnitRenderer(),
     };
 
     static drawSprite(ctx: CanvasRenderingContext2D, enemy: Enemy) {
@@ -159,8 +168,14 @@ export class EnemyRenderer {
             // Health bar
             const hpPercent = enemy.currentHealth / enemy.maxHealth;
             let hpColor = '#4caf50'; // green
-            if (hpPercent < 0.3) hpColor = '#f44336'; // red
-            else if (hpPercent < 0.6) hpColor = '#ff9800'; // orange
+
+            if (enemy.isInvulnerable) {
+                hpColor = '#ffd700'; // Gold if immune
+            } else if (hpPercent < 0.3) {
+                hpColor = '#f44336'; // red
+            } else if (hpPercent < 0.6) {
+                hpColor = '#ff9800'; // orange
+            }
 
             ctx.fillStyle = hpColor;
             ctx.fillRect(-barWidth / 2, barY, barWidth * hpPercent, barHeight);

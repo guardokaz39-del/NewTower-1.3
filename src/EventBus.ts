@@ -84,4 +84,7 @@ export const Events = {
 
     // UI
     TOGGLE_PAUSE: 'TOGGLE_PAUSE',   // data: boolean (isPaused)
+    ENEMY_IMMUNE: 'ENEMY_IMMUNE',   // data: { x: number, y: number }
+    ENEMY_DIED: 'ENEMY_DIED',       // data: { enemy: Enemy }
+    SPAWN_PUDDLE: 'SPAWN_PUDDLE',   // data: { x: number, y: number }
 };

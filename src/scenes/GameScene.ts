@@ -33,6 +33,8 @@ import { GameState } from './GameState';
 import { EntityManager } from './EntityManager';
 import { RendererFactory } from '../RendererFactory';
 import { EnemyRenderer } from '../renderers/EnemyRenderer';
+import { AcidPuddleSystem } from '../systems/AcidPuddleSystem';
+import { SkeletonCommanderSystem } from '../systems/SkeletonCommanderSystem';
 
 /**
  * Main game scene - REFACTORED VERSION
@@ -76,6 +78,8 @@ export class GameScene extends BaseScene implements IGameScene {
     public notifications: NotificationSystem;
     private dayNightCycle!: DayNightCycle;
     private atmosphere!: AtmosphereSystem;
+    public acidSystem: AcidPuddleSystem;
+    public commanderSystem: SkeletonCommanderSystem;
 
     // IGameScene compatibility properties (delegate to gameState)
     public get wave(): number { return this.gameState.wave; }
@@ -125,7 +129,10 @@ export class GameScene extends BaseScene implements IGameScene {
         this.weaponSystem = new WeaponSystem();
         this.metrics = new MetricsSystem();
         this.notifications = new NotificationSystem(this.effects, game.canvas);
+
         this.waveManager = new WaveManager(this);
+        this.acidSystem = new AcidPuddleSystem(game.ctx);
+        this.commanderSystem = new SkeletonCommanderSystem(game.ctx);
 
         // Initialize entity manager
         this.entityManager = new EntityManager(
@@ -247,6 +254,8 @@ export class GameScene extends BaseScene implements IGameScene {
 
             this.collision.update(this.projectileSystem.projectiles, this.gameState.enemies);
             this.entityManager.updateEnemies(dt);
+            this.acidSystem.update(dt, this.gameState.enemies);
+            this.commanderSystem.update(dt, this.gameState.enemies);
 
             this.effects.update(dt);
 
@@ -344,6 +353,10 @@ export class GameScene extends BaseScene implements IGameScene {
         // Add dynamic lights...
         // Add dynamic lights...
         this.lighting.render(ctx);
+
+        // Draw Acid Puddles (Under enemies and lights ideally, but over map)
+        this.acidSystem.draw();
+        this.commanderSystem.draw();
 
         // === EMISSIVE PASS (Glowing Eyes through Fog/Darkness) ===
         // Draw this AFTER lighting so it "pops"

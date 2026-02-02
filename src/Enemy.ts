@@ -1,4 +1,5 @@
 import { CONFIG, getEnemyType } from './Config';
+import { EventBus, Events } from './EventBus';
 import { RendererFactory } from './RendererFactory';
 import { Assets } from './Assets';
 import { Projectile } from './Projectile';
@@ -42,6 +43,12 @@ export class Enemy {
     public killedByProjectile: Projectile | null = null;   // Track what projectile killed this enemy
     public hitFlashTimer: number = 0;        // Timer for white flash on hit
 
+    // === BOSS MECHANICS (Spectral Shift) ===
+    public isInvulnerable: boolean = false;
+    private shieldTimer: number = 0;
+    // Thresholds: [HP Percent, Duration in Seconds]
+    private thresholds: { p: number, d: number, used: boolean }[] = [];
+
     constructor(config?: IEnemyConfig) {
         if (config) {
             this.init(config);
@@ -78,22 +85,65 @@ export class Enemy {
 
     public setType(id: string) {
         this.typeId = id;
+
+        // Initialize Boss Mechanics if this is a boss
+        if (id.toLowerCase() === 'boss') {
+            this.thresholds = [
+                { p: 0.8, d: 3.0, used: false },
+                { p: 0.5, d: 5.0, used: false },
+                { p: 0.2, d: 8.0, used: false }
+            ];
+        } else {
+            this.thresholds = [];
+        }
     }
 
     public takeDamage(amount: number, projectile?: Projectile): void {
+        if (this.isInvulnerable) {
+            // Visual Effect "BLOCKED"
+            EventBus.getInstance().emit(Events.ENEMY_IMMUNE, { x: this.x, y: this.y });
+            return;
+        }
+
+        const prevHpPercent = this.currentHealth / this.maxHealth;
+
         // Apply damage modifier (from slow effects, etc.)
         const modifiedAmount = amount * this.damageModifier;
         const actualDamage = Math.max(1, modifiedAmount - this.armor);
         this.currentHealth -= actualDamage;
         if (this.currentHealth < 0) this.currentHealth = 0;
 
+        const currentHpPercent = this.currentHealth / this.maxHealth;
+
+        // Check Thresholds
+        // Only bosses typically have this, but it doesn't hurt to have the logic generic
+        // or check if thresholds exist (they are initialized).
+        for (const t of this.thresholds) {
+            if (!t.used && currentHpPercent <= t.p && prevHpPercent > t.p) {
+                this.activateShield(t.d);
+                t.used = true;
+                break; // Activate one threshold at a time
+            }
+        }
+
         // Visual Feedback: Hit Flash
         this.hitFlashTimer = 0.08; // ~5 frames at 60fps
 
         // Track what killed this enemy
-        if (!this.isAlive() && projectile) {
-            this.killedByProjectile = projectile;
+        if (!this.isAlive()) {
+            if (projectile) {
+                this.killedByProjectile = projectile;
+            }
+            EventBus.getInstance().emit(Events.ENEMY_DIED, { enemy: this });
         }
+    }
+
+    private activateShield(duration: number) {
+        this.isInvulnerable = true;
+        this.shieldTimer = duration;
+        // Float text handled by event listener or renderer (if we want persistency)
+        // But for "IMMUNE!" popup, we can emit event
+        EventBus.getInstance().emit(Events.ENEMY_IMMUNE, { x: this.x, y: this.y - 40 });
     }
 
     // ИСПРАВЛЕНИЕ: метод стал public
@@ -165,6 +215,14 @@ export class Enemy {
 
         // Update flash timer
         if (this.hitFlashTimer > 0) this.hitFlashTimer -= dt;
+
+        // Update Shield
+        if (this.isInvulnerable) {
+            this.shieldTimer -= dt;
+            if (this.shieldTimer <= 0) {
+                this.isInvulnerable = false;
+            }
+        }
     }
 
     public draw(ctx: CanvasRenderingContext2D) {

@@ -28,7 +28,7 @@ export const ENEMY_TYPES: Record<string, IEnemyTypeConfig> = {
         color: '#212121', // Dark fur color
         desc: 'Быстрый хищник из преисподней',
         archetype: 'HELLHOUND',
-        scale: 0.8,
+        scale: 0.9,
     },
     TANK: {
         id: 'tank',
@@ -44,29 +44,28 @@ export const ENEMY_TYPES: Record<string, IEnemyTypeConfig> = {
     },
     BOSS: {
         id: 'boss',
-        name: 'Паучиха',
-        symbol: '🕷️',
-        hpMod: 25.0,
-        speed: 36, // 0.6 * 60 = 36
-        reward: 175,
-        color: '#311b92',
-        desc: 'Матка роя',
-        archetype: 'SPIDER',
-        scale: 1.8,
+        name: 'Призрак Пустоты',
+        symbol: '👻',
+        hpMod: 30.0,
+        speed: 40,
+        reward: 300,
+        color: '#1a0b2e',
+        desc: 'Неуязвимая сущность',
+        archetype: 'WRAITH',
+        scale: 1.2,
     },
     // --- NEW VARIANTS ---
     SKELETON_COMMANDER: {
         id: 'skeleton_commander',
-        name: 'Командир',
+        name: 'Командир Скелетов',
         symbol: '👑',
-        hpMod: 2.5,
-        speed: 96, // 1.6 * 60 = 96
-        reward: 8,
+        hpMod: 3.0,
+        speed: 72, // Heavy (1.2 * 60)
+        reward: 12,
         color: '#ffd700',
-        desc: 'Лидер скелетов',
-        archetype: 'SKELETON',
-        scale: 1.2,
-        props: ['prop_helmet', 'prop_weapon'],
+        desc: 'Становится сильнее от смертей союзников',
+        archetype: 'SKELETON_COMMANDER',
+        scale: 1.3,
         tint: '#ffd700'
     },
     SPIDER_POISON: {
@@ -77,9 +76,9 @@ export const ENEMY_TYPES: Record<string, IEnemyTypeConfig> = {
         speed: 132, // 2.2 * 60 = 132
         reward: 6,
         color: '#76ff03',
-        desc: 'Ядовитый паук',
+        desc: 'Оставляет лечащую лужу после смерти',
         archetype: 'SPIDER',
-        scale: 0.7,
+        scale: 1.15,
         tint: '#76ff03'
     },
     TROLL_ARMORED: {
@@ -95,5 +94,17 @@ export const ENEMY_TYPES: Record<string, IEnemyTypeConfig> = {
         scale: 1.3,
         props: ['prop_shield'],
         tint: '#616161'
+    },
+    GOBLIN: {
+        id: 'goblin',
+        name: 'Гоблин',
+        symbol: '👺',
+        hpMod: 0.8,
+        speed: 76, // 15% slower than Skeleton (90 * 0.85)
+        reward: 3,
+        color: '#689f38', // Detailed Olive
+        desc: 'Жадный мародер с мешком',
+        archetype: 'GOBLIN',
+        scale: 1.35, // 40% larger than 0.95
     }
 };
