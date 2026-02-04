@@ -11,6 +11,8 @@ import { GoblinUnitRenderer } from './units/GoblinUnitRenderer';
 import { SpiderUnitRenderer } from './units/SpiderUnitRenderer';
 import { SkeletonCommanderUnitRenderer } from './units/SkeletonCommanderUnitRenderer';
 
+import { TrollUnitRenderer } from './units/TrollUnitRenderer';
+
 export class EnemyRenderer {
     // Registry of specific renderers (Singleton/Stateless instances)
     private static defaultRenderer: UnitRenderer = new DefaultUnitRenderer();
@@ -22,6 +24,7 @@ export class EnemyRenderer {
         'GOBLIN': new GoblinUnitRenderer(),
         'SPIDER': new SpiderUnitRenderer(),
         'SKELETON_COMMANDER': new SkeletonCommanderUnitRenderer(),
+        'TROLL': new TrollUnitRenderer(),
     };
 
     static drawSprite(ctx: CanvasRenderingContext2D, enemy: Enemy) {

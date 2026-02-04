@@ -88,12 +88,11 @@ export const ENEMY_TYPES: Record<string, IEnemyTypeConfig> = {
         hpMod: 7.0,
         speed: 42, // 0.7 * 60 = 42
         reward: 15,
-        color: '#424242',
-        desc: 'Бронированный тролль',
+        color: '#eceff1', // Snow White
+        desc: 'Снежный тролль с тяжелой дубиной',
         archetype: 'TROLL',
         scale: 1.3,
-        props: ['prop_shield'],
-        tint: '#616161'
+        tint: '#cfd8dc'
     },
     GOBLIN: {
         id: 'goblin',
