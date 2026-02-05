@@ -109,15 +109,28 @@ export class WeaponSystem {
 
         if (inRange.length === 0) return null;
 
+        // PRIORITY CHECK: Filter for highest priority enemies (like Magma Statues)
+        // If there are enemies with priority > 0, we IGNORE all others and only target them.
+        let maxPriority = 0;
+        for (const e of inRange) {
+            if (e.threatPriority > maxPriority) maxPriority = e.threatPriority;
+        }
+
+        // If high priority enemies exist, reduce the pool to ONLY them
+        // This ensures the tower is "taunted" by the decoy
+        const targetPool = maxPriority > 0
+            ? inRange.filter(e => e.threatPriority === maxPriority)
+            : inRange;
+
         // Apply targeting strategy based on tower's mode
         switch (tower.targetingMode) {
             case 'first':
                 // Enemy closest to end of path (highest pathIndex)
-                return inRange.reduce((a, b) => a.pathIndex > b.pathIndex ? a : b);
+                return targetPool.reduce((a, b) => a.pathIndex > b.pathIndex ? a : b);
 
             case 'closest':
                 // Enemy nearest to tower
-                return inRange.reduce((a, b) => {
+                return targetPool.reduce((a, b) => {
                     const distA = Math.hypot(a.x - tower.x, a.y - tower.y);
                     const distB = Math.hypot(b.x - tower.x, b.y - tower.y);
                     return distA < distB ? a : b;
@@ -125,19 +138,19 @@ export class WeaponSystem {
 
             case 'strongest':
                 // Enemy with highest max health
-                return inRange.reduce((a, b) => a.maxHealth > b.maxHealth ? a : b);
+                return targetPool.reduce((a, b) => a.maxHealth > b.maxHealth ? a : b);
 
             case 'weakest':
                 // Enemy with lowest current health
-                return inRange.reduce((a, b) => a.currentHealth < b.currentHealth ? a : b);
+                return targetPool.reduce((a, b) => a.currentHealth < b.currentHealth ? a : b);
 
             case 'last':
                 // Enemy furthest from end (lowest pathIndex)
-                return inRange.reduce((a, b) => a.pathIndex < b.pathIndex ? a : b);
+                return targetPool.reduce((a, b) => a.pathIndex < b.pathIndex ? a : b);
 
             default:
                 // Default to first available
-                return inRange[0];
+                return targetPool[0];
         }
     }
 

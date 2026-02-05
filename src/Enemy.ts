@@ -46,6 +46,11 @@ export class Enemy {
     // === BOSS MECHANICS (Spectral Shift) ===
     public isInvulnerable: boolean = false;
     private shieldTimer: number = 0;
+
+    // Magma King Mechanics
+    public threatPriority: number = 0; // Higher = focused by towers first
+    public spawnThresholds: number[] = []; // HP percentages to trigger spawn (0.75, 0.5, 0.25)
+
     // Thresholds: [HP Percent, Duration in Seconds]
     private thresholds: { p: number, d: number, used: boolean }[] = [];
 
@@ -70,6 +75,11 @@ export class Enemy {
 
         this.damageModifier = 1.0;
         this.killedByProjectile = null;
+
+        // Reset specific fields
+        this.threatPriority = 0;
+        this.spawnThresholds = [];
+        this.thresholds = [];
     }
 
     public reset() {
@@ -81,6 +91,9 @@ export class Enemy {
         this.killedByProjectile = null;
         this.x = -1000; // Move offscreen
         this.y = -1000;
+        this.threatPriority = 0;
+        this.spawnThresholds = [];
+        this.thresholds = [];
     }
 
     public setType(id: string) {
@@ -93,8 +106,13 @@ export class Enemy {
                 { p: 0.5, d: 5.0, used: false },
                 { p: 0.2, d: 8.0, used: false }
             ];
+        } else if (id === 'magma_king') {
+            this.spawnThresholds = [0.75, 0.5, 0.25];
+        } else if (id === 'magma_statue') {
+            this.threatPriority = 999; // Maximum priority
         } else {
             this.thresholds = [];
+            this.spawnThresholds = [];
         }
     }
 
@@ -115,14 +133,22 @@ export class Enemy {
 
         const currentHpPercent = this.currentHealth / this.maxHealth;
 
-        // Check Thresholds
-        // Only bosses typically have this, but it doesn't hurt to have the logic generic
-        // or check if thresholds exist (they are initialized).
+        // Check Thresholds (Invulnerable Shield Boss)
         for (const t of this.thresholds) {
             if (!t.used && currentHpPercent <= t.p && prevHpPercent > t.p) {
                 this.activateShield(t.d);
                 t.used = true;
                 break; // Activate one threshold at a time
+            }
+        }
+
+        // Check Spawn Thresholds (Magma King)
+        for (let i = this.spawnThresholds.length - 1; i >= 0; i--) {
+            const threshold = this.spawnThresholds[i];
+            if (currentHpPercent <= threshold && prevHpPercent > threshold) {
+                // Trigger Split Event
+                EventBus.getInstance().emit('ENEMY_SPLIT', { enemy: this, threshold });
+                this.spawnThresholds.splice(i, 1); // Remove used threshold
             }
         }
 

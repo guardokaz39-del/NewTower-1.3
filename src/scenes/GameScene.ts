@@ -6,6 +6,7 @@ import { UIManager } from '../UIManager';
 import { CONFIG } from '../Config';
 import { CardSystem, ICard } from '../CardSystem';
 import { EventEmitter } from '../Events';
+import { EventBus, Events } from '../EventBus';
 import { InputSystem } from '../InputSystem';
 import { EffectSystem } from '../EffectSystem';
 // import { DebugSystem } from '../DebugSystem';
@@ -27,6 +28,7 @@ import { NotificationSystem } from '../systems/NotificationSystem';
 import { DayNightCycle } from '../DayNightCycle';
 import { AtmosphereSystem } from '../systems/AtmosphereSystem';
 import { ProjectileSystem } from '../systems/ProjectileSystem';
+import { Enemy } from '../Enemy';
 
 import { GameController } from './GameController';
 import { GameState } from './GameState';
@@ -170,6 +172,45 @@ export class GameScene extends BaseScene implements IGameScene {
             this.cardSys,
             this.events,
         );
+
+        // Listen for Global Events
+        EventBus.getInstance().on(Events.ENEMY_DIED, (data: any) => {
+            const enemy = data.enemy as Enemy;
+            if (enemy && enemy.typeId === 'sapper_rat') {
+                this.triggerExplosion(enemy.x, enemy.y, 75, 200, true);
+            }
+        });
+
+        // Magma King Split Logic
+        EventBus.getInstance().on('ENEMY_SPLIT', (data: any) => {
+            const enemy = data.enemy as Enemy;
+            if (enemy && enemy.typeId === 'magma_king') {
+                // Spawn Decoy
+                // Iterate through neighbor points to find a valid spot or just spawn at same location
+                // Spawning at exact same location is fine, visually they overlap during "shedding"
+                const decoy = this.entityManager.spawnEnemy('MAGMA_STATUE', this.map.waypoints);
+                if (decoy) {
+                    // Set Decoy Position to Boss Position
+                    decoy.x = enemy.x;
+                    decoy.y = enemy.y;
+
+                    // Match path progress so it doesn't walk from start
+                    decoy.pathIndex = enemy.pathIndex;
+
+                    // Add "Pop" effect
+                    this.effects.add({
+                        type: 'explosion', // Reusing explosion for visual splash
+                        x: enemy.x,
+                        y: enemy.y,
+                        radius: 40,
+                        life: 0.3,
+                        color: '#b0bec5' // Silver splash
+                    });
+
+                    this.showFloatingText('DECOY!', enemy.x, enemy.y - 30, '#b0bec5');
+                }
+            }
+        });
     }
 
     public onEnter() {
@@ -532,5 +573,44 @@ export class GameScene extends BaseScene implements IGameScene {
 
     public triggerShake(duration: number, intensity: number): void {
         this.gameState.triggerShake(duration, intensity);
+    }
+
+    /**
+     * Spawns an explosion that can damage enemies (Friendly Fire)
+     */
+    public triggerExplosion(x: number, y: number, radius: number, damage: number, friendlyFire: boolean = false) {
+        // 1. Visuals
+        this.effects.add({
+            type: 'explosion',
+            x: x,
+            y: y,
+            radius: radius,
+            life: 0.4,
+            color: friendlyFire ? 'rgba(118, 255, 3, 0.7)' : 'rgba(255, 100, 0, 0.6)', // Green for rat, Orange for others
+        });
+
+        // 2. Sound
+        SoundManager.play('explosion');
+        this.triggerShake(0.3, 5);
+
+        // 3. Damage Logic
+        if (friendlyFire) {
+            // Damage ALL enemies in range
+            const enemies = this.gameState.enemies;
+            for (const enemy of enemies) {
+                if (!enemy.isAlive()) continue;
+
+                const dist = Math.hypot(enemy.x - x, enemy.y - y);
+                if (dist <= radius) {
+                    // Falloff damage? Or full? Let's do full for chaos.
+                    enemy.takeDamage(damage);
+
+                    // Pushback effect (optional)
+                    // const angle = Math.atan2(enemy.y - y, enemy.x - x);
+                    // enemy.x += Math.cos(angle) * 20; // forceful
+                    // enemy.y += Math.sin(angle) * 20;
+                }
+            }
+        }
     }
 }

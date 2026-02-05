@@ -25,13 +25,15 @@ export interface IEnemyTypeConfig {
     hpMod: number;
     speed: number;
     reward: number;
+    armor?: number; // Optional armor value
     color: string;
     desc: string;
     // Modular Visuals
-    archetype?: 'SKELETON' | 'WOLF' | 'TROLL' | 'SPIDER' | 'HELLHOUND' | 'ORC' | 'WRAITH' | 'GOBLIN' | 'SKELETON_COMMANDER';
+    archetype?: 'SKELETON' | 'WOLF' | 'TROLL' | 'SPIDER' | 'HELLHOUND' | 'ORC' | 'WRAITH' | 'GOBLIN' | 'SKELETON_COMMANDER' | 'RAT' | 'MAGMA';
     scale?: number;
     props?: string[]; // IDs of props
     tint?: string;    // Hex color override
+    isHidden?: boolean; // If true, hidden from Editor/Bestiary lists
 }
 
 // ============================================

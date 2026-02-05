@@ -12,19 +12,24 @@ import { SpiderUnitRenderer } from './units/SpiderUnitRenderer';
 import { SkeletonCommanderUnitRenderer } from './units/SkeletonCommanderUnitRenderer';
 
 import { TrollUnitRenderer } from './units/TrollUnitRenderer';
+import { RatUnitRenderer } from './units/RatUnitRenderer';
+import { MagmaUnitRenderer } from './units/MagmaUnitRenderer';
 
 export class EnemyRenderer {
     // Registry of specific renderers (Singleton/Stateless instances)
     private static defaultRenderer: UnitRenderer = new DefaultUnitRenderer();
     private static renderers: Record<string, UnitRenderer> = {
         'SKELETON': new SkeletonUnitRenderer(),
-        'HELLHOUND': new HellhoundUnitRenderer(),
+        'WOLF': new DefaultUnitRenderer(),
+        'TROLL': new TrollUnitRenderer(),
+        'SPIDER': new DefaultUnitRenderer(),
+        'HELLHOUND': new DefaultUnitRenderer(),
         'ORC': new OrcUnitRenderer(),
         'WRAITH': new WraithUnitRenderer(),
         'GOBLIN': new GoblinUnitRenderer(),
-        'SPIDER': new SpiderUnitRenderer(),
         'SKELETON_COMMANDER': new SkeletonCommanderUnitRenderer(),
-        'TROLL': new TrollUnitRenderer(),
+        'RAT': new RatUnitRenderer(),
+        'MAGMA': new MagmaUnitRenderer(),
     };
 
     static drawSprite(ctx: CanvasRenderingContext2D, enemy: Enemy) {

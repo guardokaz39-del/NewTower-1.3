@@ -99,11 +99,49 @@ export const ENEMY_TYPES: Record<string, IEnemyTypeConfig> = {
         name: 'Гоблин',
         symbol: '👺',
         hpMod: 0.8,
-        speed: 76, // 15% slower than Skeleton (90 * 0.85)
+        speed: 76,
         reward: 3,
-        color: '#689f38', // Detailed Olive
+        color: '#689f38',
         desc: 'Жадный мародер с мешком',
         archetype: 'GOBLIN',
-        scale: 1.35, // 40% larger than 0.95
+        scale: 1.35,
+    },
+    SAPPER_RAT: {
+        id: 'sapper_rat',
+        name: 'Алхимическая Крыса',
+        symbol: '🐀',
+        hpMod: 1.8, // Durable carrier
+        speed: 130, // Slightly slower to compensate for HP
+        reward: 12,
+        color: '#3e2723', // Darker brown
+        desc: 'Взрывается при смерти, нанося урон ВСЕМ',
+        archetype: 'RAT',
+        scale: 1.15,
+    },
+    MAGMA_KING: {
+        id: 'magma_king',
+        name: 'Король Магмы',
+        symbol: '🌋',
+        hpMod: 15.0,
+        speed: 55,
+        reward: 100,
+        color: '#ff3d00', // Magma Orange
+        desc: 'Древний архидемон из расплавленной магмы. Сбрасывает остывшую оболочку при получении урона.',
+        archetype: 'MAGMA',
+        scale: 1.4,
+    },
+    MAGMA_STATUE: {
+        id: 'magma_statue',
+        name: 'Обсидиановая Статуя',
+        symbol: '🗿',
+        hpMod: 8.0,
+        speed: 1,
+        reward: 0,
+        color: '#212121', // Obsidian
+        desc: 'Остывшая лавовая оболочка босса. Твердая как камень.',
+        archetype: 'MAGMA',
+        scale: 1.0,
+        armor: 15,
+        isHidden: true,
     }
 };

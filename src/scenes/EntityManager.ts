@@ -219,10 +219,17 @@ export class EntityManager {
  * Process enemy reaching the end - lose life, cleanup
      */
     public handleEnemyFinished(enemy: Enemy): void {
-        this.state.loseLife(1, this.effects); // Pass effects for screen flash
+        const damage = enemy.typeId === 'sapper_rat' ? 5 : 1;
+        this.state.loseLife(damage, this.effects); // Pass effects for screen flash
+
+        if (damage > 1) {
+            this.showFloatingText(`CRYITICAL BREACH! -${damage}❤️`, enemy.x, enemy.y - 20, '#d32f2f');
+            SoundManager.play('explosion'); // Louder/Standard
+        }
+
         this.metrics.trackLifeLost();
         // Removed triggerShake - flash effect is enough
-        SoundManager.play('explosion', 1); // SoundPriority.HIGH = 1
+        if (damage === 1) SoundManager.play('explosion', 1);
     }
 
     /**

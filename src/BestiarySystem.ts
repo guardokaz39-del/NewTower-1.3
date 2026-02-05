@@ -112,10 +112,10 @@ export class BestiarySystem {
     private renderList() {
         this.listContainer.innerHTML = '';
 
-        // Проходим по всем типам врагов из конфига
-        const types = CONFIG.ENEMY_TYPES;
-        for (const key in types) {
-            const conf = types[key as keyof typeof types];
+        // Filter hidden enemies
+        const enemies = Object.values(CONFIG.ENEMY_TYPES).filter(e => !e.isHidden);
+
+        for (const conf of enemies) {
             const isUnlocked = this.unlockedEnemies.has(conf.id.toLowerCase());
 
             const row = document.createElement('div');
@@ -132,7 +132,7 @@ export class BestiarySystem {
                 row.innerHTML = `
                     <div style="font-size: 24px; width: 30px; text-align: center;">${conf.symbol}</div>
                     <div>
-                        <div style="font-weight: bold; color: ${conf.color || '#fff'}">${key}</div>
+                        <div style="font-weight: bold; color: ${conf.color || '#fff'}">${conf.name}</div>
                         <div style="font-size: 11px; color: #aaa;">HP: ${Math.round(CONFIG.ENEMY.BASE_HP * conf.hpMod)} | Spd: ${conf.speed}</div>
                         <div style="font-size: 11px; color: gold;">Reward: ${conf.reward}💰</div>
                     </div>

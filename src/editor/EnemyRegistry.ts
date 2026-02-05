@@ -18,7 +18,7 @@ export class EnemyRegistry {
      * @deprecated Use getAllEntries for keys
      */
     public static getAllTypes(): IEnemyTypeConfig[] {
-        return Object.values(ENEMY_TYPES);
+        return Object.values(ENEMY_TYPES).filter(e => !e.isHidden);
     }
 
     /**
