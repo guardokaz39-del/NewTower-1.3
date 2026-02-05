@@ -2,6 +2,7 @@ import { BaseComponent } from './BaseComponent';
 import { SpawnPattern } from '../../MapData';
 import { EnemyRegistry } from '../EnemyRegistry';
 import { ThreatService } from '../ThreatService';
+import { IEnemyTypeConfig } from '../../types';
 
 interface EnemyGroupProps {
     type: string;
@@ -25,18 +26,28 @@ export class EnemyGroupRow extends BaseComponent<EnemyGroupProps> {
         typeSelect.title = 'Enemy Type';
         typeSelect.style.maxWidth = '150px';
 
-        // Use entries to get the actual Key (ID) the game uses
-        const types = EnemyRegistry.getAllEntries();
+        // ИСПРАВЛЕНО: используем статический метод getVisibleForEditor()
+        const types: IEnemyTypeConfig[] = EnemyRegistry.getVisibleForEditor();
 
-        types.forEach(entry => {
+        types.forEach((config: IEnemyTypeConfig) => {
             const opt = document.createElement('option');
-            // VALUE must be the Key (e.g. 'GRUNT') because that's what the game uses
-            opt.value = entry.key;
-            opt.textContent = `${entry.config.symbol} ${entry.config.name}`;
+            // Используем ID как value (например 'grunt', 'boss')
+            opt.value = config.id;
+            opt.textContent = `${config.symbol} ${config.name}`;
 
-            // Check match: Prioritize Key match, fallback to ID match for legacy support
-            if (entry.key === this.data.type || entry.config.id === this.data.type) {
+            // BACKWARDS COMPATIBILITY: Проверяем и ID (lowercase) и KEY (UPPERCASE)
+            // Старые карты используют 'GRUNT', 'BOSS', новые - 'grunt', 'boss'
+            const currentType = this.data.type;
+            const isMatch = config.id === currentType ||
+                config.id === currentType.toLowerCase() ||
+                config.id.toUpperCase() === currentType;
+
+            if (isMatch) {
                 opt.selected = true;
+                // Нормализуем данные к lowercase ID при первом рендере
+                if (currentType !== config.id) {
+                    this.data.onChange({ type: config.id });
+                }
             }
 
             typeSelect.appendChild(opt);

@@ -22,6 +22,13 @@ export class EnemyRegistry {
     }
 
     /**
+     * Get enemy types visible in editor (excludes isHidden)
+     */
+    public static getVisibleForEditor(): IEnemyTypeConfig[] {
+        return Object.values(ENEMY_TYPES).filter(e => !e.isHidden);
+    }
+
+    /**
      * Get a specific enemy type by ID (Case insensitive check)
      */
     public static getType(id: string): IEnemyTypeConfig | undefined {

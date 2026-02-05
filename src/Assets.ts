@@ -144,7 +144,8 @@ export class Assets {
                 }
                 resolve(false);
             };
-            img.src = `/assets/images/${path}`;
+            // Поддержка загрузки из корня (если путь начинается с '../')
+            img.src = path.startsWith('../') ? path : `/assets/images/${path}`;
         });
     }
 
@@ -213,12 +214,19 @@ export class Assets {
         loadTasks.push(this.loadImage('projectile_split', 'projectiles/split.png'));
         loadTasks.push(this.loadImage('projectile_minigun', 'projectiles/minigun.png'));
 
+        // Фоны меню (загружаем из корня)
+        loadTasks.push(this.tryLoadSingleImage('menu_start', '../start.jpg').then(() => { }));
+        loadTasks.push(this.tryLoadSingleImage('menu_map', '../map.jpg').then(() => { }));
+
+
         // ЭФФЕКТЫ - оставляем процедурными (не загружаем PNG)
+
         // effect_muzzle_flash, shadow_small - будут сгенерированы процедурно
 
         // Загружаем все параллельно
         await Promise.all(loadTasks);
     }
+
 
     /**
      * Генерирует процедурные текстуры для всех ассетов, которые не были загружены
