@@ -1,0 +1,210 @@
+/* Wave Editor Core Styles */
+
+.wave-editor-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 2000;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    backdrop-filter: blur(2px);
+}
+
+.wave-editor-container {
+    width: 500px;
+    max-height: 85vh;
+    background: rgba(30, 30, 35, 0.95);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+    border-radius: 12px;
+    display: flex;
+    flex-direction: column;
+    color: #eee;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    overflow: hidden;
+}
+
+/* Header */
+.we-header {
+    padding: 16px;
+    background: rgba(255, 255, 255, 0.05);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.we-header h2 {
+    margin: 0;
+    font-size: 18px;
+    font-weight: 600;
+    color: #fff;
+    letter-spacing: 0.5px;
+}
+
+/* Content Area */
+.we-content {
+    flex: 1;
+    overflow-y: auto;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+/* Scrollbar */
+.we-content::-webkit-scrollbar {
+    width: 8px;
+}
+.we-content::-webkit-scrollbar-track {
+    background: rgba(0,0,0,0.2);
+}
+.we-content::-webkit-scrollbar-thumb {
+    background: rgba(255,255,255,0.2);
+    border-radius: 4px;
+}
+
+/* Footer */
+.we-footer {
+    padding: 16px;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+    display: flex;
+    gap: 12px;
+    background: rgba(20, 20, 25, 0.95);
+}
+
+/* Buttons */
+.we-btn {
+    padding: 8px 16px;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-weight: 500;
+    transition: all 0.2s;
+    font-size: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+}
+
+.we-btn-primary {
+    background: #4caf50;
+    color: white;
+}
+.we-btn-primary:hover { background: #43a047; }
+
+.we-btn-danger {
+    background: #f44336;
+    color: white;
+}
+.we-btn-danger:hover { background: #e53935; }
+
+.we-btn-secondary {
+    background: rgba(255,255,255,0.1);
+    color: #eee;
+}
+.we-btn-secondary:hover { background: rgba(255,255,255,0.2); }
+
+.we-btn-icon {
+    padding: 4px;
+    width: 24px;
+    height: 24px;
+    border-radius: 4px;
+    background: transparent;
+    color: #aaa;
+}
+.we-btn-icon:hover {
+    background: rgba(255,255,255,0.1);
+    color: #fff;
+}
+
+.we-btn-full {
+    width: 100%;
+}
+
+/* Wave Item */
+.we-wave-item {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    border-radius: 8px;
+    overflow: hidden;
+    transition: background 0.2s;
+}
+
+.we-wave-item:hover {
+    background: rgba(255, 255, 255, 0.06);
+    border-color: rgba(255, 255, 255, 0.1);
+}
+
+.we-wave-header {
+    padding: 10px 12px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: rgba(0,0,0,0.2);
+    cursor: pointer;
+}
+
+.we-wave-title {
+    font-weight: 600;
+    font-size: 14px;
+    color: #bbb;
+}
+
+.we-wave-content {
+    padding: 10px;
+    border-top: 1px solid rgba(255,255,255,0.05);
+}
+
+/* Enemy Row */
+.we-enemy-row {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    margin-bottom: 8px;
+    padding: 4px;
+    border-radius: 4px;
+    background: rgba(0,0,0,0.2);
+}
+
+.we-enemy-row select, .we-enemy-row input {
+    background: rgba(0,0,0,0.3);
+    border: 1px solid rgba(255,255,255,0.1);
+    color: #fff;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 13px;
+}
+
+.we-enemy-row select:focus, .we-enemy-row input:focus {
+    border-color: #2196f3;
+    outline: none;
+}
+
+/* Threat Meter */
+.we-threat-meter {
+    height: 4px;
+    background: rgba(255,255,255,0.1);
+    border-radius: 2px;
+    overflow: hidden;
+    margin-top: 4px;
+    width: 100px;
+}
+
+.we-threat-fill {
+    height: 100%;
+    transition: width 0.3s ease, background-color 0.3s ease;
+}
+
+.we-threat-badge {
+    font-size: 10px;
+    padding: 2px 6px;
+    border-radius: 10px;
+    background: rgba(0,0,0,0.4);
+    font-weight: bold;
+}

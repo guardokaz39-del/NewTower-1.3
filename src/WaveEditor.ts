@@ -1,233 +1,120 @@
-import { IWaveConfig, SpawnPattern } from './MapData';
-import { CONFIG } from './Config';
-import { UIUtils } from './UIUtils';
+import { IWaveConfig } from './MapData';
+import { WaveModel } from './editor/WaveModel';
+import { WaveList } from './editor/components/WaveList';
+import './editor/editor.css';
 
 export class WaveEditor {
     private container!: HTMLElement;
-    private waves: IWaveConfig[] = [];
+    private model: WaveModel;
+    private waveList!: WaveList;
     private onSave: (waves: IWaveConfig[]) => void;
     private onClose: () => void;
 
+    /**
+     * @param initialWaves - The initial configuration of waves (will be copied)
+     * @param onSave - Callback when user clicks Save
+     * @param onClose - Callback when user clicks Cancel
+     */
     constructor(initialWaves: IWaveConfig[], onSave: (waves: IWaveConfig[]) => void, onClose: () => void) {
-        // Deep copy to avoid mutating original until save
-        this.waves = JSON.parse(JSON.stringify(initialWaves || []));
         this.onSave = onSave;
         this.onClose = onClose;
+
+        // Initialize Model with draft data
+        // WaveModel handles deep copying
+        this.model = new WaveModel(initialWaves);
+
         this.createUI();
+
+        // Subscribe to model changes to re-render the list
+        // In the future, we could have granular updates, but full re-render is safe for now
+        this.model.subscribe(() => {
+            if (this.waveList) {
+                this.waveList.render();
+            }
+        });
     }
 
     private createUI() {
-        this.container = UIUtils.createContainer({
-            position: 'absolute',
-            top: '50%',
-            left: '50%',
-            transform: 'translate(-50%, -50%)',
-            width: '400px',
-            maxHeight: '80vh',
-            overflowY: 'auto',
-            background: '#222',
-            border: '2px solid #444',
-            borderRadius: '8px',
-            padding: '20px',
-            color: '#fff',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '10px',
-            zIndex: '2000',
-            // boxShadow not in IContainerOptions but let's assume it's fine or add it if strictly typed (it's not there, so I'll leave it or basic styling is enough)
-        });
-        // Manual override for shadow as it wasn't in my interface
-        this.container.style.boxShadow = '0 0 20px rgba(0,0,0,0.5)';
+        // 1. Overlay
+        const overlay = document.createElement('div');
+        overlay.className = 'wave-editor-overlay';
 
-        const title = document.createElement('h2');
-        title.innerText = 'Wave Configuration';
-        title.style.margin = '0 0 10px 0';
-        title.style.textAlign = 'center';
-        this.container.appendChild(title);
+        // 2. Main Container
+        this.container = document.createElement('div');
+        this.container.className = 'wave-editor-container';
 
-        const wavesList = document.createElement('div');
-        wavesList.id = 'waves-list';
-        wavesList.style.display = 'flex';
-        wavesList.style.flexDirection = 'column';
-        wavesList.style.gap = '10px';
-        this.container.appendChild(wavesList);
+        // 3. Header
+        const header = document.createElement('div');
+        header.className = 'we-header';
+        header.innerHTML = `
+            <h2>Wave Configuration</h2>
+            <div style="font-size: 12px; color: #888;">Draft Mode</div>
+        `;
+        this.container.appendChild(header);
 
-        this.renderWaves(wavesList);
+        // 4. Content (The Wave List)
+        const content = document.createElement('div');
+        content.className = 'we-content';
 
+        this.waveList = new WaveList(this.model);
+        this.waveList.mount(content);
 
+        this.container.appendChild(content);
 
-        UIUtils.createButton(this.container, '+ Add Wave', () => {
-            this.waves.push({ enemies: [] });
-            this.renderWaves(wavesList);
-        }, { background: '#1976d2', border: 'none', padding: '5px 10px', borderRadius: '4px' });
+        // 5. Footer (Buttons)
+        const footer = document.createElement('div');
+        footer.className = 'we-footer';
 
-        const buttons = document.createElement('div');
-        buttons.style.display = 'flex';
-        buttons.style.gap = '10px';
-        buttons.style.marginTop = '20px';
+        const saveBtn = document.createElement('button');
+        saveBtn.className = 'we-btn we-btn-primary';
+        saveBtn.style.flex = '1';
+        saveBtn.textContent = 'Save & Close';
+        saveBtn.onclick = () => this.save();
 
+        const cancelBtn = document.createElement('button');
+        cancelBtn.className = 'we-btn we-btn-danger';
+        cancelBtn.style.flex = '1';
+        cancelBtn.textContent = 'Cancel';
+        cancelBtn.onclick = () => this.close();
 
-        // IButtonOptions doesn't have flex. style copying in UIUtils is manual. 
-        // I created UIUtils.createButton to return the button, so I can apply extra styles.
-        // Let's rewrite it slightly.
-        const btnSave = UIUtils.createButton(buttons, 'Save & Close', () => {
-            if (!this.validateWaves()) return;
-            this.onSave(this.waves);
-            this.destroy();
-        }, { background: '#4caf50', border: 'none', padding: '5px 10px', borderRadius: '4px' });
-        btnSave.style.flex = '1';
+        footer.appendChild(saveBtn);
+        footer.appendChild(cancelBtn);
+        this.container.appendChild(footer);
 
-        const btnCancel = UIUtils.createButton(buttons, 'Cancel', () => {
-            this.onClose();
-            this.destroy();
-        }, { background: '#f44336', border: 'none', padding: '5px 10px', borderRadius: '4px' });
-        btnCancel.style.flex = '1';
+        // Mount Overlay to Body
+        overlay.appendChild(this.container);
+        document.body.appendChild(overlay);
 
-        this.container.appendChild(buttons);
-
-        document.body.appendChild(this.container);
+        // Update reference to point to overlay for destruction
+        this.container = overlay;
     }
 
-    private renderWaves(parent: HTMLElement) {
-        parent.innerHTML = '';
-        this.waves.forEach((wave, index) => {
-            const waveDiv = document.createElement('div');
-            Object.assign(waveDiv.style, {
-                background: '#333',
-                padding: '10px',
-                borderRadius: '4px',
-                border: '1px solid #555',
-            });
-
-            const header = document.createElement('div');
-            header.style.display = 'flex';
-            header.style.justifyContent = 'space-between';
-            header.style.marginBottom = '5px';
-            header.innerHTML = `<strong>Wave ${index + 1}</strong>`;
-
-            UIUtils.createButton(header, 'X', () => {
-                this.waves.splice(index, 1);
-                this.renderWaves(parent);
-            }, {
-                background: '#d32f2f',
-                padding: '2px 6px',
-                fontSize: '12px',
-                border: 'none',
-                borderRadius: '4px'
-            });
-            waveDiv.appendChild(header);
-
-            // Enemy groups
-            const groupsDiv = document.createElement('div');
-            groupsDiv.style.marginLeft = '10px';
-
-            wave.enemies.forEach((group, gIndex) => {
-                const groupRow = document.createElement('div');
-                groupRow.style.display = 'flex';
-                groupRow.style.gap = '5px';
-                groupRow.style.alignItems = 'center';
-                groupRow.style.marginBottom = '5px';
-
-                const typeSelect = document.createElement('select');
-                const types = Object.keys(CONFIG.ENEMY_TYPES);
-                types.forEach((t) => {
-                    const opt = document.createElement('option');
-                    opt.value = t;
-                    opt.innerText = t;
-                    if (t === group.type) opt.selected = true;
-                    typeSelect.appendChild(opt);
-                });
-                typeSelect.onchange = (e) => {
-                    group.type = (e.target as HTMLSelectElement).value;
-                };
-
-                const countInput = document.createElement('input');
-                countInput.type = 'number';
-                countInput.value = group.count.toString();
-                countInput.min = '1';
-                countInput.style.width = '50px';
-                countInput.onchange = (e) => {
-                    group.count = parseInt((e.target as HTMLInputElement).value) || 1;
-                };
-
-                // Spawn Pattern dropdown - режим появления врагов
-                const patternSelect = document.createElement('select');
-                patternSelect.style.width = '100px';
-                patternSelect.style.fontSize = '12px';
-                patternSelect.title = 'Режим появления врагов';
-
-                const patterns: Array<{ value: SpawnPattern; label: string }> = [
-                    { value: 'normal', label: '⏱️ Обычный' },
-                    { value: 'random', label: '🎲 Рандом' },
-                    { value: 'swarm', label: '🐝 Рой' }
-                ];
-
-                patterns.forEach(({ value, label }) => {
-                    const opt = document.createElement('option');
-                    opt.value = value;
-                    opt.textContent = label;
-                    if (value === (group.spawnPattern || 'normal')) opt.selected = true;
-                    patternSelect.appendChild(opt);
-                });
-
-                patternSelect.onchange = (e) => {
-                    group.spawnPattern = (e.target as HTMLSelectElement).value as SpawnPattern;
-                };
-
-                UIUtils.createButton(groupRow, '-', () => {
-                    wave.enemies.splice(gIndex, 1);
-                    this.renderWaves(parent);
-                }, { background: '#555', padding: '2px 6px', border: 'none', borderRadius: '4px' });
-
-                groupRow.appendChild(typeSelect);
-                groupRow.appendChild(document.createTextNode('x'));
-                groupRow.appendChild(countInput);
-                groupRow.appendChild(patternSelect);
-
-                groupsDiv.appendChild(groupRow);
-            });
-
-            UIUtils.createButton(waveDiv, '+ Add Enemy', () => {
-                wave.enemies.push({ type: 'GRUNT', count: 1 });
-                this.renderWaves(parent);
-            }, { background: '#444', fontSize: '12px', width: '100%', border: 'none', borderRadius: '4px', padding: '5px 10px' });
-
-            waveDiv.appendChild(groupsDiv);
-
-            parent.appendChild(waveDiv);
-        });
-    }
-
-    // styleBtn removed
-
-    /**
-     * Валидация конфигурации волн перед сохранением
-     */
-    private validateWaves(): boolean {
-        for (const wave of this.waves) {
-            if (!wave.enemies || wave.enemies.length === 0) {
-                alert('Каждая волна должна содержать хотя бы одну группу врагов!');
-                return false;
-            }
-
-            for (const group of wave.enemies) {
-                if (!group.type || group.count < 1) {
-                    alert('Некорректная конфигурация группы врагов!');
-                    return false;
-                }
-
-                // Валидация нового поля spawnPattern
-                if (group.spawnPattern &&
-                    !['normal', 'random', 'swarm'].includes(group.spawnPattern)) {
-                    alert('Некорректный режим появления!');
-                    return false;
-                }
-            }
+    private save() {
+        if (!this.model.validate()) {
+            alert('Invalid configuration! Check for empty waves or groups.');
+            return;
         }
-        return true;
+        this.onSave(this.model.getWaves());
+        this.destroy();
+    }
+
+    private close() {
+        this.onClose();
+        this.destroy();
     }
 
     public destroy() {
+        // Component Cleanup
+        if (this.waveList) {
+            this.waveList.destroy();
+        }
+
+        // Model Cleanup
+        if (this.model) {
+            this.model.destroy();
+        }
+
+        // DOM Cleanup
         if (this.container && this.container.parentNode) {
             this.container.parentNode.removeChild(this.container);
         }
