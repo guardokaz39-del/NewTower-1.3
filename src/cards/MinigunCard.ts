@@ -11,7 +11,7 @@ export const MINIGUN_UPGRADES: Record<number, IUpgradeCard> = {
     1: {
         level: 1,
         modifiers: {
-            damageMultiplier: 0.30, // 30% of base damage (70% reduction)
+            damageMultiplier: 0.50, // 50% of base damage (50% reduction)
             attackSpeedMultiplier: 2.65, // 45 / 17 = 2.65x faster attacks
         },
         effects: [
@@ -32,7 +32,7 @@ export const MINIGUN_UPGRADES: Record<number, IUpgradeCard> = {
     2: {
         level: 2,
         modifiers: {
-            damageMultiplier: 0.40, // 40% of base damage (60% reduction)
+            damageMultiplier: 0.60, // 60% of base damage (40% reduction)
             attackSpeedMultiplier: 2.75,
         },
         effects: [
@@ -49,7 +49,7 @@ export const MINIGUN_UPGRADES: Record<number, IUpgradeCard> = {
     3: {
         level: 3,
         modifiers: {
-            damageMultiplier: 0.55, // 55% of base damage (45% reduction)
+            damageMultiplier: 0.75, // 75% of base damage (25% reduction)
             attackSpeedMultiplier: 2.65,
         },
         effects: [

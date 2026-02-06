@@ -45,6 +45,39 @@ export class WeaponSystem {
         const target = this.findTarget(tower, enemies, stats.range);
 
         if (target) {
+            // === SPINUP MECHANIC ===
+            // Increment spinup progress whenever we have a target (and not overheated yet)
+            const spinupEffect = stats.effects.find(e => e.type === 'spinup');
+            if (spinupEffect && !tower.isOverheated) {
+                // PHYSICS-BASED HEAT GENERATION
+                // Heat generation depends on how fast the gun is firing.
+                // Standard Minigun (LVL1) has ~2.65x multiplier.
+                // If we add Sniper (0.5x), heat should generate slower.
+                // If we add Rapid Fire (2.0x), heat should generate faster.
+                // We normalize against the base Minigun speed (~2.65) to keep the 5s duration standard.
+                const MINIGUN_BASE_SPEED_MULT = 2.65;
+                const speedFactor = (stats.attackSpeedMultiplier || 1.0) / MINIGUN_BASE_SPEED_MULT;
+
+                // If using Sniper card, speedFactor will be < 1, so heat builds slower (takes longer to overheat)
+                // If using Rapid card, speedFactor will be > 1, so heat builds faster
+                tower.spinupTime += dt * speedFactor;
+
+                const maxSpinupSeconds = spinupEffect.maxSpinupSeconds || 5;
+                tower.maxHeat = maxSpinupSeconds; // Sync for visual bar
+
+                // Check if tower has Ice card (for overheat extension)
+                const hasIceCard = tower.cards.some(c => c.type.id === 'ice');
+                const overheatExtension = hasIceCard ? (spinupEffect.overheatExtensionWithIce || 0) : 0;
+                const overheatThreshold = maxSpinupSeconds + overheatExtension;
+
+                if (tower.spinupTime >= overheatThreshold) {
+                    tower.isOverheated = true;
+                    tower.overheatCooldown = spinupEffect.overheatDuration || 1.5;
+                    tower.totalOverheatDuration = tower.overheatCooldown; // Store for UI
+                    tower.spinupTime = 0;
+                }
+            }
+
             // 2. Rotate Tower Smoothly
             const dx = target.x - tower.x;
             const dy = target.y - tower.y;
@@ -59,28 +92,6 @@ export class WeaponSystem {
             if (tower.cooldown <= 0 && angleDiff < CONFIG.TOWER.AIM_TOLERANCE) {
                 this.fire(tower, target, stats, projectileSystem, effects);
                 tower.cooldown = stats.cd;
-
-                // === SPINUP MECHANIC ===
-                // Increment spinup progress when firing
-                const spinupEffect = stats.effects.find(e => e.type === 'spinup');
-                if (spinupEffect) {
-                    tower.spinupTime += dt;
-
-                    // Check for overheat
-                    const maxSpinupSeconds = spinupEffect.maxSpinupSeconds || 5;
-                    tower.maxHeat = maxSpinupSeconds; // Sync for visual bar
-
-                    // Check if tower has Ice card (for overheat extension)
-                    const hasIceCard = tower.cards.some(c => c.type.id === 'ice');
-                    const overheatExtension = hasIceCard ? (spinupEffect.overheatExtensionWithIce || 0) : 0;
-                    const overheatThreshold = maxSpinupSeconds + overheatExtension;
-
-                    if (tower.spinupTime >= overheatThreshold) {
-                        tower.isOverheated = true;
-                        tower.overheatCooldown = spinupEffect.overheatDuration || 1.5;
-                        tower.spinupTime = 0;
-                    }
-                }
             }
         } else {
             // === SPINUP RESET / COOLING ===
@@ -93,8 +104,9 @@ export class WeaponSystem {
                 tower.spinupTime = Math.max(0, tower.spinupTime - coolRate);
             }
             if (tower.isOverheated) {
-                tower.isOverheated = false;
-                tower.overheatCooldown = 0;
+                // If we lost target but are overheated, we still cool down the overheat timer?
+                // The overheat timer is handled at the top of processTower logic.
+                // We don't need to force clear it here, let it run its course.
             }
         }
     }

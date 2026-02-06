@@ -255,43 +255,68 @@ export class TowerRenderer {
     }
 
     private static drawOverheatBar(ctx: CanvasRenderingContext2D, tower: Tower) {
-        // Calculate heat percentage
-        const maxTime = tower.maxHeat || 5;
-        let pct = tower.spinupTime / maxTime;
-        if (pct > 1) pct = 1;
+        // Calculate percentage
+        let pct = 0;
 
-        // Visual flash if overheated
         if (tower.isOverheated) {
-            pct = 1; // Full bar
+            // During overheat, show REVERSE progress (draining)
+            // If totalOverheatDuration is 0 (shouldn't happen), avoid divide by zero
+            const totalDur = tower.totalOverheatDuration || 1.5;
+            pct = tower.overheatCooldown / totalDur;
+        } else {
+            // Normal heating up
+            const maxTime = tower.maxHeat || 5;
+            pct = tower.spinupTime / maxTime;
         }
 
-        const barW = 4;
-        const barH = 20;
-        const barX = tower.x + 20; // Right of tower
-        const barY = tower.y - 10;
+        if (pct > 1) pct = 1;
+        if (pct < 0) pct = 0;
+
+        const barW = 6; // Slightly wider (was 4)
+        const barH = 24; // Taller (was 20)
+        const barX = tower.x + 22; // Right of tower
+        const barY = tower.y - 12;
 
         // Bg
-        ctx.fillStyle = 'rgba(0,0,0,0.5)';
+        ctx.fillStyle = 'rgba(0,0,0,0.6)';
         ctx.fillRect(barX, barY, barW, barH);
-
-        // Fill
-        // Color gradient from yellow to red
-        if (tower.isOverheated) {
-            ctx.fillStyle = (Math.floor(Date.now() / 100) % 2 === 0) ? '#ff0000' : '#ffffff'; // Flash
-        } else {
-            const r = 255;
-            const g = Math.floor(255 * (1 - pct));
-            ctx.fillStyle = `rgb(${r},${g},0)`;
-        }
-
-        // Draw from bottom up
-        const fillH = barH * pct;
-        ctx.fillRect(barX, barY + (barH - fillH), barW, fillH);
 
         // Border
         ctx.strokeStyle = '#fff';
         ctx.lineWidth = 1;
         ctx.strokeRect(barX, barY, barW, barH);
+
+        // Fill Logic
+        if (tower.isOverheated) {
+            // Flashing Red/Orange indicating danger/lockout
+            const flash = Math.floor(Date.now() / 100) % 2 === 0;
+            ctx.fillStyle = flash ? '#ff4400' : '#ff8800';
+        } else {
+            // Check if Cooling (No target, spinupTime > 0)
+            // Ideally we'd pass a "isCooling" flag, but we can infer it if heat is decreasing.
+            // However, TowerRenderer is static. 
+            // Let's use blue tint if heat is not full and likely cooling? 
+            // Actually, we don't know if it's cooling just by state here.
+            // But we can check if it has a target in Tower? No.
+            // Let's just keep the Red/Green gradient but maybe add a blue border if cooling?
+            // Actually, user complained about "no animation of cooling".
+            // The bar shrinking IS the animation.
+            // Maybe they want the BAR COLOR to trigger "Cooling".
+            // In WeaponSystem, when cooling, we reduce spinupTime.
+
+            // Gradient Green -> Yellow -> Red
+            if (pct < 0.5) {
+                const r = Math.floor(255 * (pct * 2));
+                ctx.fillStyle = `rgb(${r},255,0)`;
+            } else {
+                const g = Math.floor(255 * (2 - pct * 2));
+                ctx.fillStyle = `rgb(255,${g},0)`;
+            }
+        }
+
+        // Draw from bottom up
+        const fillH = barH * pct;
+        ctx.fillRect(barX + 1, barY + (barH - fillH) - 1, barW - 2, fillH);
     }
 
     private static drawHeatHaze(ctx: CanvasRenderingContext2D, tower: Tower) {

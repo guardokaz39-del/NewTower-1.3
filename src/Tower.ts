@@ -33,6 +33,7 @@ export class Tower {
     public maxHeat: number = 5;             // Max seconds before overheat (default 5s)
     public isOverheated: boolean = false;   // Whether tower is overheated
     public overheatCooldown: number = 0;    // Seconds remaining in overheat lockout
+    public totalOverheatDuration: number = 0; // Total duration of the current overheat lockout (for UI)
 
     // Visual state (Phase 3)
     public recoilTimer: number = 0;        // Recoil animation timer (seconds)
@@ -52,7 +53,7 @@ export class Tower {
         return dummy.getStats();
     }
 
-    getStats(): IProjectileStats & { range: number; cd: number; projCount: number; spread: number; projectileType: string } {
+    getStats(): IProjectileStats & { range: number; cd: number; projCount: number; spread: number; projectileType: string; attackSpeedMultiplier: number } {
         // Start with base stats
         let range = CONFIG.TOWER.BASE_RANGE;
         let damage = CONFIG.TOWER.BASE_DMG;
@@ -178,7 +179,8 @@ export class Tower {
             projCount,
             spread,
             critChance,
-            projectileType
+            projectileType,
+            attackSpeedMultiplier: mergedMods.attackSpeedMultiplier || 1.0
         };
     }
 
