@@ -229,10 +229,10 @@ export class ObjectRenderer {
             }
         }
 
-        // Border for definition
-        ctx.strokeStyle = 'rgba(0, 0, 0, 0.1)';
-        ctx.lineWidth = 1;
-        ctx.strokeRect(x, y, TS, TS);
+        // Border removed - was causing bright white artifacts on tiles
+        // ctx.strokeStyle = 'rgba(0, 0, 0, 0.1)';
+        // ctx.lineWidth = 1;
+        // ctx.strokeRect(x, y, TS, TS);
     }
 
     /**

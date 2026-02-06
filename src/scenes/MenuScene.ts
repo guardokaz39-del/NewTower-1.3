@@ -32,6 +32,9 @@ export class MenuScene extends BaseScene {
     public onExit() {
         this.container.style.display = 'none';
         this.mapSelectionContainer.style.display = 'none';
+
+        // Cleanup canvas elements to prevent memory leaks
+        this.clearMapPreviews();
     }
 
     public update(dt: number) { }
@@ -304,6 +307,27 @@ export class MenuScene extends BaseScene {
             });
             parent.appendChild(errCard);
         }
+    }
+
+    /**
+     * Clears canvas previews to prevent memory leaks
+     */
+    private clearMapPreviews(): void {
+        // Find the list container with map cards
+        const listContainer = this.mapSelectionContainer.querySelector('div[style*="overflowX"]') as HTMLElement;
+        if (!listContainer) return;
+
+        // Clear all canvas contexts before removing from DOM
+        const canvases = listContainer.querySelectorAll('canvas');
+        canvases.forEach(canvas => {
+            const ctx = canvas.getContext('2d');
+            if (ctx) {
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+            }
+        });
+
+        // Remove all map cards to free memory
+        listContainer.innerHTML = '';
     }
 
     private showMapSelection() {

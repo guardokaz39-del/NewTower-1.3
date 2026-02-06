@@ -36,12 +36,14 @@ export class InputSystem {
 
         this.canvas.addEventListener('pointermove', this.onPointerMove);
         this.canvas.addEventListener('pointerdown', this.onPointerDown);
+        this.canvas.addEventListener('pointerleave', this.onPointerLeave.bind(this));
         window.addEventListener('pointerup', this.onPointerUp);
     }
 
     public destroy() {
         this.canvas.removeEventListener('pointermove', this.onPointerMove);
         this.canvas.removeEventListener('pointerdown', this.onPointerDown);
+        this.canvas.removeEventListener('pointerleave', this.onPointerLeave.bind(this));
         window.removeEventListener('pointerup', this.onPointerUp);
     }
 
@@ -62,6 +64,12 @@ export class InputSystem {
                 scene.cardSys.updateDrag(e.clientX, e.clientY);
             }
         }
+    }
+
+    private onPointerLeave(_e: PointerEvent) {
+        // Reset hover position when mouse leaves canvas to prevent stuck highlights
+        this.hoverCol = -1;
+        this.hoverRow = -1;
     }
 
     private onPointerDown(e: PointerEvent) {

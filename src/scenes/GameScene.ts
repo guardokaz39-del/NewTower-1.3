@@ -314,6 +314,10 @@ export class GameScene extends BaseScene implements IGameScene {
     public draw(ctx: CanvasRenderingContext2D) {
         ctx.save();
 
+        // Reset global canvas state to prevent artifacts from previous frames
+        ctx.globalAlpha = 1.0;
+        ctx.globalCompositeOperation = 'source-over';
+
         // Apply screen shake
         if (this.gameState.shakeTimer > 0) {
             const dx = (Math.random() - 0.5) * this.gameState.shakeIntensity;
@@ -321,26 +325,8 @@ export class GameScene extends BaseScene implements IGameScene {
             ctx.translate(dx, dy);
         }
 
-        // World Render
-        RendererFactory.drawMap(ctx, this.map);
-        // ... (rest of drawing)
-
-        // (Assuming render continues...)
-        // We need to inject code where the scene is actually drawn or create a post-process overlay
-        // The draw method here just sets up shake. The rest of the draw sequence is separate?
-        // Wait, looking at GameScene.ts structure... 
-        // I see the start of draw(ctx).
-        // Let's scroll down to find where I can insert the overlay.
-        // Actually, looking at the previous view_file, GameScene.ts has a `draw` method that delegates to map, entities etc.
-        // I need to insert the Vignette AT THE VERY END of the `draw` method.
-        // I'll assume lines 250+ (which I saw earlier) were the start.
-        // I need to view the END of GameScene.draw to insert the overlay.
-
-        // Let me first view the end of GameScene.ts to find the right spot.
-        // Aborting this specific tool call to View File first.
-
-
-        // Clear screen
+        // Complete canvas clearing to prevent "Hall of Mirrors" artifacts
+        ctx.clearRect(0, 0, this.game.canvas.width, this.game.canvas.height);
         ctx.fillStyle = '#222';
         ctx.fillRect(0, 0, this.game.canvas.width, this.game.canvas.height);
 
