@@ -21,17 +21,6 @@ export const CONFIG = {
         }
     },
 
-    COLORS: {
-        GRASS: '#8bc34a',
-        PATH: '#ded29e',
-        BASE: '#3f51b5',
-        SPAWN: '#d32f2f',
-        TOWER_BASE: '#9e9e9e',
-        DECOR_BG: '#558b2f',
-        DECOR_TREE: '#2e7d32',
-        DECOR_ROCK: '#78909c',
-    },
-
     PLAYER: {
         START_MONEY: 250,
         START_LIVES: 20,

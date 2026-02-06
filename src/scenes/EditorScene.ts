@@ -117,10 +117,14 @@ export class EditorScene extends BaseScene {
         const oldFogDensity = this.fog.getFog(col, row);
 
         if (this.mode === 'paint_road') {
+            console.log('[EditorScene] paint_road mode active, tile type:', oldTileType, '→ 1');
             if (oldTileType !== 1) {
                 this.history.push(EditorActions.createTileAction(this.map.grid, col, row, oldTileType, 1));
                 this.map.grid[row][col].type = 1;
                 this.map.grid[row][col].decor = null;
+                console.log('[EditorScene] Road painted at', col, row);
+            } else {
+                console.log('[EditorScene] Tile already road, skipping');
             }
         } else if (this.mode === 'paint_grass') {
             if (oldTileType !== 0) {
@@ -246,6 +250,10 @@ export class EditorScene extends BaseScene {
             }
         }
 
+        // CRITICAL FIX: Regenerate prerendered cache after tile changes
+        // The Map.draw() uses a cached canvas that must be updated when tiles change
+        this.map.prerender();
+
         // We do NOT overwrite map.waypoints here every frame anymore.
         // It prevents saving them correctly.
         this.map.draw(ctx);
@@ -337,6 +345,7 @@ export class EditorScene extends BaseScene {
     private createUI() {
         // Create new modular toolbar
         this.toolbar = new EditorToolbar((mode) => {
+            console.log('[EditorScene] Mode changed to:', mode);
             this.mode = mode;
         });
 

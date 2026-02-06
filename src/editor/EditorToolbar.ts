@@ -1,4 +1,5 @@
 import { UIUtils } from '../UIUtils';
+import { VISUALS } from '../VisualConfig';
 
 export type EditorMode =
     | 'paint_road'
@@ -105,10 +106,10 @@ export class EditorToolbar {
             transform: 'translateX(-50%)',
             display: 'flex',
             flexDirection: 'column',
-            gap: '8px',
-            padding: '12px',
-            background: 'rgba(0,0,0,0.85)',
-            borderRadius: '10px',
+            gap: `${VISUALS.UI.SPACING.sm}px`,
+            padding: `${VISUALS.UI.SPACING.md}px`,
+            background: VISUALS.UI.COLORS.glass.bgDark,
+            borderRadius: VISUALS.UI.BORDERS.radius.lg,
             zIndex: '1000'
         });
     }
@@ -117,9 +118,9 @@ export class EditorToolbar {
         const container = document.createElement('div');
         Object.assign(container.style, {
             display: 'flex',
-            gap: '6px',
-            borderBottom: '2px solid #444',
-            paddingBottom: '8px'
+            gap: `${VISUALS.UI.SPACING.xs}px`,
+            borderBottom: `${VISUALS.UI.BORDERS.width.normal} solid #444`,
+            paddingBottom: `${VISUALS.UI.SPACING.sm}px`
         });
 
         this.categories.forEach((cat, idx) => {
@@ -128,15 +129,15 @@ export class EditorToolbar {
             btn.dataset.categoryIndex = idx.toString();
 
             Object.assign(btn.style, {
-                background: '#333',
-                color: '#fff',
-                border: '2px solid #555',
-                padding: '8px 16px',
-                borderRadius: '6px',
+                background: VISUALS.UI.COLORS.neutral.medium,
+                color: VISUALS.UI.COLORS.text.primary,
+                border: `${VISUALS.UI.BORDERS.width.normal} solid ${VISUALS.UI.COLORS.neutral.light}`,
+                padding: `${VISUALS.UI.SPACING.sm}px ${VISUALS.UI.SPACING.lg}px`,
+                borderRadius: VISUALS.UI.BORDERS.radius.md,
                 cursor: 'pointer',
-                fontSize: '14px',
-                fontWeight: 'bold',
-                transition: 'all 0.2s'
+                fontSize: VISUALS.UI.FONTS.size.md,
+                fontWeight: VISUALS.UI.FONTS.weight.bold,
+                transition: VISUALS.UI.TRANSITIONS.presets.fast
             });
 
             btn.onclick = () => this.selectCategory(idx);
@@ -167,14 +168,14 @@ export class EditorToolbar {
         categoryBtns.forEach((btn, idx) => {
             if (idx === index) {
                 Object.assign((btn as HTMLElement).style, {
-                    background: '#1976d2',
+                    background: VISUALS.UI.COLORS.info,
                     borderColor: '#2196f3',
                     transform: 'translateY(-2px)'
                 });
             } else {
                 Object.assign((btn as HTMLElement).style, {
-                    background: '#333',
-                    borderColor: '#555',
+                    background: VISUALS.UI.COLORS.neutral.medium,
+                    borderColor: VISUALS.UI.COLORS.neutral.light,
                     transform: 'translateY(0)'
                 });
             }
@@ -198,19 +199,19 @@ export class EditorToolbar {
 
             Object.assign(btn.style, {
                 background: tool.color,
-                color: '#fff',
-                border: '1px solid rgba(255,255,255,0.3)',
-                padding: '10px 18px',
-                borderRadius: '6px',
+                color: VISUALS.UI.COLORS.text.primary,
+                border: `${VISUALS.UI.BORDERS.width.thin} solid ${VISUALS.UI.COLORS.glass.borderHover}`,
+                padding: `${VISUALS.UI.SPACING.sm}px ${VISUALS.UI.SPACING.lg}px`,
+                borderRadius: VISUALS.UI.BORDERS.radius.md,
                 cursor: 'pointer',
-                fontSize: '14px',
-                fontWeight: 'bold',
-                transition: 'transform 0.1s, box-shadow 0.1s'
+                fontSize: VISUALS.UI.FONTS.size.md,
+                fontWeight: VISUALS.UI.FONTS.weight.bold,
+                transition: VISUALS.UI.TRANSITIONS.presets.fast
             });
 
             btn.onmouseenter = () => {
                 btn.style.transform = 'scale(1.05)';
-                btn.style.boxShadow = '0 4px 8px rgba(0,0,0,0.3)';
+                btn.style.boxShadow = VISUALS.UI.SHADOWS.md;
             };
 
             btn.onmouseleave = () => {
@@ -218,7 +219,10 @@ export class EditorToolbar {
                 btn.style.boxShadow = 'none';
             };
 
-            btn.onclick = () => this.onModeChange(tool.id);
+            btn.onclick = () => {
+                console.log('[EditorToolbar] Tool clicked:', tool.id, tool.label);
+                this.onModeChange(tool.id);
+            };
 
             this.toolsContainer.appendChild(btn);
         });

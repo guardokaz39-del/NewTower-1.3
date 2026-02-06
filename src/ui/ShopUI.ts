@@ -1,6 +1,7 @@
 import { IGameScene } from '../scenes/IGameScene';
 import { CONFIG } from '../Config';
 import { EventBus, Events } from '../EventBus';
+import { VISUALS } from '../VisualConfig';
 
 export class ShopUI {
     private scene: IGameScene;

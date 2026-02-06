@@ -59,7 +59,7 @@ export class MapManager {
         this.cacheTorches();
     }
 
-    private prerender() {
+    public prerender() {
         // Create offscreen canvas
         this.cacheCanvas = document.createElement('canvas');
         this.cacheCanvas.width = this.cols * CONFIG.TILE_SIZE;

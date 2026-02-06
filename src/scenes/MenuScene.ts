@@ -6,6 +6,7 @@ import { MapManager } from '../Map';
 import { CONFIG } from '../Config';
 import { UIUtils } from '../UIUtils';
 import { Assets } from '../Assets';
+import { VISUALS } from '../VisualConfig';
 
 export class MenuScene extends BaseScene {
     private game: Game;
@@ -166,10 +167,10 @@ export class MenuScene extends BaseScene {
         const title = document.createElement('h2');
         title.innerText = 'SELECT MAP';
         Object.assign(title.style, {
-            marginBottom: '30px',
-            fontSize: '42px',
-            fontWeight: 'bold',
-            textShadow: '0 4px 8px rgba(0,0,0,0.9)',
+            marginBottom: `${VISUALS.UI.SPACING.xl}px`,
+            fontSize: VISUALS.UI.FONTS.size.huge,
+            fontWeight: VISUALS.UI.FONTS.weight.bold,
+            textShadow: VISUALS.UI.SHADOWS.lg,
             letterSpacing: '2px'
         });
         this.mapSelectionContainer.appendChild(title);
@@ -177,19 +178,19 @@ export class MenuScene extends BaseScene {
         const listContainer = document.createElement('div');
         Object.assign(listContainer.style, {
             display: 'flex',
-            gap: '25px',
+            gap: `${VISUALS.UI.SPACING.lg}px`,
             overflowX: 'auto',
             overflowY: 'hidden',
             maxWidth: '90%',
             maxHeight: '70vh',
-            padding: '30px',
-            border: '2px solid rgba(255, 255, 255, 0.2)',
-            borderRadius: '15px',
-            background: 'rgba(0, 0, 0, 0.4)',
+            padding: `${VISUALS.UI.SPACING.xl}px`,
+            border: `${VISUALS.UI.BORDERS.width.normal} solid ${VISUALS.UI.COLORS.glass.border}`,
+            borderRadius: VISUALS.UI.BORDERS.radius.xl,
+            background: VISUALS.UI.COLORS.glass.bgLight,
             backdropFilter: 'blur(10px)',
-            boxShadow: '0 8px 30px rgba(0,0,0,0.5)',
+            boxShadow: VISUALS.UI.SHADOWS.xl,
             scrollbarWidth: 'thin',
-            scrollbarColor: 'rgba(255,255,255,0.3) rgba(0,0,0,0.2)'
+            scrollbarColor: `${VISUALS.UI.COLORS.glass.borderHover} ${VISUALS.UI.COLORS.glass.bgDark}`
         });
         this.mapSelectionContainer.appendChild(listContainer);
 
@@ -211,12 +212,12 @@ export class MenuScene extends BaseScene {
             this.mapSelectionContainer.style.display = 'none';
             this.container.style.display = 'flex';
         }, {
-            background: 'linear-gradient(135deg, #d32f2f, #b71c1c)',
-            fontSize: '20px',
-            padding: '12px 40px',
-            border: '2px solid rgba(255,255,255,0.2)',
-            borderRadius: '10px',
-            boxShadow: '0 4px 15px rgba(211, 47, 47, 0.5)',
+            background: `linear-gradient(135deg, ${VISUALS.UI.COLORS.danger}, #b71c1c)`,
+            fontSize: VISUALS.UI.FONTS.size.xl,
+            padding: `${VISUALS.UI.SPACING.md}px ${VISUALS.UI.SPACING.xxl}px`,
+            border: `${VISUALS.UI.BORDERS.width.normal} solid ${VISUALS.UI.COLORS.glass.border}`,
+            borderRadius: VISUALS.UI.BORDERS.radius.lg,
+            boxShadow: VISUALS.UI.SHADOWS.glow.danger,
             width: 'auto'
         });
 
@@ -230,16 +231,16 @@ export class MenuScene extends BaseScene {
                 display: 'flex',
                 flexDirection: 'column',
                 alignItems: 'center',
-                gap: '10px',
-                background: 'rgba(30, 30, 40, 0.85)',
-                padding: '15px',
-                borderRadius: '12px',
+                gap: `${VISUALS.UI.SPACING.sm}px`,
+                background: VISUALS.UI.COLORS.glass.bg,
+                padding: `${VISUALS.UI.SPACING.md}px`,
+                borderRadius: VISUALS.UI.BORDERS.radius.lg,
                 minWidth: '220px',
                 cursor: 'pointer',
-                border: '3px solid rgba(255, 255, 255, 0.1)',
+                border: `${VISUALS.UI.BORDERS.width.thick} solid ${VISUALS.UI.COLORS.glass.border}`,
                 backdropFilter: 'blur(5px)',
-                transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)', // Плавная кривая
-                boxShadow: '0 4px 15px rgba(0,0,0,0.3)',
+                transition: VISUALS.UI.TRANSITIONS.presets.normal,
+                boxShadow: VISUALS.UI.SHADOWS.md,
                 transform: 'translateZ(0)' // GPU acceleration
             });
 
@@ -263,20 +264,20 @@ export class MenuScene extends BaseScene {
 
             const label = document.createElement('div');
             label.innerText = name;
-            label.style.fontWeight = 'bold';
-            label.style.fontSize = '16px';
-            label.style.textShadow = '0 2px 4px rgba(0,0,0,0.8)';
+            label.style.fontWeight = VISUALS.UI.FONTS.weight.bold;
+            label.style.fontSize = VISUALS.UI.FONTS.size.lg;
+            label.style.textShadow = VISUALS.UI.SHADOWS.md;
             card.appendChild(label);
 
             card.onmouseover = () => {
-                card.style.borderColor = '#00ffff';
+                card.style.borderColor = VISUALS.UI.COLORS.primary;
                 card.style.transform = 'scale(1.05) translateY(-5px)';
-                card.style.boxShadow = '0 8px 25px rgba(0, 255, 255, 0.4)';
+                card.style.boxShadow = VISUALS.UI.SHADOWS.glow.primary;
             };
             card.onmouseout = () => {
-                card.style.borderColor = 'rgba(255, 255, 255, 0.1)';
+                card.style.borderColor = VISUALS.UI.COLORS.glass.border;
                 card.style.transform = 'scale(1)';
-                card.style.boxShadow = '0 4px 15px rgba(0,0,0,0.3)';
+                card.style.boxShadow = VISUALS.UI.SHADOWS.md;
             };
             card.onclick = () => {
                 console.log('Map card clicked:', name);

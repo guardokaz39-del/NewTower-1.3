@@ -1,4 +1,6 @@
 
+import { VISUALS } from './VisualConfig';
+
 export interface IButtonOptions {
     background?: string;
     color?: string;
@@ -71,17 +73,18 @@ export class UIUtils {
         const btn = document.createElement('button');
         btn.innerHTML = text;
 
-        // Defaults
+        // UPDATED: Use design tokens from VISUALS.UI
         const defaults: Partial<CSSStyleDeclaration> = {
-            padding: '10px 20px',
-            fontSize: '16px',
+            padding: `${VISUALS.UI.SPACING.sm}px ${VISUALS.UI.SPACING.lg}px`,
+            fontSize: VISUALS.UI.FONTS.size.lg,
             cursor: 'pointer',
-            background: '#333',
-            color: '#fff',
-            border: '2px solid #555',
-            borderRadius: '8px',
-            fontFamily: 'Segoe UI, sans-serif',
-            pointerEvents: 'auto'
+            background: VISUALS.UI.COLORS.neutral.medium,
+            color: VISUALS.UI.COLORS.text.primary,
+            border: `${VISUALS.UI.BORDERS.width.normal} solid ${VISUALS.UI.COLORS.neutral.light}`,
+            borderRadius: VISUALS.UI.BORDERS.radius.md,
+            fontFamily: VISUALS.UI.FONTS.family.primary,
+            pointerEvents: 'auto',
+            transition: VISUALS.UI.TRANSITIONS.presets.fast
         };
 
         // Merge options
@@ -180,14 +183,14 @@ export class UIUtils {
             left: '0',
             width: '100%',
             height: '100%',
-            backgroundColor: 'rgba(0,0,0,0.8)',
+            backgroundColor: VISUALS.UI.COLORS.overlay,
             zIndex: '2000',
             display: 'none',
             flexDirection: 'column',
             alignItems: 'center',
             justifyContent: 'center',
-            color: 'white',
-            fontFamily: 'Segoe UI, sans-serif'
+            color: VISUALS.UI.COLORS.text.primary,
+            fontFamily: VISUALS.UI.FONTS.family.primary
         });
         document.body.appendChild(overlay);
         return overlay;
@@ -200,7 +203,9 @@ export class UIUtils {
         const originalColor = el.style.color;
         const originalTransform = el.style.transform;
 
-        el.style.transition = `color ${durationMs / 2}ms, transform ${durationMs / 2}ms`;
+        // UPDATED: Use design token easing curve
+        const easing = VISUALS.UI.TRANSITIONS.easing.standard;
+        el.style.transition = `color ${durationMs / 2}ms ${easing}, transform ${durationMs / 2}ms ${easing}`;
         el.style.color = color;
         el.style.transform = 'scale(1.3)';
 

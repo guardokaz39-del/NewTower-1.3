@@ -2,6 +2,7 @@ import { IGameScene } from '../scenes/IGameScene';
 import { CONFIG } from '../Config';
 import { UIUtils } from '../UIUtils';
 import { EventBus, Events } from '../EventBus';
+import { VISUALS } from '../VisualConfig';
 
 export class GameHUD {
     private scene: IGameScene;
@@ -72,9 +73,9 @@ export class GameHUD {
         // Flash animation
         const current = parseInt(this.elMoney.innerText) || 0;
         if (newMoney > current) {
-            UIUtils.flashElement(this.elMoney.parentElement || this.elMoney, '#4caf50');
+            UIUtils.flashElement(this.elMoney.parentElement || this.elMoney, VISUALS.UI.COLORS.success);
         } else if (newMoney < current) {
-            UIUtils.flashElement(this.elMoney.parentElement || this.elMoney, '#f44336');
+            UIUtils.flashElement(this.elMoney.parentElement || this.elMoney, VISUALS.UI.COLORS.danger);
         }
         this.elMoney.innerText = newMoney.toString();
         this.updateForgeBtn(newMoney);
@@ -83,7 +84,7 @@ export class GameHUD {
     private updateLives(newLives: number) {
         const current = parseInt(this.elLives.innerText) || 0;
         if (newLives < current) {
-            UIUtils.flashElement(this.elLives.parentElement || this.elLives, '#f44336');
+            UIUtils.flashElement(this.elLives.parentElement || this.elLives, VISUALS.UI.COLORS.danger);
         }
         this.elLives.innerText = newLives.toString();
     }

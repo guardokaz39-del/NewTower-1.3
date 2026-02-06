@@ -3,6 +3,8 @@
  * Stores colors, sizes, and other visual constants for procedural generation and rendering.
  */
 
+import { UI } from './design';
+
 export const VISUALS = {
     ENVIRONMENT: {
         GRASS: {
@@ -114,10 +116,12 @@ export const VISUALS = {
         },
         BUILDING: {
             BASE: 'rgba(158, 158, 158, 0.5)',
-            BAR_BG: '#333',
+            BAR_BG: 'rgba(0,0,0,0.5)',
             BAR_FILL: 'gold',
         },
-        LASER: 'rgba(255, 0, 0, 0.3)',
+        LASER: 'rgba(255, 0, 0, 0.6)',  // Sniper laser sight
+        HEIGHT: 0.6,
+        BASE_COLOR: '#9e9e9e', // Fallback color for tower base (migrated from CONFIG.COLORS.TOWER_BASE)
         RANGE_CIRCLE: {
             FILL: 'rgba(0, 255, 255, 0.1)',
             STROKE: 'rgba(0, 255, 255, 0.4)',
@@ -154,5 +158,11 @@ export const VISUALS = {
         FIRE: '#f44336',
         SNIPER: '#4caf50',
         SPLIT: '#ff9800',
-    }
+    },
+
+    // UI Design System (imported from modular design tokens)
+    UI: UI
 };
+
+// Re-export helper functions from design system
+export { getSpacing, getTransition } from './design';

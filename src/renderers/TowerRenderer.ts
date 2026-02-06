@@ -56,7 +56,7 @@ export class TowerRenderer {
             ctx.drawImage(baseImg, drawX, drawY - emergeOffset);
         } else {
             // Fallback circle
-            ctx.fillStyle = CONFIG.COLORS.TOWER_BASE;
+            ctx.fillStyle = VISUALS.TOWER.BASE_COLOR;
             ctx.beginPath();
             ctx.arc(tower.x, tower.y - emergeOffset, size * 0.35, 0, Math.PI * 2);
             ctx.fill();
