@@ -58,6 +58,9 @@ export interface IContainerOptions {
     overflowY?: string;
     overflowX?: string;
     transform?: string;
+    flexGrow?: string;
+    flexShrink?: string;
+    marginBottom?: string;
 }
 
 export class UIUtils {
@@ -167,6 +170,9 @@ export class UIUtils {
         if (options.overflowY) div.style.overflowY = options.overflowY;
         if (options.overflowX) div.style.overflowX = options.overflowX;
         if (options.transform) div.style.transform = options.transform;
+        if (options.flexGrow) div.style.flexGrow = options.flexGrow;
+        if (options.flexShrink) div.style.flexShrink = options.flexShrink;
+        if (options.marginBottom) div.style.marginBottom = options.marginBottom;
 
         return div;
     }

@@ -22,7 +22,7 @@ export class EnemyRenderer {
         'SKELETON': new SkeletonUnitRenderer(),
         'WOLF': new DefaultUnitRenderer(),
         'TROLL': new TrollUnitRenderer(),
-        'SPIDER': new DefaultUnitRenderer(),
+        'SPIDER': new SpiderUnitRenderer(),
         'HELLHOUND': new DefaultUnitRenderer(),
         'ORC': new OrcUnitRenderer(),
         'WRAITH': new WraithUnitRenderer(),

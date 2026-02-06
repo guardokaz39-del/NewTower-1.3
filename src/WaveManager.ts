@@ -131,14 +131,14 @@ export class WaveManager {
         // this.scene.ui.update(); // EventBus handles UI
     }
 
-    private generateWave(waveNum: number) {
-        this.spawnQueue = [];
-        this.currentIndex = 0;
-
+    public getWaveConfig(waveNum: number): IWaveConfig | null {
         let waveConfig: IWaveConfig | null = null;
 
         // 1. Пытаемся взять волну из Карты (из редактора)
         if (this.scene.mapData && this.scene.mapData.waves && this.scene.mapData.waves.length > 0) {
+            // Note: Map data often repeats the last wave or loops, but for now we just clamp
+            // Actually, if we want "infinite" waves logic, we need to replicate how generateWave picks it.
+            // Current generateWave logic: Math.min(waveNum - 1, length - 1)
             const idx = Math.min(waveNum - 1, this.scene.mapData.waves.length - 1);
             waveConfig = this.scene.mapData.waves[idx];
         }
@@ -148,15 +148,22 @@ export class WaveManager {
             const idx = Math.min(waveNum - 1, CONFIG.WAVES.length - 1);
             const rawData = CONFIG.WAVES[idx];
 
-            // Проверяем: если rawData это массив, то оборачиваем его вручную
             if (Array.isArray(rawData)) {
-                // @ts-ignore - TS thinks rawData is readonly array which works for us
+                // @ts-ignore
                 waveConfig = { enemies: rawData };
             } else {
-                // Иначе считаем, что это уже правильный объект
                 waveConfig = rawData as unknown as IWaveConfig;
             }
         }
+
+        return waveConfig;
+    }
+
+    private generateWave(waveNum: number) {
+        this.spawnQueue = [];
+        this.currentIndex = 0;
+
+        const waveConfig = this.getWaveConfig(waveNum);
 
         // Разбор конфига и заполнение очереди с метаданными
         if (waveConfig && waveConfig.enemies) {

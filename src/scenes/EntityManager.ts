@@ -7,6 +7,7 @@ import { GameState } from './GameState';
 import { EffectSystem } from '../EffectSystem';
 import { MetricsSystem } from '../MetricsSystem';
 import { SoundManager } from '../SoundManager';
+import { EventBus, Events } from '../EventBus';
 
 /**
  * Manages entity lifecycle:
@@ -133,6 +134,9 @@ export class EntityManager {
         const enemy = this.state.enemyPool.obtain();
         EntityFactory.setupEnemy(enemy, type, this.state.wave, waypoints);
         this.state.enemies.push(enemy);
+
+        // Notify systems
+        EventBus.getInstance().emit(Events.ENEMY_SPAWNED, type);
 
         return enemy;
     }

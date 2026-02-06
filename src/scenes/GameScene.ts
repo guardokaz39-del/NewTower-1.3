@@ -227,6 +227,7 @@ export class GameScene extends BaseScene implements IGameScene {
         const ui = document.getElementById('ui-layer');
         if (ui) ui.style.display = 'none';
         window.removeEventListener('keydown', this.onKeyDown);
+        if (this.bestiary) this.bestiary.destroy();
     }
 
     private onKeyDown = (e: KeyboardEvent) => {
