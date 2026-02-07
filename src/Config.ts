@@ -41,11 +41,11 @@ export const CONFIG = {
     },
 
     CARD_TYPES: {
-        FIRE: { id: 'fire', name: 'Мортира', icon: '🔥', color: '#f44336', desc: 'Урон по площади' },
-        ICE: { id: 'ice', name: 'Стужа', icon: '❄️', color: '#00bcd4', desc: 'Замедляет врагов' },
-        SNIPER: { id: 'sniper', name: 'Снайпер', icon: '🎯', color: '#4caf50', desc: 'Дальняя стрельба' },
-        MULTISHOT: { id: 'multi', name: 'Залп', icon: '💥', color: '#ff9800', desc: '+1 снаряд, -урон' },
-        MINIGUN: { id: 'minigun', name: 'Пулемёт', icon: '⚡', color: '#9c27b0', desc: 'Быстрая стрельба, урон растёт' },
+        FIRE: { id: 'fire', name: 'Мортира', icon: '🔥', color: '#f44336', desc: 'Урон по площади', turretAsset: 'turret_fire', moduleAsset: 'mod_fire' },
+        ICE: { id: 'ice', name: 'Стужа', icon: '❄️', color: '#00bcd4', desc: 'Замедляет врагов', turretAsset: 'turret_ice', moduleAsset: 'mod_ice' },
+        SNIPER: { id: 'sniper', name: 'Снайпер', icon: '🎯', color: '#4caf50', desc: 'Дальняя стрельба', turretAsset: 'turret_sniper', moduleAsset: 'mod_sniper' },
+        MULTISHOT: { id: 'multi', name: 'Залп', icon: '💥', color: '#ff9800', desc: '+1 снаряд, -урон', turretAsset: 'turret_split', moduleAsset: 'mod_split' },
+        MINIGUN: { id: 'minigun', name: 'Пулемёт', icon: '⚡', color: '#9c27b0', desc: 'Быстрая стрельба, урон растёт', turretAsset: 'turret_minigun', moduleAsset: 'mod_minigun' },
     } as Readonly<Record<string, ICardTypeConfig>>,
 
     ENEMY: ENEMY_CONFIG,

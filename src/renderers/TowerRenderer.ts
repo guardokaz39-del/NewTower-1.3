@@ -2,6 +2,7 @@ import { Assets } from '../Assets';
 import { CONFIG } from '../Config';
 import { VISUALS } from '../VisualConfig';
 import type { Tower } from '../Tower';
+import { getTurretRenderer } from './turrets';
 
 export class TowerRenderer {
     static drawSprite(ctx: CanvasRenderingContext2D, tower: Tower) {
@@ -94,16 +95,10 @@ export class TowerRenderer {
             ctx.drawImage(baseImg, tower.x - halfSize, tower.y - halfSize);
         }
 
-        // 2. Determine Turret Asset based on Main Card (First Slot)
-        let turretName = 'turret_standard';
+        // 2. Get turret renderer via Strategy Pattern
         const mainCard = tower.cards[0];
-        if (mainCard) {
-            if (mainCard.type.id === 'ice') turretName = 'turret_ice';
-            else if (mainCard.type.id === 'fire') turretName = 'turret_fire';
-            else if (mainCard.type.id === 'sniper') turretName = 'turret_sniper';
-            else if (mainCard.type.id === 'multi') turretName = 'turret_split';
-            else if (mainCard.type.id === 'minigun') turretName = 'turret_minigun';
-        }
+        const renderer = getTurretRenderer(mainCard?.type.id || 'default');
+        const turretName = renderer.getTurretAsset();
 
         // 3. Draw Turret (Rotated) with Level Visuals
         const turretImg = Assets.get(turretName);
@@ -112,39 +107,35 @@ export class TowerRenderer {
             ctx.translate(tower.x, tower.y);
             ctx.rotate(tower.angle);
 
-            // Progressive scaling based on HIGHEST card level (not just first card)
+            // Progressive scaling based on HIGHEST card level
             const cardLevel = tower.cards.length > 0
                 ? Math.max(...tower.cards.map(c => c.level))
                 : 1;
-            const scaleMultiplier = 1.0 + ((cardLevel - 1) * 0.15); // LVL2=1.15, LVL3=1.30
+            const scaleMultiplier = 1.0 + ((cardLevel - 1) * 0.15);
             ctx.scale(scaleMultiplier, scaleMultiplier);
 
             // Recoil offset
             if (tower.recoilTimer > 0) {
                 const recoilOffset = Math.sin(tower.recoilTimer * 20) * tower.recoilIntensity;
                 ctx.translate(0, recoilOffset);
-                // tower.recoilTimer reduced in WeaponSystem
             }
 
+            // Draw turret
             ctx.drawImage(turretImg, -halfSize, -halfSize);
 
             // 4. Draw Modules (Attachments)
             TowerRenderer.drawModules(ctx, tower);
 
-            // Laser Sight for Sniper (Only if Turret is Sniper)
-            if (turretName === 'turret_sniper') {
-                TowerRenderer.drawLaserSight(ctx, tower);
+            // 5. Draw turret-specific effects (laser, heat haze)
+            // Called INSIDE rotated+recoiled context so effects move with barrel
+            if (renderer.drawEffects) {
+                renderer.drawEffects(ctx, tower);
             }
 
             ctx.restore();
 
             // Level-based visual effects (outside rotation context)
             TowerRenderer.drawLevelVisuals(ctx, tower, cardLevel, mainCard);
-
-            // 5. Heat Haze for Minigun (Visual FX)
-            if (turretName === 'turret_minigun' && tower.spinupTime > 0) {
-                TowerRenderer.drawHeatHaze(ctx, tower);
-            }
         }
     }
 
@@ -152,60 +143,32 @@ export class TowerRenderer {
         tower.cards.forEach((card, index) => {
             // Slot 0 Defines Turret Body. Modules are for Index > 0
             if (index > 0) {
-                let modName = '';
-                if (card.type.id === 'ice') modName = 'mod_ice';
-                else if (card.type.id === 'fire') modName = 'mod_fire';
-                else if (card.type.id === 'sniper') modName = 'mod_sniper';
-                else if (card.type.id === 'multi') modName = 'mod_split';
-                else if (card.type.id === 'minigun') modName = 'mod_minigun';
+                const renderer = getTurretRenderer(card.type.id);
+                const modName = renderer.getModuleAsset();
 
-                const modImg = Assets.get(modName);
-                if (modImg) {
-                    let offX = 0;
-                    let offY = 0;
+                if (modName) {
+                    const modImg = Assets.get(modName);
+                    if (modImg) {
+                        let offX = 0;
+                        let offY = 0;
 
-                    if (index === 1) {
-                        offX = -5; offY = 12; // Side 1
-                    } else if (index === 2) {
-                        offX = -5; offY = -12; // Side 2
-                    } else {
-                        offX = -12; offY = 0; // Back
+                        // Standard offsets (future: getModuleOffsets())
+                        if (index === 1) {
+                            offX = -5; offY = 12;
+                        } else if (index === 2) {
+                            offX = -5; offY = -12;
+                        } else {
+                            offX = -12; offY = 0;
+                        }
+
+                        ctx.save();
+                        ctx.translate(offX, offY);
+                        ctx.drawImage(modImg, -12, -12);
+                        ctx.restore();
                     }
-
-                    ctx.save();
-                    ctx.translate(offX, offY);
-                    ctx.drawImage(modImg, -12, -12);
-                    ctx.restore();
                 }
             }
         });
-    }
-
-    private static drawLaserSight(ctx: CanvasRenderingContext2D, tower: Tower) {
-        // Draw faint red line
-        const stats = tower.getStats();
-        // Pulse effect
-        const opacity = 0.4 + Math.sin(Date.now() * 0.005) * 0.2; // 0.2 to 0.6
-
-        ctx.save();
-        ctx.globalCompositeOperation = 'screen';
-        ctx.strokeStyle = VISUALS.TOWER.LASER;
-        ctx.globalAlpha = opacity;
-        ctx.lineWidth = 1.5;
-
-        ctx.beginPath();
-        ctx.moveTo(10, 0); // Start from end of barrel approx
-        ctx.lineTo(stats.range, 0); // extend to max range
-        ctx.stroke();
-
-        // Dot at the end
-        ctx.fillStyle = VISUALS.TOWER.LASER;
-        ctx.globalAlpha = opacity * 1.5;
-        ctx.beginPath();
-        ctx.arc(stats.range, 0, 2, 0, Math.PI * 2);
-        ctx.fill();
-
-        ctx.restore();
     }
 
     private static drawLevelVisuals(ctx: CanvasRenderingContext2D, tower: Tower, visualLevel: number, mainCard: any) {
@@ -317,40 +280,5 @@ export class TowerRenderer {
         // Draw from bottom up
         const fillH = barH * pct;
         ctx.fillRect(barX + 1, barY + (barH - fillH) - 1, barW - 2, fillH);
-    }
-
-    private static drawHeatHaze(ctx: CanvasRenderingContext2D, tower: Tower) {
-        // Heat rises from the barrel
-        // Calculate barrel tip world position
-        const barrelLen = 30;
-        const tipX = tower.x + Math.cos(tower.angle) * barrelLen;
-        const tipY = tower.y + Math.sin(tower.angle) * barrelLen;
-
-        ctx.save();
-        // Use time for animation
-        const time = Date.now() * 0.005;
-
-        // Draw multiple rising heat puffs
-        for (let i = 0; i < 3; i++) {
-            // Oscillating offset
-            // Cycle 0..50 pixels UP
-            const cycleDur = 50;
-            const offset = (time * 20 + i * (cycleDur / 3)) % cycleDur;
-
-            // Fade out as it goes up (1.0 at bottom, 0.0 at top)
-            const alpha = Math.max(0, (1 - (offset / cycleDur)) * 0.2);
-
-            // Sway left/right
-            const sway = Math.sin(time + i) * 5;
-            const dist = offset; // rising
-
-            ctx.fillStyle = `rgba(255, 255, 255, ${alpha})`;
-            ctx.beginPath();
-            // Circle grows as it rises
-            const size = 5 + (offset * 0.2);
-            ctx.arc(tipX + sway, tipY - dist, size, 0, Math.PI * 2);
-            ctx.fill();
-        }
-        ctx.restore();
     }
 }

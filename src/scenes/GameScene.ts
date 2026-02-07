@@ -177,7 +177,7 @@ export class GameScene extends BaseScene implements IGameScene {
         EventBus.getInstance().on(Events.ENEMY_DIED, (data: any) => {
             const enemy = data.enemy as Enemy;
             if (enemy && enemy.typeId === 'sapper_rat') {
-                this.triggerExplosion(enemy.x, enemy.y, 75, 200, true);
+                this.triggerExplosion(enemy.x, enemy.y, 45, 200, true); // Уменьшенный радиус
             }
         });
 
@@ -366,6 +366,10 @@ export class GameScene extends BaseScene implements IGameScene {
         // Draw targeting mode tooltip for hovered tower
         this.drawTargetingModeTooltip(ctx);
 
+        // Draw acid puddles UNDER enemies (z-order fix)
+        this.acidSystem.draw();
+        this.commanderSystem.draw();
+
         this.gameState.enemies.forEach((e) => e.draw(ctx));
         this.projectileSystem.draw(ctx);
         // Draw effects
@@ -381,10 +385,6 @@ export class GameScene extends BaseScene implements IGameScene {
         // Add dynamic lights...
         // Add dynamic lights...
         this.lighting.render(ctx);
-
-        // Draw Acid Puddles (Under enemies and lights ideally, but over map)
-        this.acidSystem.draw();
-        this.commanderSystem.draw();
 
         // === EMISSIVE PASS (Glowing Eyes through Fog/Darkness) ===
         // Draw this AFTER lighting so it "pops"
@@ -566,21 +566,41 @@ export class GameScene extends BaseScene implements IGameScene {
      * Spawns an explosion that can damage enemies (Friendly Fire)
      */
     public triggerExplosion(x: number, y: number, radius: number, damage: number, friendlyFire: boolean = false) {
-        // 1. Visuals
+        // 1. Main Explosion Visual
         this.effects.add({
             type: 'explosion',
             x: x,
             y: y,
-            radius: radius,
-            life: 0.4,
-            color: friendlyFire ? 'rgba(118, 255, 3, 0.7)' : 'rgba(255, 100, 0, 0.6)', // Green for rat, Orange for others
+            radius: radius, // No multiplier - new effect looks good at base size
+            life: 0.45,
+            color: friendlyFire ? 'rgba(118, 255, 3, 0.8)' : 'rgba(255, 100, 0, 0.7)',
         });
 
-        // 2. Sound
-        SoundManager.play('explosion');
-        this.triggerShake(0.3, 5);
+        // 2. Explosion particles (debris flying out)
+        const particleCount = friendlyFire ? 8 : 5;
+        for (let i = 0; i < particleCount; i++) {
+            const angle = (i / particleCount) * Math.PI * 2 + Math.random() * 0.5;
+            const speed = 150 + Math.random() * 100;
+            this.effects.add({
+                type: 'debris',
+                x: x,
+                y: y,
+                vx: Math.cos(angle) * speed,
+                vy: Math.sin(angle) * speed - 50,
+                life: 0.4 + Math.random() * 0.2,
+                size: 3 + Math.random() * 3,
+                color: friendlyFire ? '#76ff03' : '#ff6d00',
+                rotation: Math.random() * Math.PI * 2,
+                vRot: (Math.random() - 0.5) * 20,
+                gravity: 400,
+            });
+        }
 
-        // 3. Damage Logic
+        // 3. Sound and shake
+        SoundManager.play('explosion');
+        this.triggerShake(0.4, friendlyFire ? 8 : 5);
+
+        // 4. Damage Logic
         if (friendlyFire) {
             // Damage ALL enemies in range
             const enemies = this.gameState.enemies;
@@ -589,13 +609,7 @@ export class GameScene extends BaseScene implements IGameScene {
 
                 const dist = Math.hypot(enemy.x - x, enemy.y - y);
                 if (dist <= radius) {
-                    // Falloff damage? Or full? Let's do full for chaos.
                     enemy.takeDamage(damage);
-
-                    // Pushback effect (optional)
-                    // const angle = Math.atan2(enemy.y - y, enemy.x - x);
-                    // enemy.x += Math.cos(angle) * 20; // forceful
-                    // enemy.y += Math.sin(angle) * 20;
                 }
             }
         }

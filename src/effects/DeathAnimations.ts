@@ -28,7 +28,7 @@ const ANIMATORS: Record<string, IDeathAnimator> = {
     SPIDER: playAcidPop,
     TROLL: playIceShatter,
     MAGMA: playLavaPop,
-    RAT: playDefaultDeath,
+    RAT: playToxicExplosion,
     WOLF: playDefaultDeath,
 };
 
@@ -120,6 +120,30 @@ function playIceShatter(e: EffectSystem, x: number, y: number, _c: IEnemyTypeCon
 function playLavaPop(e: EffectSystem, x: number, y: number, _c: IEnemyTypeConfig) {
     addDebris(e, x, y, 4, '#ff3d00', 180, 100);
     addDust(e, x, y, 2, 'rgba(50,50,50,0.5)');
+}
+
+/** Крыса-сапёр — токсичный взрыв (радиальные искры) */
+function playToxicExplosion(e: EffectSystem, x: number, y: number, _c: IEnemyTypeConfig) {
+    // Радиальные зелёные искры
+    const sparkCount = 6;
+    for (let i = 0; i < sparkCount; i++) {
+        const angle = (i / sparkCount) * Math.PI * 2;
+        const speed = 120 + Math.random() * 60;
+        e.add({
+            type: 'particle',
+            x,
+            y,
+            vx: Math.cos(angle) * speed,
+            vy: Math.sin(angle) * speed - 30,
+            life: 0.5 + Math.random() * 0.2,
+            radius: 4 + Math.random() * 2,
+            color: '#76ff03',
+        });
+    }
+    // Токсичный дым
+    addDust(e, x, y, 3, 'rgba(118,255,3,0.4)');
+    // Обломки бочки
+    addDebris(e, x, y, 3, '#4e342e', 140, 80, 3);
 }
 
 // ============================================

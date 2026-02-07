@@ -88,10 +88,55 @@ export class EffectSystem {
             this.ctx.globalAlpha = progress;
 
             if (e.type === 'explosion') {
-                this.ctx.fillStyle = e.color || 'orange';
+                const radius = e.radius || 30;
+                const time = 1 - progress; // 0 -> 1 over lifetime
+
+                // Layer 1: Expanding shockwave ring
+                const ringRadius = radius * (0.3 + time * 0.7);
+                const ringWidth = 3 + (1 - time) * 4;
+                this.ctx.strokeStyle = e.color || 'rgba(255, 150, 50, 0.8)';
+                this.ctx.lineWidth = ringWidth;
                 this.ctx.beginPath();
-                this.ctx.arc(e.x, e.y, e.radius || 30, 0, Math.PI * 2);
-                this.ctx.fill();
+                this.ctx.arc(e.x, e.y, ringRadius, 0, Math.PI * 2);
+                this.ctx.stroke();
+
+                // Layer 2: Inner glow core (shrinking)
+                const coreRadius = radius * 0.4 * progress;
+                if (coreRadius > 1) {
+                    const gradient = this.ctx.createRadialGradient(
+                        e.x, e.y, 0,
+                        e.x, e.y, coreRadius
+                    );
+                    gradient.addColorStop(0, 'rgba(255, 255, 200, 0.9)');
+                    gradient.addColorStop(0.5, e.color || 'rgba(255, 150, 50, 0.6)');
+                    gradient.addColorStop(1, 'rgba(255, 100, 0, 0)');
+                    this.ctx.fillStyle = gradient;
+                    this.ctx.beginPath();
+                    this.ctx.arc(e.x, e.y, coreRadius, 0, Math.PI * 2);
+                    this.ctx.fill();
+                }
+
+                // Layer 3: Radial rays (spikes)
+                if (progress > 0.3) {
+                    const rayCount = 8;
+                    const rayLength = radius * 0.6 * progress;
+                    this.ctx.strokeStyle = e.color || 'rgba(255, 200, 100, 0.7)';
+                    this.ctx.lineWidth = 2;
+                    for (let i = 0; i < rayCount; i++) {
+                        const angle = (i / rayCount) * Math.PI * 2;
+                        const startR = radius * 0.15;
+                        this.ctx.beginPath();
+                        this.ctx.moveTo(
+                            e.x + Math.cos(angle) * startR,
+                            e.y + Math.sin(angle) * startR
+                        );
+                        this.ctx.lineTo(
+                            e.x + Math.cos(angle) * rayLength,
+                            e.y + Math.sin(angle) * rayLength
+                        );
+                        this.ctx.stroke();
+                    }
+                }
             } else if (e.type === 'text') {
                 const fontSize = e.fontSize || 16;
                 this.ctx.fillStyle = e.color || '#fff';

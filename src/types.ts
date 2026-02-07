@@ -12,6 +12,9 @@ export interface ICardTypeConfig {
     icon: string;
     color: string;
     desc: string;
+    // Turret rendering (optional for backward compatibility)
+    turretAsset?: string;  // e.g. 'turret_fire'
+    moduleAsset?: string;  // e.g. 'mod_fire'
 }
 
 // ============================================

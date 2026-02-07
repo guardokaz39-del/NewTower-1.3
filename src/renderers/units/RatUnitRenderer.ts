@@ -194,31 +194,57 @@ export class RatUnitRenderer implements UnitRenderer {
     }
 
     private drawPaw(ctx: CanvasRenderingContext2D, x: number, y: number, scale: number) {
-        ctx.fillStyle = RatUnitRenderer.SKIN_COLOR;
+        // Более заметные лапки
+        ctx.fillStyle = '#d7ccc8'; // Lighter than SKIN_COLOR for visibility
+        ctx.strokeStyle = RatUnitRenderer.SKIN_COLOR;
+        ctx.lineWidth = 1;
         ctx.beginPath();
-        // Claws
-        ctx.moveTo(x - 2 * scale, y + 2 * scale);
-        ctx.lineTo(x, y - 1 * scale);
-        ctx.lineTo(x + 2 * scale, y + 2 * scale);
+        // Larger claws with visible toes
+        ctx.moveTo(x - 3 * scale, y + 3 * scale);
+        ctx.lineTo(x - 1 * scale, y - 1 * scale);
+        ctx.lineTo(x, y + 1 * scale);
+        ctx.lineTo(x + 1 * scale, y - 1 * scale);
+        ctx.lineTo(x + 3 * scale, y + 3 * scale);
+        ctx.closePath();
         ctx.fill();
+        ctx.stroke();
     }
 
     private drawTail(ctx: CanvasRenderingContext2D, x: number, y: number, scale: number, angleObs: number, isBack: boolean, time: number = 0) {
-        ctx.strokeStyle = RatUnitRenderer.SKIN_COLOR;
-        ctx.lineWidth = 2.5 * scale;
+        // Более толстый и заметный хвост
+        ctx.strokeStyle = '#d7ccc8'; // Lighter for visibility
+        ctx.lineWidth = 3.5 * scale; // Thicker
         ctx.lineCap = 'round';
         ctx.beginPath();
         ctx.moveTo(x, y);
 
         if (isBack) {
-            // Wagging tail from back view
-            ctx.quadraticCurveTo(x + Math.sin(angleObs) * 10 * scale, y + 5 * scale, x + Math.sin(angleObs) * 15 * scale, y - 2 * scale);
+            // Wagging tail from back view - more pronounced
+            ctx.quadraticCurveTo(
+                x + Math.sin(angleObs) * 12 * scale,
+                y + 6 * scale,
+                x + Math.sin(angleObs) * 18 * scale,
+                y - 3 * scale
+            );
         } else {
-            // Side view trailing Sine Wave
-            const wave = Math.sin(time * 15) * 3 * scale;
-            ctx.quadraticCurveTo(x - 5 * scale, y + wave, x - 12 * scale, y + 2 * scale);
+            // Side view trailing Sine Wave - more visible
+            const wave = Math.sin(time * 15) * 4 * scale;
+            ctx.quadraticCurveTo(
+                x - 6 * scale,
+                y + wave,
+                x - 15 * scale,
+                y + 3 * scale
+            );
         }
         ctx.stroke();
+
+        // Tip of tail
+        ctx.fillStyle = RatUnitRenderer.SKIN_COLOR;
+        const tipX = isBack ? (x + Math.sin(angleObs) * 18 * scale) : (x - 15 * scale);
+        const tipY = isBack ? (y - 3 * scale) : (y + 3 * scale);
+        ctx.beginPath();
+        ctx.arc(tipX, tipY, 1.5 * scale, 0, Math.PI * 2);
+        ctx.fill();
     }
 
     private drawBarrel(ctx: CanvasRenderingContext2D, scale: number, glow: boolean) {
