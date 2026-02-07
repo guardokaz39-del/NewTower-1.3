@@ -38,6 +38,10 @@ export class Tower {
     // Visual state (Phase 3)
     public recoilTimer: number = 0;        // Recoil animation timer (seconds)
     public recoilIntensity: number = 0;     // Recoil strength
+    public barrelRotation: number = 0;      // Rotation angle of the barrel (Minigun)
+    public barrelRecoil: number = 0;        // Recoil offset of the barrel (px)
+    public heatLevel: number = 0;          // Heat level 0-1 (Minigun visual)
+    public chargeProgress: number = 0;      // Charge progress 0-1 (Sniper visual)
 
     constructor(c: number, r: number) {
         this.col = c;

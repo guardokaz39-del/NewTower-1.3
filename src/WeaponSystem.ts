@@ -5,6 +5,7 @@ import { CONFIG } from './Config';
 import { EffectSystem } from './EffectSystem';
 import { SoundManager, SoundPriority } from './SoundManager';
 import { ProjectileSystem } from './systems/ProjectileSystem';
+import { getTurretRenderer } from './renderers/turrets';
 
 export class WeaponSystem {
 
@@ -37,6 +38,12 @@ export class WeaponSystem {
         if (tower.recoilTimer > 0) {
             tower.recoilTimer -= dt;
             if (tower.recoilTimer < 0) tower.recoilTimer = 0;
+        }
+
+        // Decay barrel recoil (spring physics)
+        if (tower.barrelRecoil < 0) {
+            tower.barrelRecoil += dt * 20; // Recovery speed
+            if (tower.barrelRecoil > 0) tower.barrelRecoil = 0;
         }
 
         const stats = tower.getStats();
@@ -188,7 +195,10 @@ export class WeaponSystem {
 
     private fire(tower: Tower, target: { x: number, y: number }, stats: any, projectileSystem: ProjectileSystem, effects?: EffectSystem) {
         // Muzzle Math
-        const barrelLen = CONFIG.TOWER.BARREL_LENGTH;
+        // NEW: Get dynamic muzzle length from renderer
+        const renderer = getTurretRenderer(tower.cards[0]?.type.id || 'default');
+        const barrelLen = renderer.getMuzzleOffset ? renderer.getMuzzleOffset() : CONFIG.TOWER.BARREL_LENGTH;
+
         const muzzleX = tower.x + Math.cos(tower.angle) * barrelLen;
         const muzzleY = tower.y + Math.sin(tower.angle) * barrelLen;
 
@@ -251,8 +261,15 @@ export class WeaponSystem {
 
             // Trigger recoil for critical hits
             if (p.isCrit) {
-                tower.recoilTimer = 0.2; // 0.2s duration (was 10 frames)
+                // Apply barrel recoil (visual only)
+                tower.barrelRecoil = -6;
+
+                // Keep body recoil for critical hits (screen shake effect optional)
+                tower.recoilTimer = 0.2;
                 tower.recoilIntensity = 3;
+            } else {
+                // Standard recoil
+                tower.barrelRecoil = -4;
             }
         }
 

@@ -14,5 +14,9 @@ export class IceTurretRenderer implements ITurretRenderer {
         return 'mod_ice';
     }
 
+    getMuzzleOffset(): number {
+        return 24; // Crystal structure length
+    }
+
     // Future: drawEffects for frost aura
 }

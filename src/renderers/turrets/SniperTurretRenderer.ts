@@ -17,6 +17,10 @@ export class SniperTurretRenderer implements ITurretRenderer {
         return 'mod_sniper';
     }
 
+    getMuzzleOffset(): number {
+        return 40; // Long barrel for Sniper
+    }
+
     /**
      * Draw laser sight
      * Called INSIDE rotated+recoiled context — laser moves with barrel

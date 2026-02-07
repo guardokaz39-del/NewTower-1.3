@@ -36,7 +36,40 @@ export class TowerRenderer {
         }
     }
 
+    static drawPreview(ctx: CanvasRenderingContext2D, x: number, y: number, cardId?: string) {
+        ctx.globalAlpha = 0.5;
+        // Draw Base
+        const baseImg = Assets.get('base_default');
+        if (baseImg) {
+            ctx.drawImage(baseImg, x - 32, y - 32);
+        } else {
+            ctx.fillStyle = VISUALS.TOWER.BASE_COLOR;
+            ctx.beginPath();
+            ctx.arc(x, y, 22, 0, Math.PI * 2);
+            ctx.fill();
+        }
+
+        // Draw Turret (if card selected)
+        if (cardId) {
+            const renderer = getTurretRenderer(cardId);
+            const turretImg = Assets.get(renderer.getTurretAsset());
+
+            // Should also draw preview modules? Maybe too much detail.
+            // Just draw the main turret for now.
+            if (turretImg) {
+                // Determine scale based on... level 1 for preview
+                ctx.drawImage(turretImg, x - 32, y - 32);
+            }
+
+            // Draw range circle in preview?
+            // Already handled by UI usually, but good to ensure visual clarity
+        }
+        ctx.globalAlpha = 1.0;
+    }
+
+
     private static drawBuildingSprite(ctx: CanvasRenderingContext2D, tower: Tower, drawX: number, drawY: number, size: number) {
+        // ... existing building sprite logic ...
         // Enhanced building animation - base emerges from below with opacity
         const pct = tower.buildProgress / tower.maxBuildProgress;
         const emergeOffset = (1 - pct) * 15; // Starts 15px below, rises to 0
@@ -78,6 +111,7 @@ export class TowerRenderer {
     }
 
     private static drawBuildingUI(ctx: CanvasRenderingContext2D, tower: Tower, drawX: number, drawY: number, size: number) {
+        // ... existing building UI logic ...
         // Progress bar
         const pct = tower.buildProgress / tower.maxBuildProgress;
         const barWidth = size - 10;
@@ -88,7 +122,7 @@ export class TowerRenderer {
     }
 
     private static drawActiveSprite(ctx: CanvasRenderingContext2D, tower: Tower, size: number) {
-        // 1. Draw Base
+        // 1. Draw Base (Static - NO Rotation, NO Recoil)
         const halfSize = size / 2;
         const baseImg = Assets.get('base_default');
         if (baseImg) {
@@ -100,11 +134,21 @@ export class TowerRenderer {
         const renderer = getTurretRenderer(mainCard?.type.id || 'default');
         const turretName = renderer.getTurretAsset();
 
-        // 3. Draw Turret (Rotated) with Level Visuals
+        // 3. Draw Turret (Rotated + Recoiled)
         const turretImg = Assets.get(turretName);
         if (turretImg) {
             ctx.save();
             ctx.translate(tower.x, tower.y);
+
+            // Apply rotation
+            // For Minigun, we might have additional barrel rotation? 
+            // Usually minigun barrels spin AROUND the aim axis.
+            // But this is top-down 2D. 
+            // So 'barrelRotation' might effectively just be 'angle' if we want the whole gun to spin?
+            // No, minigun barrels spin around the central axis.
+            // Visually in 2D top down, this might look like the sprite switching frames OR
+            // just blurring.
+            // For now, standard rotation towards target:
             ctx.rotate(tower.angle);
 
             // Progressive scaling based on HIGHEST card level
@@ -114,16 +158,21 @@ export class TowerRenderer {
             const scaleMultiplier = 1.0 + ((cardLevel - 1) * 0.15);
             ctx.scale(scaleMultiplier, scaleMultiplier);
 
-            // Recoil offset
-            if (tower.recoilTimer > 0) {
-                const recoilOffset = Math.sin(tower.recoilTimer * 20) * tower.recoilIntensity;
-                ctx.translate(0, recoilOffset);
+            // Apply Barrel Recoil (Kickback)
+            // Move along the negative X axis (since we are rotated, X is "forward")
+            // Wait, standard canvas rotation: 0 is right (East).
+            // So translates X moves forward/back.
+            if (tower.barrelRecoil) {
+                ctx.translate(tower.barrelRecoil, 0);
             }
 
-            // Draw turret
+            // Draw turret body
             ctx.drawImage(turretImg, -halfSize, -halfSize);
 
-            // 4. Draw Modules (Attachments)
+            // 4. Draw Modules (Attachments) - Attached to turret body?
+            // If modules are attached to the rotating turret (like side-mounted guns), draw here.
+            // If they are on the base, draw before.
+            // Current design: Modules are ON the turret.
             TowerRenderer.drawModules(ctx, tower);
 
             // 5. Draw turret-specific effects (laser, heat haze)
@@ -134,7 +183,7 @@ export class TowerRenderer {
 
             ctx.restore();
 
-            // Level-based visual effects (outside rotation context)
+            // Level-based visual effects (outside rotation context, e.g. auras)
             TowerRenderer.drawLevelVisuals(ctx, tower, cardLevel, mainCard);
         }
     }
@@ -144,31 +193,68 @@ export class TowerRenderer {
             // Slot 0 Defines Turret Body. Modules are for Index > 0
             if (index > 0) {
                 const renderer = getTurretRenderer(card.type.id);
-                const modName = renderer.getModuleAsset();
+                // OLD: Sprite based
+                // const modName = renderer.getModuleAsset();
 
-                if (modName) {
-                    const modImg = Assets.get(modName);
-                    if (modImg) {
-                        let offX = 0;
-                        let offY = 0;
+                // NEW: Shape based modules (Phase 1)
+                // For now, let's keep using the old sprite logic BUT
+                // Phase 1 calls for Shapes.
+                // Let's implement Shapes here as part of "Critical Fixes" 
+                // because old icons were "pixel mush".
 
-                        // Standard offsets (future: getModuleOffsets())
-                        if (index === 1) {
-                            offX = -5; offY = 12;
-                        } else if (index === 2) {
-                            offX = -5; offY = -12;
-                        } else {
-                            offX = -12; offY = 0;
-                        }
+                // Determine position
+                let offX = 0;
+                let offY = 0;
+                if (index === 1) { offX = -5; offY = 12; }
+                else if (index === 2) { offX = -5; offY = -12; }
+                else { offX = -12; offY = 0; }
 
-                        ctx.save();
-                        ctx.translate(offX, offY);
-                        ctx.drawImage(modImg, -12, -12);
-                        ctx.restore();
-                    }
-                }
+                TowerRenderer.drawModuleShape(ctx, card.type.id, offX, offY, card.type.color);
             }
         });
+    }
+
+    private static drawModuleShape(ctx: CanvasRenderingContext2D, type: string, x: number, y: number, color: string) {
+        ctx.fillStyle = color;
+        ctx.strokeStyle = '#fff';
+        ctx.lineWidth = 1;
+
+        // Simple shapes for readability
+        ctx.beginPath();
+        switch (type) {
+            case 'fire': // Circle
+                ctx.arc(x, y, 4, 0, Math.PI * 2);
+                break;
+            case 'ice': // Diamond
+                ctx.moveTo(x, y - 5);
+                ctx.lineTo(x + 5, y);
+                ctx.lineTo(x, y + 5);
+                ctx.lineTo(x - 5, y);
+                ctx.closePath();
+                break;
+            case 'sniper': // Triangle
+                ctx.moveTo(x + 5, y);
+                ctx.lineTo(x - 4, y - 4);
+                ctx.lineTo(x - 4, y + 4);
+                ctx.closePath();
+                break;
+            case 'multi': // Hexagon (Split)
+                for (let i = 0; i < 6; i++) {
+                    const angle = i * Math.PI / 3;
+                    const vx = x + Math.cos(angle) * 4;
+                    const vy = y + Math.sin(angle) * 4;
+                    if (i === 0) ctx.moveTo(vx, vy); else ctx.lineTo(vx, vy);
+                }
+                ctx.closePath();
+                break;
+            case 'minigun': // Square
+                ctx.rect(x - 4, y - 4, 8, 8);
+                break;
+            default: // Small circle default
+                ctx.arc(x, y, 3, 0, Math.PI * 2);
+        }
+        ctx.fill();
+        ctx.stroke();
     }
 
     private static drawLevelVisuals(ctx: CanvasRenderingContext2D, tower: Tower, visualLevel: number, mainCard: any) {

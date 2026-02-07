@@ -66,6 +66,7 @@ export function getCardType(key: string): ICardTypeConfig | undefined {
  * Type-safe helper to get enemy type configuration
  */
 export function getEnemyType(key: string): IEnemyTypeConfig | undefined {
+    // Try exact match first, then uppercase
     // @ts-ignore
-    return CONFIG.ENEMY_TYPES[key];
+    return CONFIG.ENEMY_TYPES[key] || CONFIG.ENEMY_TYPES[key.toUpperCase()];
 }

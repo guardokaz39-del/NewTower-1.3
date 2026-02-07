@@ -16,6 +16,10 @@ export class MinigunTurretRenderer implements ITurretRenderer {
         return 'mod_minigun';
     }
 
+    getMuzzleOffset(): number {
+        return 30; // Medium barrel for Minigun
+    }
+
     /**
      * Draw heat haze when spinning up
      * Called INSIDE rotated context — effect is attached to barrel

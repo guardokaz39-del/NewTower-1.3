@@ -15,10 +15,24 @@ export interface ITurretRenderer {
     getModuleAsset(): string;
 
     /** 
+     * Get muzzle offset from tower center (px) 
+     * Used for projectile spawn point and muzzle flash
+     */
+    getMuzzleOffset(): number;
+
+    /** 
      * Additional rendering after turret (laser, heat haze)
      * Called INSIDE rotated+recoiled context — effects move with barrel
      */
     drawEffects?(ctx: CanvasRenderingContext2D, tower: Tower): void;
+
+    /**
+     * Draw preview of turret for ghost building
+     * @param ctx Context to draw to
+     * @param x Center X
+     * @param y Center Y
+     */
+    drawPreview?(ctx: CanvasRenderingContext2D, x: number, y: number): void;
 }
 
 /**
@@ -33,5 +47,9 @@ export class DefaultTurretRenderer implements ITurretRenderer {
 
     getModuleAsset(): string {
         return '';
+    }
+
+    getMuzzleOffset(): number {
+        return 22; // Default barrel length
     }
 }

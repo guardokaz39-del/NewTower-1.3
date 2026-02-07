@@ -13,4 +13,8 @@ export class SplitTurretRenderer implements ITurretRenderer {
     getModuleAsset(): string {
         return 'mod_split';
     }
+
+    getMuzzleOffset(): number {
+        return 28; // Wide barrel array
+    }
 }

@@ -13,4 +13,8 @@ export class FireTurretRenderer implements ITurretRenderer {
     getModuleAsset(): string {
         return 'mod_fire';
     }
+
+    getMuzzleOffset(): number {
+        return 15; // Short barrel for Mortar/Fire
+    }
 }
