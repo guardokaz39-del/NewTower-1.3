@@ -8,6 +8,7 @@ import { EffectSystem } from '../EffectSystem';
 import { MetricsSystem } from '../MetricsSystem';
 import { SoundManager } from '../SoundManager';
 import { EventBus, Events } from '../EventBus';
+import { playDeathAnimation } from '../effects';
 
 /**
  * Manages entity lifecycle:
@@ -159,16 +160,8 @@ export class EntityManager {
 
         const enemyTypeConf = getEnemyType(enemy.typeId.toUpperCase());
 
-        // Scale pop animation (enemy "pops" before disappearing)
-        const archetype = enemyTypeConf?.archetype || 'skeleton';
-        this.effects.add({
-            type: 'scale_pop',
-            x: enemy.x,
-            y: enemy.y,
-            life: 0.2, // 12 frames
-            enemySprite: `enemy_${archetype.toLowerCase()}`,
-            enemyColor: enemyTypeConf?.color
-        });
+        // === Архетип-специфичная анимация смерти ===
+        playDeathAnimation(this.effects, enemy, enemyTypeConf);
 
         // Soft death sound (throttled by SoundManager)
         SoundManager.play('death');
@@ -179,9 +172,9 @@ export class EntityManager {
             text: `+${reward}💰`,
             x: enemy.x,
             y: enemy.y,
-            life: 0.6, // 40 frames
+            life: 0.6,
             color: 'gold',
-            vy: -90, // -1.5 * 60
+            vy: -90,
         });
 
         // Coin particle burst
@@ -191,30 +184,11 @@ export class EntityManager {
                 type: 'particle',
                 x: enemy.x + (Math.random() - 0.5) * 20,
                 y: enemy.y + (Math.random() - 0.5) * 20,
-                vx: (Math.random() - 0.5) * 360, // 6 * 60
-                vy: -(Math.random() * 240 + 120), // 4+2 * 60
-                life: 0.4 + Math.random() * 0.25, // 25-40 frames
+                vx: (Math.random() - 0.5) * 360,
+                vy: -(Math.random() * 240 + 120),
+                life: 0.4 + Math.random() * 0.25,
                 radius: 3 + Math.random() * 2,
                 color: Math.random() > 0.3 ? '#ffd700' : '#ffeb3b',
-            });
-        }
-
-        // Death debris (colored by enemy type)
-        const debrisColor = enemyTypeConf?.color || '#888';
-        const debrisCount = 4 + Math.floor(Math.random() * 3);
-        for (let d = 0; d < debrisCount; d++) {
-            this.effects.add({
-                type: 'debris',
-                x: enemy.x,
-                y: enemy.y,
-                vx: (Math.random() - 0.5) * 360, // 6 * 60
-                vy: -(Math.random() * 180 + 60), // 3+1 * 60
-                life: 0.4 + Math.random() * 0.15, // 25
-                size: 2 + Math.random() * 3,
-                color: debrisColor,
-                rotation: Math.random() * Math.PI * 2,
-                vRot: (Math.random() - 0.5) * 18, // 0.3 * 60
-                gravity: 900, // 15 * 60 (approx 0.25 * 60 * 60)
             });
         }
     }
