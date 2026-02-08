@@ -106,7 +106,7 @@ export class Tower {
         // Get visual overrides from first card (data-driven approach)
         const mainCard = this.cards[0];
         if (mainCard) {
-            const upgrade = getCardUpgrade(mainCard.type.id, mainCard.level);
+            const upgrade = getCardUpgrade(mainCard.type.id, mainCard.level, mainCard.evolutionPath);
             if (upgrade?.visualOverrides) {
                 projectileType = upgrade.visualOverrides.projectileType || 'standard';
                 color = upgrade.visualOverrides.projectileColor || VISUALS.PROJECTILES.STANDARD;

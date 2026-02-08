@@ -12,10 +12,14 @@ export interface ICardModifiers {
 }
 
 export interface ICardEffect {
-    type: 'splash' | 'slow' | 'pierce' | 'explodeOnDeath' | 'chainSlowOnDeath' | 'spinup';
+    type: 'splash' | 'slow' | 'pierce' | 'explodeOnDeath' | 'chainSlowOnDeath' | 'spinup' | 'burn';
 
     // Splash effect properties
     splashRadius?: number;
+
+    // Burn effect properties (Napalm evolution)
+    burnDps?: number;           // Damage per second
+    burnDuration?: number;      // Duration in seconds
 
     // Slow effect properties
     slowPower?: number;           // 0-1, where 0.2 = 20% slow

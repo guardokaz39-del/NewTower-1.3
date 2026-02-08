@@ -78,7 +78,8 @@ export function mergeCardsWithStacking(cards: ICard[]): MergedCardData {
             continue;
         } else if (typeCards.length === 1) {
             // Single card of this type: 100% bonus
-            const upgrade = getCardUpgrade(typeId, typeCards[0].level);
+            const card = typeCards[0];
+            const upgrade = getCardUpgrade(typeId, card.level, card.evolutionPath);
             if (upgrade) {
                 applyModifiers(result, upgrade.modifiers, 1.0);
                 allEffects.push(...upgrade.effects);
@@ -104,7 +105,7 @@ function processSameTypeGroup(
 
     // First card (highest level): 100%
     const mainCard = cards[0];
-    const mainUpgrade = getCardUpgrade(mainCard.type.id, mainCard.level);
+    const mainUpgrade = getCardUpgrade(mainCard.type.id, mainCard.level, mainCard.evolutionPath);
     if (mainUpgrade) {
         applyModifiers(result, mainUpgrade.modifiers, 1.0);
         allEffects.push(...mainUpgrade.effects);
@@ -113,7 +114,7 @@ function processSameTypeGroup(
     // Rest of the cards: apply stacking bonus
     for (let i = 1; i < cards.length; i++) {
         const card = cards[i];
-        const upgrade = getCardUpgrade(card.type.id, card.level);
+        const upgrade = getCardUpgrade(card.type.id, card.level, card.evolutionPath);
         if (!upgrade) continue;
 
         const bonus = getStackingBonus(card.level);
@@ -143,7 +144,7 @@ function processMinigunGroup(
 ) {
     // Already sorted by level
     const mainCard = cards[0];
-    const mainUpgrade = getCardUpgrade('minigun', mainCard.level);
+    const mainUpgrade = getCardUpgrade('minigun', mainCard.level, mainCard.evolutionPath);
 
     if (!mainUpgrade) return;
 

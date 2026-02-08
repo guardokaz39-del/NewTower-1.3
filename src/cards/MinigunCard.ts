@@ -1,72 +1,74 @@
 import { IUpgradeCard } from './CardType';
 
 /**
- * Minigun Card Upgrades
+ * Minigun Card Upgrades (BUFFED)
  * 
- * Level 1: Percentage damage modifier (-70%), +3 dmg/sec, overheat after 5s (1.5s lockout)
- * Level 2: Same as level 1 (-60%) + 2% crit chance per second
- * Level 3: Stepped damage ramp (-45%), + crit, overheat 3s lockout
+ * Role: Sustained DPS monster, rewards commitment
+ * Trade-off: Needs ramp-up time, vulnerable to overheat
+ * 
+ * Level 1: 55% base, x2.65 speed, +4 DPS/s, 5s to overheat
+ * Level 2: 65% base, x2.75 speed, +5 DPS/s, +2% crit/s, 6s overheat
+ * Level 3: 80% base, stepped damage up to +40, extended overheat
  */
 export const MINIGUN_UPGRADES: Record<number, IUpgradeCard> = {
     1: {
         level: 1,
         modifiers: {
-            damageMultiplier: 0.50, // 50% of base damage (50% reduction)
-            attackSpeedMultiplier: 2.65, // 45 / 17 = 2.65x faster attacks
+            damageMultiplier: 0.55,       // Buffed from 0.50
+            attackSpeedMultiplier: 2.65,
         },
         effects: [
             {
                 type: 'spinup',
-                spinupDamagePerSecond: 3, // +3 damage per second
-                maxSpinupSeconds: 5, // 5 seconds
-                overheatDuration: 1.5, // 90 / 60
-                overheatExtensionWithIce: 2, // 120 / 60
+                spinupDamagePerSecond: 4,  // Buffed from 3
+                maxSpinupSeconds: 5,
+                overheatDuration: 1.2,     // Slightly reduced from 1.5
+                overheatExtensionWithIce: 2.5,
             }
         ],
         visualOverrides: {
             projectileType: 'minigun',
             projectileColor: '#fff',
-            projectileSpeed: 720, // 12 * 60
+            projectileSpeed: 720,
         }
     },
     2: {
         level: 2,
         modifiers: {
-            damageMultiplier: 0.60, // 60% of base damage (40% reduction)
-            attackSpeedMultiplier: 2.75,
+            damageMultiplier: 0.65,       // Buffed from 0.60
+            attackSpeedMultiplier: 2.80,  // Buffed from 2.75
         },
         effects: [
             {
                 type: 'spinup',
-                spinupDamagePerSecond: 3,
-                spinupCritPerSecond: 0.02, // +2% crit chance per second
-                maxSpinupSeconds: 5,
-                overheatDuration: 1.5,
-                overheatExtensionWithIce: 2,
+                spinupDamagePerSecond: 5,  // Buffed from 3
+                spinupCritPerSecond: 0.025, // Buffed from 0.02
+                maxSpinupSeconds: 6,       // Extended from 5
+                overheatDuration: 1.0,     // Reduced from 1.5
+                overheatExtensionWithIce: 2.5,
             }
         ]
     },
     3: {
         level: 3,
         modifiers: {
-            damageMultiplier: 0.75, // 75% of base damage (25% reduction)
-            attackSpeedMultiplier: 2.65,
+            damageMultiplier: 0.80,       // Buffed from 0.75
+            attackSpeedMultiplier: 2.75,  // Buffed from 2.65
         },
         effects: [
             {
                 type: 'spinup',
-                // Stepped damage: 5 steps over 5 seconds
                 spinupSteps: [
-                    { threshold: 1, damage: 5 },   // 0-1 sec: +5 dmg
-                    { threshold: 2, damage: 10 },  // 1-2 sec: +10 dmg
-                    { threshold: 3, damage: 15 },  // 2-3 sec: +15 dmg
-                    { threshold: 4, damage: 20 },  // 3-4 sec: +20 dmg
-                    { threshold: 5, damage: 30 },  // 4-5 sec: +30 dmg (max)
+                    { threshold: 1, damage: 6 },   // Buffed
+                    { threshold: 2, damage: 14 },  // Buffed
+                    { threshold: 3, damage: 22 },  // Buffed
+                    { threshold: 4, damage: 32 },  // Buffed
+                    { threshold: 5, damage: 45 },  // Buffed from 30
                 ],
-                spinupCritPerSecond: 0.02, // +2% crit chance per second
-                maxSpinupSeconds: 5,
-                overheatDuration: 1.5,
-                overheatExtensionWithIce: 2,
+                spinupCritPerSecond: 0.03,
+                maxSpinupSeconds: 6,       // Extended
+                overheatDuration: 1.2,     // Reduced
+                overheatExtensionWithIce: 3,
             }
         ]
     }

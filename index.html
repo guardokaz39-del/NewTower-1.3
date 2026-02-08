@@ -893,6 +893,322 @@
             box-shadow: 0 8px 20px rgba(76, 175, 80, 0.6),
                 0 0 30px rgba(76, 175, 80, 0.4) !important;
         }
+
+        /* ======================================== */
+        /* EVOLUTION MODAL STYLES */
+        /* ======================================== */
+        #evolution-modal {
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.9);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 10000;
+        }
+
+        #evolution-modal.show {
+            display: flex;
+            animation: evoFadeIn 0.3s ease-out;
+        }
+
+        @keyframes evoFadeIn {
+            from {
+                opacity: 0;
+            }
+
+            to {
+                opacity: 1;
+            }
+        }
+
+        .evo-container {
+            background: linear-gradient(135deg, #1a1a2e, #16213e);
+            border-radius: 20px;
+            padding: 30px;
+            border: 2px solid #0f3460;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+            max-width: 600px;
+            animation: evoScaleIn 0.3s ease-out;
+        }
+
+        @keyframes evoScaleIn {
+            from {
+                transform: scale(0.9);
+                opacity: 0;
+            }
+
+            to {
+                transform: scale(1);
+                opacity: 1;
+            }
+        }
+
+        .evo-title {
+            text-align: center;
+            color: #ffd700;
+            font-size: 28px;
+            margin-bottom: 5px;
+            text-shadow: 0 0 20px rgba(255, 215, 0, 0.5);
+        }
+
+        .evo-subtitle {
+            text-align: center;
+            color: #aaa;
+            font-size: 14px;
+            margin-bottom: 20px;
+        }
+
+        .evo-paths {
+            display: flex;
+            gap: 20px;
+        }
+
+        .evo-path {
+            flex: 1;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 15px;
+            padding: 25px 20px;
+            cursor: pointer;
+            transition: all 0.2s;
+            border: 2px solid transparent;
+            text-align: center;
+        }
+
+        .evo-path:hover {
+            transform: scale(1.03);
+            border-color: #4caf50;
+            background: rgba(76, 175, 80, 0.1);
+            box-shadow: 0 0 20px rgba(76, 175, 80, 0.3);
+        }
+
+        .evo-path:active {
+            transform: scale(0.98);
+        }
+
+        .evo-path-icon {
+            font-size: 56px;
+            margin-bottom: 10px;
+        }
+
+        .evo-path-name {
+            color: #fff;
+            font-size: 22px;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+
+        .evo-path-desc {
+            color: #bbb;
+            font-size: 13px;
+            line-height: 1.4;
+        }
+
+        .evo-cancel-btn {
+            display: block;
+            margin: 25px auto 0;
+            padding: 12px 35px;
+            background: #555;
+            border: none;
+            border-radius: 8px;
+            color: #fff;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.2s;
+        }
+
+        .evo-cancel-btn:hover {
+            background: #666;
+        }
+
+        /* Evolution Badge on Cards */
+        .evo-badge {
+            position: absolute;
+            top: 3px;
+            right: 3px;
+            font-size: 11px;
+            background: rgba(0, 0, 0, 0.6);
+            border-radius: 4px;
+            padding: 2px 5px;
+            line-height: 1;
+            z-index: 5;
+        }
+
+        /* ============================================ */
+        /* EVOLUTION-SPECIFIC CARD STYLING */
+        /* Subtle but clear visual differences */
+        /* ============================================ */
+
+        /* FIRE EVOLUTIONS */
+        .card.evo-inferno {
+            border-top: 3px solid #ff3d00;
+            box-shadow: 0 4px 12px rgba(255, 61, 0, 0.4);
+        }
+
+        .card.evo-napalm {
+            border-top: 3px solid #ff9100;
+            background: linear-gradient(180deg, rgba(255, 145, 0, 0.15) 0%, transparent 50%);
+        }
+
+        .card.evo-meteor {
+            border-top: 4px solid #d50000;
+            box-shadow: 0 4px 16px rgba(213, 0, 0, 0.5);
+        }
+
+        .card.evo-hellfire {
+            border-top: 4px solid #c51162;
+            background: linear-gradient(180deg, rgba(197, 17, 98, 0.2) 0%, transparent 40%);
+        }
+
+        .card.evo-magma {
+            border-top: 4px solid #ff6d00;
+            box-shadow: 0 4px 14px rgba(255, 109, 0, 0.45);
+        }
+
+        .card.evo-scorch {
+            border-top: 4px solid #ffab00;
+            background: linear-gradient(180deg, rgba(255, 171, 0, 0.15) 0%, transparent 50%);
+        }
+
+        /* ICE EVOLUTIONS */
+        .card.evo-frost {
+            border-top: 3px solid #40c4ff;
+            box-shadow: 0 4px 12px rgba(64, 196, 255, 0.4);
+        }
+
+        .card.evo-shatter {
+            border-top: 3px solid #18ffff;
+            background: linear-gradient(180deg, rgba(24, 255, 255, 0.12) 0%, transparent 50%);
+        }
+
+        .card.evo-absolutezero {
+            border-top: 4px solid #00b0ff;
+            box-shadow: 0 4px 18px rgba(0, 176, 255, 0.5);
+        }
+
+        .card.evo-blizzard {
+            border-top: 4px solid #00e5ff;
+            background: linear-gradient(180deg, rgba(0, 229, 255, 0.15) 0%, transparent 40%);
+        }
+
+        .card.evo-permafrost {
+            border-top: 4px solid #64ffda;
+            box-shadow: 0 4px 14px rgba(100, 255, 218, 0.45);
+        }
+
+        .card.evo-glacier {
+            border-top: 4px solid #84ffff;
+            background: linear-gradient(180deg, rgba(132, 255, 255, 0.12) 0%, transparent 50%);
+        }
+
+        /* SNIPER EVOLUTIONS */
+        .card.evo-precision {
+            border-top: 3px solid #76ff03;
+            box-shadow: 0 4px 12px rgba(118, 255, 3, 0.35);
+        }
+
+        .card.evo-penetrator {
+            border-top: 3px solid #b2ff59;
+            background: linear-gradient(180deg, rgba(178, 255, 89, 0.10) 0%, transparent 50%);
+        }
+
+        .card.evo-executor {
+            border-top: 4px solid #64dd17;
+            box-shadow: 0 4px 16px rgba(100, 221, 23, 0.5);
+        }
+
+        .card.evo-headhunter {
+            border-top: 4px solid #aeea00;
+            background: linear-gradient(180deg, rgba(174, 234, 0, 0.15) 0%, transparent 40%);
+        }
+
+        .card.evo-railgun {
+            border-top: 4px solid #eeff41;
+            box-shadow: 0 4px 14px rgba(238, 255, 65, 0.4);
+        }
+
+        .card.evo-marksman {
+            border-top: 4px solid #c6ff00;
+            background: linear-gradient(180deg, rgba(198, 255, 0, 0.12) 0%, transparent 50%);
+        }
+
+        /* MULTISHOT EVOLUTIONS */
+        .card.evo-barrage {
+            border-top: 3px solid #ea80fc;
+            box-shadow: 0 4px 12px rgba(234, 128, 252, 0.35);
+        }
+
+        .card.evo-spread {
+            border-top: 3px solid #b388ff;
+            background: linear-gradient(180deg, rgba(179, 136, 255, 0.12) 0%, transparent 50%);
+        }
+
+        .card.evo-storm {
+            border-top: 4px solid #e040fb;
+            box-shadow: 0 4px 16px rgba(224, 64, 251, 0.45);
+        }
+
+        .card.evo-volley {
+            border-top: 4px solid #d500f9;
+            background: linear-gradient(180deg, rgba(213, 0, 249, 0.15) 0%, transparent 40%);
+        }
+
+        .card.evo-homing {
+            border-top: 4px solid #7c4dff;
+            box-shadow: 0 4px 14px rgba(124, 77, 255, 0.4);
+        }
+
+        .card.evo-twin {
+            border-top: 4px solid #651fff;
+            background: linear-gradient(180deg, rgba(101, 31, 255, 0.15) 0%, transparent 50%);
+        }
+
+        /* MINIGUN EVOLUTIONS */
+        .card.evo-chaingun {
+            border-top: 3px solid #e0e0e0;
+            box-shadow: 0 4px 12px rgba(224, 224, 224, 0.3);
+        }
+
+        .card.evo-gatling {
+            border-top: 3px solid #bdbdbd;
+            background: linear-gradient(180deg, rgba(189, 189, 189, 0.10) 0%, transparent 50%);
+        }
+
+        .card.evo-autocannon {
+            border-top: 4px solid #90a4ae;
+            box-shadow: 0 4px 16px rgba(144, 164, 174, 0.45);
+        }
+
+        .card.evo-rotary {
+            border-top: 4px solid #ff8a80;
+            background: linear-gradient(180deg, rgba(255, 138, 128, 0.15) 0%, transparent 40%);
+        }
+
+        .card.evo-devastator {
+            border-top: 4px solid #ffab40;
+            box-shadow: 0 4px 14px rgba(255, 171, 64, 0.5);
+        }
+
+        .card.evo-suppressor {
+            border-top: 4px solid #ce93d8;
+            background: linear-gradient(180deg, rgba(206, 147, 216, 0.12) 0%, transparent 50%);
+        }
+
+        /* Evolution playstyle tag */
+        .evo-playstyle {
+            position: absolute;
+            bottom: 3px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 8px;
+            font-weight: bold;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: rgba(255, 255, 255, 0.7);
+            background: rgba(0, 0, 0, 0.4);
+            padding: 1px 6px;
+            border-radius: 3px;
+        }
     </style>
 </head>
 
