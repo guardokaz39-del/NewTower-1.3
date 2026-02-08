@@ -29,6 +29,7 @@ import { DayNightCycle } from '../DayNightCycle';
 import { AtmosphereSystem } from '../systems/AtmosphereSystem';
 import { ProjectileSystem } from '../systems/ProjectileSystem';
 import { Enemy } from '../Enemy';
+import { PerformanceMonitor } from '../utils/PerformanceMonitor';
 
 import { GameController } from './GameController';
 import { GameState } from './GameState';
@@ -293,6 +294,9 @@ export class GameScene extends BaseScene implements IGameScene {
     };
 
     public update(dt: number) {
+        // PERF: Track frame timing for FPS graph
+        PerformanceMonitor.beginFrame();
+
         if (!this.gameState.isRunning) return;
         if (this.gameState.paused) return;
 
@@ -532,8 +536,14 @@ export class GameScene extends BaseScene implements IGameScene {
             if (mode) {
                 // Draw small icon above tower
                 ctx.save();
-                ctx.shadowBlur = 10;
-                ctx.shadowColor = 'rgba(0, 0, 0, 0.8)';
+                // PERF: Removed shadowBlur - causes severe performance hit in render loop
+                // Use layered circles for fake shadow effect instead
+
+                // Shadow layer (dark circle behind)
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+                ctx.beginPath();
+                ctx.arc(hoveredTower.x + 2, hoveredTower.y - 43, 18, 0, Math.PI * 2);
+                ctx.fill();
 
                 // Background circle
                 ctx.fillStyle = 'rgba(50, 50, 70, 0.95)';

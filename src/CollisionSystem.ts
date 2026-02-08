@@ -6,7 +6,7 @@ import { SpatialGrid } from './SpatialGrid';
 
 export class CollisionSystem {
     private effects: EffectSystem;
-    private enemyGrid: SpatialGrid<Enemy>;
+    public readonly enemyGrid: SpatialGrid<Enemy>; // Public for DevConsole stats
 
     constructor(effects: EffectSystem) {
         this.effects = effects;
@@ -85,7 +85,7 @@ export class CollisionSystem {
         // --- ВИЗУАЛ: Искры при попадании (critical hit = more particles) ---
         const particleCount = p.isCrit ? 10 : 5;
         for (let i = 0; i < particleCount; i++) {
-            this.effects.add({
+            this.effects.spawn({
                 type: 'particle',
                 x: target.x,
                 y: target.y,
@@ -100,7 +100,7 @@ export class CollisionSystem {
         // === CRIT FLASH + BIG TEXT ===
         if (p.isCrit) {
             // Screen flash (white)
-            this.effects.add({
+            this.effects.spawn({
                 type: 'screen_flash',
                 x: 0,
                 y: 0,
@@ -109,7 +109,7 @@ export class CollisionSystem {
             });
 
             // Big "CRIT!" text
-            this.effects.add({
+            this.effects.spawn({
                 type: 'text',
                 text: 'CRIT!',
                 x: target.x,
@@ -121,7 +121,7 @@ export class CollisionSystem {
             });
 
             // Enlarged damage number
-            this.effects.add({
+            this.effects.spawn({
                 type: 'text',
                 text: Math.floor(p.damage).toString(),
                 x: target.x + 15,
@@ -150,7 +150,7 @@ export class CollisionSystem {
             }
         }
         if (splash) {
-            this.effects.add({
+            this.effects.spawn({
                 type: 'explosion',
                 x: target.x,
                 y: target.y,
@@ -159,10 +159,15 @@ export class CollisionSystem {
                 color: 'rgba(255, 100, 0, 0.5)',
             });
 
-            for (const neighbor of allEnemies) {
+            // PERF: indexed loop + squared distance (no sqrt)
+            const splashRadiusSq = (splash.splashRadius || splash.radius) ** 2;
+            for (let i = 0; i < allEnemies.length; i++) {
+                const neighbor = allEnemies[i];
                 if (neighbor === target || !neighbor.isAlive()) continue;
-                const dist = Math.hypot(neighbor.x - target.x, neighbor.y - target.y);
-                if (dist <= (splash.splashRadius || splash.radius)) {
+                const dx = neighbor.x - target.x;
+                const dy = neighbor.y - target.y;
+                const distSq = dx * dx + dy * dy;
+                if (distSq <= splashRadiusSq) {
                     neighbor.takeDamage(p.damage * 0.7);
                 }
             }
@@ -194,7 +199,7 @@ export class CollisionSystem {
 
         // Fire Level 3: Explosion on death
         if (killingProjectile.explodeOnDeath) {
-            this.effects.add({
+            this.effects.spawn({
                 type: 'explosion',
                 x: deathX,
                 y: deathY,
@@ -203,11 +208,15 @@ export class CollisionSystem {
                 color: 'rgba(255, 69, 0, 0.8)',
             });
 
-            // Damage nearby enemies
-            for (const neighbor of allEnemies) {
+            // Damage nearby enemies - PERF: indexed loop + squared distance
+            const explosionRadiusSq = killingProjectile.explosionRadius ** 2;
+            for (let i = 0; i < allEnemies.length; i++) {
+                const neighbor = allEnemies[i];
                 if (!neighbor.isAlive()) continue;
-                const dist = Math.hypot(neighbor.x - deathX, neighbor.y - deathY);
-                if (dist <= killingProjectile.explosionRadius) {
+                const dx = neighbor.x - deathX;
+                const dy = neighbor.y - deathY;
+                const distSq = dx * dx + dy * dy;
+                if (distSq <= explosionRadiusSq) {
                     neighbor.takeDamage(killingProjectile.explosionDamage);
                 }
             }
@@ -220,7 +229,7 @@ export class CollisionSystem {
                 const chainRadius = chainSlowEffect.chainRadius || 60;
 
                 // Visual effect for chain slow
-                this.effects.add({
+                this.effects.spawn({
                     type: 'explosion',
                     x: deathX,
                     y: deathY,
@@ -229,11 +238,15 @@ export class CollisionSystem {
                     color: 'rgba(0, 188, 212, 0.5)',
                 });
 
-                // Apply slow to nearby enemies
-                for (const neighbor of allEnemies) {
+                // Apply slow to nearby enemies - PERF: indexed loop + squared distance
+                const chainRadiusSq = chainRadius ** 2;
+                for (let i = 0; i < allEnemies.length; i++) {
+                    const neighbor = allEnemies[i];
                     if (!neighbor.isAlive()) continue;
-                    const dist = Math.hypot(neighbor.x - deathX, neighbor.y - deathY);
-                    if (dist <= chainRadius) {
+                    const dx = neighbor.x - deathX;
+                    const dy = neighbor.y - deathY;
+                    const distSq = dx * dx + dy * dy;
+                    if (distSq <= chainRadiusSq) {
                         // Apply the same slow effect from the projectile
                         const slowEffect = killingProjectile.effects.find((ef: any) => ef.type === 'slow');
                         if (slowEffect) {

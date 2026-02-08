@@ -65,7 +65,9 @@ export class ProjectileSystem {
     }
 
     public update(dt: number, effects: EffectSystem) {
-        for (const p of this.pool) {
+        // PERF: indexed loop instead of for...of
+        for (let i = 0; i < this.pool.length; i++) {
+            const p = this.pool[i];
             if (p.alive) {
                 p.update(effects, dt);
             }
@@ -73,7 +75,9 @@ export class ProjectileSystem {
     }
 
     public draw(ctx: CanvasRenderingContext2D) {
-        for (const p of this.pool) {
+        // PERF: indexed loop instead of for...of
+        for (let i = 0; i < this.pool.length; i++) {
+            const p = this.pool[i];
             if (p.alive) {
                 p.draw(ctx);
             }
@@ -82,8 +86,9 @@ export class ProjectileSystem {
 
     public clear() {
         // Mark all as dead, but keep objects in pool for reuse
-        for (const p of this.pool) {
-            p.alive = false;
+        // PERF: indexed loop instead of for...of
+        for (let i = 0; i < this.pool.length; i++) {
+            this.pool[i].alive = false;
         }
     }
 }

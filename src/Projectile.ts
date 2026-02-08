@@ -51,7 +51,7 @@ export class Projectile {
         this.color = stats.color;
         this.effects = stats.effects;
         this.pierce = stats.pierce || 0;
-        this.hitList = [];
+        this.hitList.length = 0; // PERF: Reuse array instead of allocating new
         this.projectileType = stats.projectileType || 'standard';
         this.towerLevel = stats.towerLevel || 1;
 
