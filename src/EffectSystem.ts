@@ -97,6 +97,24 @@ export class EffectSystem {
         return this.effects;
     }
 
+    /**
+     * Get number of active effects
+     */
+    public getCount(): number {
+        return this.effects.length;
+    }
+
+    /**
+     * Clear all active effects (for debugging)
+     */
+    public clear(): void {
+        // Return all effects to pool
+        for (let i = 0; i < this.effects.length; i++) {
+            this.release(this.effects[i]);
+        }
+        this.effects.length = 0;
+    }
+
     public update(dt: number) {
         // Update all effects
         for (let i = 0; i < this.effects.length; i++) {

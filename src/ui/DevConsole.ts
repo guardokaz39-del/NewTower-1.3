@@ -196,92 +196,314 @@ export class DevConsole {
     }
 
     private createToolsContent() {
-        // Buttons for common debugging tasks
-        const addBtn = (label: string, action: () => void) => {
+        const rootContainer = this.contentTools;
+        let currentContainer: HTMLElement = rootContainer;
+
+        // Helper to create styled buttons with icons
+        const addBtn = (label: string, action: () => void, style: 'default' | 'success' | 'warning' | 'danger' = 'default') => {
             const btn = document.createElement('button');
             btn.innerText = label;
+            const colors = {
+                default: { bg: '#2a2a2a', hover: '#3a3a3a', border: '#444' },
+                success: { bg: '#1a4a1a', hover: '#2a5a2a', border: '#3a7a3a' },
+                warning: { bg: '#4a3a1a', hover: '#5a4a2a', border: '#7a6a3a' },
+                danger: { bg: '#4a1a1a', hover: '#5a2a2a', border: '#7a3a3a' }
+            };
+            const c = colors[style];
             Object.assign(btn.style, {
                 display: 'block',
                 width: '100%',
-                padding: '8px',
-                marginBottom: '5px',
-                background: '#333',
-                color: '#fff',
-                border: '1px solid #555',
-                cursor: 'pointer'
+                padding: '8px 12px',
+                marginBottom: '4px',
+                background: c.bg,
+                color: '#ddd',
+                border: `1px solid ${c.border}`,
+                borderRadius: '4px',
+                cursor: 'pointer',
+                textAlign: 'left',
+                fontSize: '11px',
+                transition: 'background 0.15s'
             });
+            btn.onmouseenter = () => btn.style.background = c.hover;
+            btn.onmouseleave = () => btn.style.background = c.bg;
             btn.onclick = action;
-            this.contentTools.appendChild(btn);
+            currentContainer.appendChild(btn);
         };
 
-        const addSection = (title: string) => {
+        const addSection = (title: string, collapsed: boolean = false) => {
+            const section = document.createElement('div');
+            section.style.marginBottom = '10px';
+
             const header = document.createElement('div');
             header.innerText = title;
             Object.assign(header.style, {
-                color: '#888',
+                color: '#aaa',
                 fontSize: '10px',
-                marginTop: '10px',
-                marginBottom: '5px',
-                borderBottom: '1px solid #444',
-                paddingBottom: '3px'
+                fontWeight: 'bold',
+                marginTop: '8px',
+                marginBottom: '6px',
+                padding: '4px 8px',
+                background: '#1a1a1a',
+                borderRadius: '3px',
+                cursor: 'pointer',
+                userSelect: 'none'
             });
-            this.contentTools.appendChild(header);
+
+            const content = document.createElement('div');
+            content.style.display = collapsed ? 'none' : 'block';
+
+            header.onclick = () => {
+                content.style.display = content.style.display === 'none' ? 'block' : 'none';
+            };
+
+            section.appendChild(header);
+            section.appendChild(content);
+            rootContainer.appendChild(section);
+            currentContainer = content; // Switch to this section for subsequent buttons
+            return content;
         };
 
-        // === GAME CHEATS ===
+        // === STATUS BAR ===
+        const statusBar = document.createElement('div');
+        Object.assign(statusBar.style, {
+            padding: '6px 8px',
+            background: '#111',
+            borderBottom: '1px solid #333',
+            marginBottom: '8px',
+            fontSize: '10px',
+            color: '#888',
+            display: 'flex',
+            gap: '12px'
+        });
+        statusBar.innerHTML = `
+            <span id="status-fps">FPS: --</span>
+            <span id="status-enemies">👾 --</span>
+            <span id="status-towers">🗼 --</span>
+            <span id="status-projectiles">💫 --</span>
+        `;
+        this.contentTools.appendChild(statusBar);
+
+        // Update status bar periodically
+        setInterval(() => {
+            const fps = document.getElementById('status-fps');
+            const enemies = document.getElementById('status-enemies');
+            const towers = document.getElementById('status-towers');
+            const proj = document.getElementById('status-projectiles');
+            if (fps) fps.innerText = `FPS: ${Math.round(1000 / (this.scene.gameState?.frames || 16.67))}`;
+            if (enemies) enemies.innerText = `👾 ${this.scene.enemies?.length || 0}`;
+            if (towers) towers.innerText = `🗼 ${this.scene.towers?.length || 0}`;
+            if (proj) proj.innerText = `💫 ${this.scene.projectiles?.length || 0}`;
+        }, 500);
+
+        // === 🎮 GAME CHEATS ===
         addSection('🎮 GAME CHEATS');
-        addBtn('💰 +1000 Gold', () => { this.scene.addMoney(1000); Logger.info(LogChannel.GAME, 'Added 1000 gold'); });
-        addBtn('⏩ Skip Wave', () => {
+
+        addBtn('💰 +1000 Gold', () => {
+            this.scene.addMoney(1000);
+            Logger.info(LogChannel.GAME, 'Added 1000 gold');
+        }, 'success');
+
+        addBtn('💰 +10000 Gold', () => {
+            this.scene.addMoney(10000);
+            Logger.info(LogChannel.GAME, 'Added 10000 gold');
+        }, 'success');
+
+        addBtn('⏩ Skip to Next Wave', () => {
             this.scene.wave++;
             Logger.info(LogChannel.GAME, `Skipped to wave ${this.scene.wave}`);
-        });
-        addBtn('💀 Kill All', () => {
+        }, 'warning');
+
+        addBtn('💀 Kill All Enemies', () => {
             for (let i = 0; i < this.scene.enemies.length; i++) {
                 this.scene.enemies[i].takeDamage(999999);
             }
             Logger.info(LogChannel.GAME, 'Killed all enemies');
+        }, 'danger');
+
+        addBtn('❤️ Full Lives', () => {
+            (this.scene as any).gameState.lives = 100;
+            Logger.info(LogChannel.GAME, 'Lives restored to 100');
+        }, 'success');
+
+        addBtn('⏸️ Toggle Pause', () => {
+            this.scene.gameState.paused = !this.scene.gameState.paused;
+            Logger.info(LogChannel.GAME, `Game ${this.scene.gameState.paused ? 'PAUSED' : 'RESUMED'}`);
         });
 
-        // === PERFORMANCE TOOLS ===
+        // === 👾 SPAWN ENEMIES ===
+        addSection('👾 SPAWN ENEMIES');
+
+        const enemyTypes = [
+            'GRUNT',           // Скелет
+            'SCOUT',           // Адская Гончая
+            'TANK',            // Воевода Орков
+            'BOSS',            // Призрак Пустоты
+            'SKELETON_COMMANDER',
+            'SPIDER_POISON',   // Ядовитый Паук
+            'TROLL_ARMORED',   // Латник
+            'GOBLIN',          // Гоблин
+            'SAPPER_RAT',      // Алхимическая Крыса
+            'MAGMA_KING',      // Король Магмы
+            'FLESH_COLOSSUS'   // Мясной Колосс
+        ];
+        for (const type of enemyTypes) {
+            addBtn(`+ ${type}`, () => {
+                this.scene.spawnEnemy?.(type);
+                Logger.info(LogChannel.GAME, `Spawned ${type}`);
+            });
+        }
+
+        // === ⚡ PERFORMANCE ===
         addSection('⚡ PERFORMANCE');
+
         addBtn('📊 Toggle FPS Overlay', () => {
-            // Will be connected to PerformanceMonitor
             (window as any).__PERF_OVERLAY = !(window as any).__PERF_OVERLAY;
             Logger.info(LogChannel.SYSTEM, `FPS Overlay: ${(window as any).__PERF_OVERLAY ? 'ON' : 'OFF'}`);
         });
-        addBtn('🔥 Profile 5 sec', () => {
-            Logger.warn(LogChannel.SYSTEM, 'Profiling started for 5 seconds...');
-            (window as any).__PERF_PROFILING = true;
-            setTimeout(() => {
-                (window as any).__PERF_PROFILING = false;
-                Logger.info(LogChannel.SYSTEM, 'Profiling complete. Check console for results.');
-            }, 5000);
-        });
+
         addBtn('📈 Stress Test (+50 enemies)', () => {
+            const types = ['GRUNT', 'RUNNER', 'TANK'];
             for (let i = 0; i < 50; i++) {
-                const types = ['GRUNT', 'RUNNER', 'TANK'];
                 const type = types[Math.floor(Math.random() * types.length)];
                 this.scene.spawnEnemy?.(type);
             }
-            Logger.warn(LogChannel.SYSTEM, 'Spawned 50 random enemies for stress test');
+            Logger.warn(LogChannel.SYSTEM, 'Spawned 50 random enemies');
+        }, 'warning');
+
+        addBtn('📈 Mega Stress (+200 enemies)', () => {
+            for (let i = 0; i < 200; i++) {
+                this.scene.spawnEnemy?.('GRUNT');
+            }
+            Logger.warn(LogChannel.SYSTEM, 'Spawned 200 GRUNT enemies');
+        }, 'danger');
+
+        addBtn('🧹 Clear Pools', () => {
+            this.scene.effects?.clear?.();
+            this.scene.projectileSystem?.clear?.();
+            Logger.info(LogChannel.SYSTEM, 'Pools cleared');
         });
-        addBtn('📉 Show Entity Stats', () => {
+
+        addBtn('📉 Entity Stats', () => {
             const stats = {
                 enemies: this.scene.enemies?.length || 0,
                 towers: this.scene.towers?.length || 0,
                 projectiles: this.scene.projectiles?.length || 0,
-                effects: this.scene.effects?.activeEffects?.length || 0
+                effects: this.scene.effects?.getCount?.() || this.scene.effects?.activeEffects?.length || 0,
+                wave: this.scene.wave,
+                money: this.scene.money,
+                lives: (this.scene as any).gameState?.lives
             };
-            Logger.info(LogChannel.SYSTEM, `Entities: ${JSON.stringify(stats)}`);
+            Logger.info(LogChannel.SYSTEM, `Stats: ${JSON.stringify(stats, null, 2)}`);
         });
 
-        // === DEBUG ===
+        // === 🐛 DEBUG ===
         addSection('🐛 DEBUG');
-        addBtn('📋 Copy Full Report', () => {
+
+        addBtn('🎯 Toggle Hitboxes', () => {
+            (window as any).__DEBUG_HITBOXES = !(window as any).__DEBUG_HITBOXES;
+            Logger.info(LogChannel.SYSTEM, `Hitboxes: ${(window as any).__DEBUG_HITBOXES ? 'ON' : 'OFF'}`);
+        });
+
+        addBtn('📍 Toggle Paths', () => {
+            (window as any).__DEBUG_PATHS = !(window as any).__DEBUG_PATHS;
+            Logger.info(LogChannel.SYSTEM, `Paths: ${(window as any).__DEBUG_PATHS ? 'ON' : 'OFF'}`);
+        });
+
+        addBtn('🔦 Toggle Lighting Debug', () => {
+            (window as any).__DEBUG_LIGHTING = !(window as any).__DEBUG_LIGHTING;
+            Logger.info(LogChannel.SYSTEM, `Lighting Debug: ${(window as any).__DEBUG_LIGHTING ? 'ON' : 'OFF'}`);
+        });
+
+        addBtn('⏯️ Step Frame (when paused)', () => {
+            if (!this.scene.gameState.paused) {
+                Logger.warn(LogChannel.SYSTEM, 'Game must be paused to step frames');
+                return;
+            }
+            (this.scene as any).stepOneFrame?.();
+            Logger.info(LogChannel.SYSTEM, 'Stepped 1 frame');
+        });
+
+        // === 📋 BUG REPORT ===
+        addSection('📋 BUG REPORT');
+
+        addBtn('📋 Generate Full Report', () => {
+            this.generateBugReport();
+        }, 'warning');
+
+        addBtn('📋 Copy State Only', () => {
             const dump = SafeJson.stringify({ scene: this.scene }, 2);
             navigator.clipboard.writeText(dump);
             Logger.info(LogChannel.SYSTEM, 'State copied to clipboard');
         });
+
+        addBtn('📋 Copy Recent Logs', () => {
+            const logs = Logger.getHistory().slice(-100).map(e =>
+                `[${new Date(e.timestamp).toISOString()}] [${e.channel}] ${e.message}`
+            ).join('\n');
+            navigator.clipboard.writeText(logs);
+            Logger.info(LogChannel.SYSTEM, 'Last 100 logs copied');
+        });
+    }
+
+    /**
+     * Generate comprehensive bug report
+     */
+    private generateBugReport(): void {
+        const report = {
+            meta: {
+                version: '1.4-alfa',
+                timestamp: new Date().toISOString(),
+                browser: navigator.userAgent,
+                screen: `${window.innerWidth}x${window.innerHeight}`,
+                devicePixelRatio: window.devicePixelRatio
+            },
+            gameState: {
+                wave: this.scene.wave,
+                money: this.scene.money,
+                lives: (this.scene as any).gameState?.lives,
+                paused: this.scene.gameState?.paused,
+                isRunning: this.scene.gameState?.isRunning,
+                frames: this.scene.gameState?.frames
+            },
+            entities: {
+                enemies: this.scene.enemies?.length || 0,
+                towers: this.scene.towers?.length || 0,
+                projectiles: this.scene.projectiles?.length || 0,
+                effects: this.scene.effects?.getCount?.() || 0
+            },
+            enemyDetails: this.scene.enemies?.slice(0, 10).map((e: any) => ({
+                type: e.typeId,
+                hp: `${e.currentHealth?.toFixed(0)}/${e.maxHealth?.toFixed(0)}`,
+                pos: `${e.x?.toFixed(0)},${e.y?.toFixed(0)}`,
+                statuses: e.statuses?.map((s: any) => s.type)
+            })),
+            towerDetails: this.scene.towers?.slice(0, 10).map((t: any) => ({
+                pos: `${t.col},${t.row}`,
+                cards: t.cards?.length || 0,
+                building: t.isBuilding
+            })),
+            waveManager: {
+                isWaveActive: (this.scene as any).waveManager?.isWaveActive,
+                spawnQueue: (this.scene as any).waveManager?.spawnQueue?.length,
+                currentPattern: (this.scene as any).waveManager?.currentPattern
+            },
+            recentLogs: Logger.getHistory().slice(-50).map(e => ({
+                time: new Date(e.timestamp).toISOString().split('T')[1].slice(0, -1),
+                level: LogLevel[e.level],
+                channel: e.channel,
+                msg: e.message.slice(0, 100)
+            })),
+            performance: {
+                fpsOverlay: (window as any).__PERF_OVERLAY || false,
+                debugHitboxes: (window as any).__DEBUG_HITBOXES || false,
+                debugPaths: (window as any).__DEBUG_PATHS || false
+            }
+        };
+
+        const reportStr = JSON.stringify(report, null, 2);
+        navigator.clipboard.writeText(reportStr);
+        Logger.info(LogChannel.SYSTEM, `📋 Full bug report copied to clipboard (${reportStr.length} chars)`);
+        console.log('=== BUG REPORT ===\n', report);
     }
 
     public toggle() {

@@ -140,15 +140,23 @@ export class WeaponSystem {
         // PRIORITY CHECK: Filter for highest priority enemies (like Magma Statues)
         // If there are enemies with priority > 0, we IGNORE all others and only target them.
         let maxPriority = 0;
-        for (const e of inRange) {
-            if (e.threatPriority > maxPriority) maxPriority = e.threatPriority;
+        for (let i = 0; i < inRange.length; i++) {
+            if (inRange[i].threatPriority > maxPriority) maxPriority = inRange[i].threatPriority;
         }
 
         // If high priority enemies exist, reduce the pool to ONLY them
         // This ensures the tower is "taunted" by the decoy
-        const targetPool = maxPriority > 0
-            ? inRange.filter(e => e.threatPriority === maxPriority)
-            : inRange;
+        let targetPool: Enemy[];
+        if (maxPriority > 0) {
+            targetPool = [];
+            for (let i = 0; i < inRange.length; i++) {
+                if (inRange[i].threatPriority === maxPriority) {
+                    targetPool.push(inRange[i]);
+                }
+            }
+        } else {
+            targetPool = inRange;
+        }
 
         // Apply targeting strategy based on tower's mode
         switch (tower.targetingMode) {
@@ -157,11 +165,15 @@ export class WeaponSystem {
                 return targetPool.reduce((a, b) => a.pathIndex > b.pathIndex ? a : b);
 
             case 'closest':
-                // Enemy nearest to tower
+                // Enemy nearest to tower (using squared distance - faster than hypot)
                 return targetPool.reduce((a, b) => {
-                    const distA = Math.hypot(a.x - tower.x, a.y - tower.y);
-                    const distB = Math.hypot(b.x - tower.x, b.y - tower.y);
-                    return distA < distB ? a : b;
+                    const dxA = a.x - tower.x;
+                    const dyA = a.y - tower.y;
+                    const dxB = b.x - tower.x;
+                    const dyB = b.y - tower.y;
+                    const distSqA = dxA * dxA + dyA * dyA;
+                    const distSqB = dxB * dxB + dyB * dyB;
+                    return distSqA < distSqB ? a : b;
                 });
 
             case 'strongest':

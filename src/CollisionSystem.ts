@@ -18,41 +18,48 @@ export class CollisionSystem {
     public update(projectiles: Projectile[], enemies: Enemy[]) {
         // Rebuild spatial grid each frame
         this.enemyGrid.clear();
-        for (const enemy of enemies) {
+        for (let i = 0; i < enemies.length; i++) {
+            const enemy = enemies[i];
             if (enemy.isAlive()) {
                 this.enemyGrid.register(enemy);
             }
         }
 
         // Check projectile collisions using spatial grid
-        for (const p of projectiles) {
-            if (!p.alive) continue;
+        for (let p = 0; p < projectiles.length; p++) {
+            const proj = projectiles[p];
+            if (!proj.alive) continue;
 
             // Out of bounds check
-            if (p.x < -50 || p.x > window.innerWidth + 50 || p.y < -50 || p.y > window.innerHeight + 50) {
-                p.alive = false;
+            if (proj.x < -50 || proj.x > window.innerWidth + 50 || proj.y < -50 || proj.y > window.innerHeight + 50) {
+                proj.alive = false;
                 continue;
             }
 
             // Get only nearby enemies instead of checking all enemies
             const searchRadius = 100; // Reasonable search radius for collision
-            const nearbyEnemies = this.enemyGrid.getNearby(p.x, p.y, searchRadius);
+            const nearbyEnemies = this.enemyGrid.getNearby(proj.x, proj.y, searchRadius);
 
-            for (const e of nearbyEnemies) {
-                if (!e.isAlive()) continue;
-                if (p.hitList.includes(e.id)) continue;
+            for (let e = 0; e < nearbyEnemies.length; e++) {
+                const enemy = nearbyEnemies[e];
+                if (!enemy.isAlive()) continue;
+                if (proj.hitList.includes(enemy.id)) continue;
 
-                const dist = Math.hypot(e.x - p.x, e.y - p.y);
-                const hitDist = 20 + p.radius;
+                // Squared distance check (faster than Math.hypot)
+                const dx = enemy.x - proj.x;
+                const dy = enemy.y - proj.y;
+                const distSq = dx * dx + dy * dy;
+                const hitDist = 20 + proj.radius;
+                const hitDistSq = hitDist * hitDist;
 
-                if (dist < hitDist) {
-                    this.handleHit(p, e, enemies);
+                if (distSq < hitDistSq) {
+                    this.handleHit(proj, enemy, enemies);
 
-                    if (p.pierce > 0) {
-                        p.pierce--;
-                        p.hitList.push(e.id);
+                    if (proj.pierce > 0) {
+                        proj.pierce--;
+                        proj.hitList.push(enemy.id);
                     } else {
-                        p.alive = false;
+                        proj.alive = false;
                         break;
                     }
                 }

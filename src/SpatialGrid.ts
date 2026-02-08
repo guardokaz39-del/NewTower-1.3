@@ -33,11 +33,11 @@ export class SpatialGrid<T extends IGridEntity> {
      */
     public register(entity: T): void {
         const cellKey = this.getCellKey(entity.x, entity.y);
-        
+
         if (!this.grid.has(cellKey)) {
             this.grid.set(cellKey, []);
         }
-        
+
         this.grid.get(cellKey)!.push(entity);
     }
 
@@ -47,7 +47,7 @@ export class SpatialGrid<T extends IGridEntity> {
      */
     public getNearby(x: number, y: number, radius: number): T[] {
         const results: T[] = [];
-        
+
         // Calculate which cells to check
         const minCol = Math.max(0, Math.floor((x - radius) / this.cellSize));
         const maxCol = Math.min(this.cols - 1, Math.floor((x + radius) / this.cellSize));
@@ -59,9 +59,12 @@ export class SpatialGrid<T extends IGridEntity> {
             for (let row = minRow; row <= maxRow; row++) {
                 const cellKey = this.makeCellKey(col, row);
                 const entities = this.grid.get(cellKey);
-                
+
                 if (entities) {
-                    results.push(...entities);
+                    // Optimized: use for loop instead of spread operator
+                    for (let i = 0; i < entities.length; i++) {
+                        results.push(entities[i]);
+                    }
                 }
             }
         }
