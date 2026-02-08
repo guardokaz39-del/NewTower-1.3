@@ -44,20 +44,29 @@ export class EventBus {
      * Unsubscribe using the ID returned by on()
      */
     public off(id: number): void {
-        this.subscribers.forEach((subs, event) => {
-            const index = subs.findIndex(s => s.id === id);
-            if (index !== -1) {
-                subs.splice(index, 1);
+        // Optimized: iterate with for loop instead of forEach
+        const events = this.subscribers.keys();
+        for (const event of events) {
+            const subs = this.subscribers.get(event)!;
+            for (let i = 0; i < subs.length; i++) {
+                if (subs[i].id === id) {
+                    subs.splice(i, 1);
+                    return; // Found and removed, exit early
+                }
             }
-        });
+        }
     }
 
     /**
      * Emit an event with data
      */
     public emit<T = any>(event: string, data?: T): void {
-        if (!this.subscribers.has(event)) return;
-        this.subscribers.get(event)!.forEach(sub => sub.callback(data));
+        const subs = this.subscribers.get(event);
+        if (!subs) return;
+        // Use for loop instead of forEach for hot path
+        for (let i = 0; i < subs.length; i++) {
+            subs[i].callback(data);
+        }
     }
 
     /**

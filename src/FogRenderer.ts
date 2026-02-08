@@ -47,8 +47,8 @@ export class FogRenderer {
         ctx.clearRect(0, 0, width, height);
 
         // 1. Draw Dual-Layer Fog
-        for (const structure of structures) {
-            this.renderStructure(structure, time);
+        for (let i = 0; i < structures.length; i++) {
+            this.renderStructure(structures[i], time);
         }
 
         // 2. Apply Light Masks (Cut holes)
@@ -61,7 +61,8 @@ export class FogRenderer {
         const TS = CONFIG.TILE_SIZE;
         const ctx = this.ctx;
 
-        for (const tile of structure.tiles) {
+        for (let t = 0; t < structure.tiles.length; t++) {
+            const tile = structure.tiles[t];
             if (tile.density === 0) continue;
 
             const cx = tile.x * TS + TS / 2;
@@ -130,7 +131,8 @@ export class FogRenderer {
         // Cut out holes in the fog
         ctx.globalCompositeOperation = 'destination-out';
 
-        for (const light of lights) {
+        for (let i = 0; i < lights.length; i++) {
+            const light = lights[i];
             // Flicker effect: radius +/- 5%
             const flicker = 0.95 + Math.random() * 0.1;
             const r = light.radius * flicker;

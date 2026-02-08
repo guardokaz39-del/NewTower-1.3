@@ -238,14 +238,25 @@ export class Enemy {
     }
 
     public update(dt: number): void {
-        // Update status durations
-        this.statuses = this.statuses.filter((s) => {
-            s.duration -= dt;
-            return s.duration > 0;
-        });
+        // Update status durations - in-place removal (no new array)
+        for (let i = this.statuses.length - 1; i >= 0; i--) {
+            this.statuses[i].duration -= dt;
+            if (this.statuses[i].duration <= 0) {
+                // Swap with last and pop
+                this.statuses[i] = this.statuses[this.statuses.length - 1];
+                this.statuses.pop();
+            }
+        }
 
         // Reset damage modifier if no slow status
-        if (!this.statuses.some(s => s.type === 'slow')) {
+        let hasSlow = false;
+        for (let i = 0; i < this.statuses.length; i++) {
+            if (this.statuses[i].type === 'slow') {
+                hasSlow = true;
+                break;
+            }
+        }
+        if (!hasSlow) {
             this.damageModifier = 1.0;
         }
 

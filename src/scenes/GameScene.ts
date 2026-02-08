@@ -249,7 +249,8 @@ export class GameScene extends BaseScene implements IGameScene {
             }
 
             // 3. Spawn children with circular offset to prevent overlap
-            spawns.forEach((typeKey, i) => {
+            for (let i = 0; i < spawns.length; i++) {
+                const typeKey = spawns[i];
                 const child = this.entityManager.spawnEnemy(typeKey.toUpperCase(), this.map.waypoints);
                 if (child) {
                     // Copy path progress from parent
@@ -261,7 +262,7 @@ export class GameScene extends BaseScene implements IGameScene {
                     child.x = parent.x + Math.cos(angle) * offset;
                     child.y = parent.y + Math.sin(angle) * offset;
                 }
-            });
+            }
 
             // 4. Floating text and feedback
             this.showFloatingText('BURST!', parent.x, parent.y - 40, '#ff5252');
@@ -349,10 +350,11 @@ export class GameScene extends BaseScene implements IGameScene {
             );
 
             // Update tower visual states
-            this.gameState.towers.forEach((t) => {
+            for (let i = 0; i < this.gameState.towers.length; i++) {
+                const t = this.gameState.towers[i];
                 t.updateBuilding(this.effects, dt);
                 RendererFactory.updateTower(dt, t);
-            });
+            }
 
             this.collision.update(this.projectileSystem.projectiles, this.gameState.enemies);
             this.entityManager.updateEnemies(dt);
@@ -420,7 +422,9 @@ export class GameScene extends BaseScene implements IGameScene {
         this.drawHoverHighlight(ctx);
 
         // Draw entities
-        this.gameState.towers.forEach((t) => t.draw(ctx));
+        for (let i = 0; i < this.gameState.towers.length; i++) {
+            this.gameState.towers[i].draw(ctx);
+        }
         this.drawSelectedTowerRange(ctx);
 
         // Draw targeting mode tooltip for hovered tower
@@ -430,7 +434,9 @@ export class GameScene extends BaseScene implements IGameScene {
         this.acidSystem.draw();
         this.commanderSystem.draw();
 
-        this.gameState.enemies.forEach((e) => e.draw(ctx));
+        for (let i = 0; i < this.gameState.enemies.length; i++) {
+            this.gameState.enemies[i].draw(ctx);
+        }
         this.projectileSystem.draw(ctx);
         // Draw effects
         this.effects.draw();
@@ -448,7 +454,9 @@ export class GameScene extends BaseScene implements IGameScene {
 
         // === EMISSIVE PASS (Glowing Eyes through Fog/Darkness) ===
         // Draw this AFTER lighting so it "pops"
-        this.gameState.enemies.forEach((e) => EnemyRenderer.drawEmissive(ctx, e));
+        for (let i = 0; i < this.gameState.enemies.length; i++) {
+            EnemyRenderer.drawEmissive(ctx, this.gameState.enemies[i]);
+        }
 
         // Draw atmosphere effects (sunlight, moonlight, stars, etc)
         this.atmosphere.draw(ctx);

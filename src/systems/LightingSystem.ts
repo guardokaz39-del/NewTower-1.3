@@ -84,7 +84,9 @@ export class LightingSystem {
         // 2. Punch holes / Add lights (Visibility)
         this.ctx.globalCompositeOperation = 'destination-out';
 
-        this.lights.forEach(light => {
+        // Optimized: for loop instead of forEach
+        for (let i = 0; i < this.lights.length; i++) {
+            const light = this.lights[i];
             const g = this.ctx.createRadialGradient(light.x, light.y, 0, light.x, light.y, light.radius);
             g.addColorStop(0, `rgba(0, 0, 0, ${light.intensity})`); // Full erase
             g.addColorStop(1, 'rgba(0, 0, 0, 0)'); // No erase
@@ -93,13 +95,9 @@ export class LightingSystem {
             this.ctx.beginPath();
             this.ctx.arc(light.x, light.y, light.radius, 0, Math.PI * 2);
             this.ctx.fill();
-        });
+        }
 
         // 3. Draw colored glows (Additive Pass)
-        // We render this DIRECTLY to the target context to add glow on top of game + darkness
-        // OR we render to a separate canvas. 
-        // Rendering to targetCtx directly is better for performance and visual control.
-
         // Draw the darkness overlay first (scaled up if using optimization)
         targetCtx.save();
         targetCtx.drawImage(this.canvas, 0, 0, this.width, this.height);
@@ -107,8 +105,10 @@ export class LightingSystem {
         // Now draw colored lights on TOP using 'lighter' (or 'screen')
         targetCtx.globalCompositeOperation = 'lighter'; // Additive blending
 
-        this.lights.forEach(light => {
-            if (light.color === '#000000') return; // Skip black lights
+        // Optimized: for loop instead of forEach
+        for (let i = 0; i < this.lights.length; i++) {
+            const light = this.lights[i];
+            if (light.color === '#000000') continue; // Skip black lights
 
             // Scale back to target resolution
             const x = light.x * this.scale;
@@ -116,13 +116,6 @@ export class LightingSystem {
             const r = light.radius * this.scale;
 
             const g = targetCtx.createRadialGradient(x, y, 0, x, y, r);
-            // Convert hex to rgb for gradient? Or just use hex if browser supports (it does usually)
-            // But we need alpha falloff.
-
-            // Helper to get RGBA from potentially hex string would be nice, but simple fix:
-            // Let's assume color is a valid CSS color string. 
-            // We'll use a simple approximation or just draw with lower opacity at center.
-
             g.addColorStop(0, light.color); // Color at center
             g.addColorStop(1, 'rgba(0, 0, 0, 0)'); // Fade to transparent
 
@@ -131,7 +124,7 @@ export class LightingSystem {
             targetCtx.beginPath();
             targetCtx.arc(light.x, light.y, light.radius, 0, Math.PI * 2);
             targetCtx.fill();
-        });
+        }
 
         targetCtx.restore();
     }

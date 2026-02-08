@@ -1,6 +1,30 @@
 import { Cell } from './MapData';
 
 export class Pathfinder {
+    // Path cache - avoids recalculating path on every spawn
+    private static cachedPath: { x: number; y: number }[] = [];
+    private static cacheKey: string = '';
+
+    /**
+     * Invalidate cache when map changes (call this after map edits)
+     */
+    public static invalidateCache(): void {
+        this.cachedPath = [];
+        this.cacheKey = '';
+    }
+
+    /**
+     * Generate a simple hash of start/end points for cache key
+     */
+    private static getCacheKey(
+        start: { x: number; y: number },
+        end: { x: number; y: number },
+        gridRows: number,
+        gridCols: number
+    ): string {
+        return `${start.x},${start.y}-${end.x},${end.y}-${gridRows}x${gridCols}`;
+    }
+
     // Находит путь от start до end, используя только тайлы типа 1 (Path)
     // Возвращает массив координат {x, y} или пустой массив, если пути нет
     public static findPath(
@@ -10,6 +34,12 @@ export class Pathfinder {
     ): { x: number; y: number }[] {
         const rows = grid.length;
         const cols = grid[0].length;
+
+        // Check cache first
+        const key = this.getCacheKey(start, end, rows, cols);
+        if (key === this.cacheKey && this.cachedPath.length > 0) {
+            return this.cachedPath;
+        }
 
         // Очередь для BFS: [ {x, y}, [path_so_far] ]
         const queue: { pos: { x: number; y: number }; path: { x: number; y: number }[] }[] = [];
@@ -29,20 +59,22 @@ export class Pathfinder {
             const { pos, path } = queue.shift()!;
 
             if (pos.x === end.x && pos.y === end.y) {
+                // Cache the result
+                this.cachedPath = path;
+                this.cacheKey = key;
                 return path;
             }
 
-            for (const dir of directions) {
+            for (let i = 0; i < directions.length; i++) {
+                const dir = directions[i];
                 const nx = pos.x + dir.dx;
                 const ny = pos.y + dir.dy;
-                const key = `${nx},${ny}`;
+                const cellKey = `${nx},${ny}`;
 
-                if (nx >= 0 && nx < cols && ny >= 0 && ny < rows && !visited.has(key)) {
-                    // Проверяем, что это дорога (type === 1) ИЛИ это конечная точка (даже если мы её случайно закрасили травой, хотя по логике она должна быть на дороге)
-                    // Но лучше строго: ходить можно только по дороге.
+                if (nx >= 0 && nx < cols && ny >= 0 && ny < rows && !visited.has(cellKey)) {
                     const cell = grid[ny][nx];
                     if (cell.type === 1) {
-                        visited.add(key);
+                        visited.add(cellKey);
                         queue.push({ pos: { x: nx, y: ny }, path: [...path, { x: nx, y: ny }] });
                     }
                 }

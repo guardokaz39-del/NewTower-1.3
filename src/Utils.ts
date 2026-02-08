@@ -2,17 +2,18 @@ import { MapManager } from './Map';
 import { IMapData, IWaveConfig } from './MapData';
 import { CONFIG } from './Config';
 
+// Fast ID generator using counter instead of regex-based UUID
+let _idCounter = 0;
 export function generateUUID(): string {
-    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
-        var r = (Math.random() * 16) | 0,
-            v = c == 'x' ? r : (r & 0x3) | 0x8;
-        return v.toString(16);
-    });
+    return `id_${++_idCounter}_${Date.now().toString(36)}`;
 }
 
 export class ObjectPool<T> {
     private createFn: () => T;
     private pool: T[] = [];
+    private hasReset: boolean = false;
+    private resetChecked: boolean = false;
+
     constructor(createFn: () => T) {
         this.createFn = createFn;
     }
@@ -20,8 +21,12 @@ export class ObjectPool<T> {
         return this.pool.length > 0 ? this.pool.pop()! : this.createFn();
     }
     public free(obj: T): void {
-        // Type-safe check for reset method
-        if (obj && typeof obj === 'object' && 'reset' in obj && typeof (obj as any).reset === 'function') {
+        // Check reset method only once per pool type
+        if (!this.resetChecked) {
+            this.hasReset = obj && typeof obj === 'object' && 'reset' in obj && typeof (obj as any).reset === 'function';
+            this.resetChecked = true;
+        }
+        if (this.hasReset) {
             (obj as any).reset();
         }
         this.pool.push(obj);

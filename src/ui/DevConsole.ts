@@ -22,6 +22,9 @@ export class DevConsole {
     private showError: boolean = true;
     private showVerbose: boolean = false;
 
+    // Cleanup
+    private keyDownHandler: ((e: KeyboardEvent) => void) | null = null;
+
     constructor(scene: GameScene) {
         this.scene = scene;
         this.createUI();
@@ -172,13 +175,24 @@ export class DevConsole {
             // Note: we don't clear Logger history, just view. Or we could implemented clear in Logger.
         });
 
-        // Global Key
-        window.addEventListener('keydown', (e) => {
+        // Global Key - store reference for cleanup
+        this.keyDownHandler = (e: KeyboardEvent) => {
             if (e.code === 'Backquote') {
                 e.preventDefault();
                 this.toggle();
             }
-        });
+        };
+        window.addEventListener('keydown', this.keyDownHandler);
+    }
+
+    /**
+     * Clean up event listeners - call on scene destroy
+     */
+    public destroy(): void {
+        if (this.keyDownHandler) {
+            window.removeEventListener('keydown', this.keyDownHandler);
+        }
+        this.container.remove();
     }
 
     private createToolsContent() {
@@ -200,21 +214,70 @@ export class DevConsole {
             this.contentTools.appendChild(btn);
         };
 
+        const addSection = (title: string) => {
+            const header = document.createElement('div');
+            header.innerText = title;
+            Object.assign(header.style, {
+                color: '#888',
+                fontSize: '10px',
+                marginTop: '10px',
+                marginBottom: '5px',
+                borderBottom: '1px solid #444',
+                paddingBottom: '3px'
+            });
+            this.contentTools.appendChild(header);
+        };
+
+        // === GAME CHEATS ===
+        addSection('🎮 GAME CHEATS');
         addBtn('💰 +1000 Gold', () => { this.scene.addMoney(1000); Logger.info(LogChannel.GAME, 'Added 1000 gold'); });
         addBtn('⏩ Skip Wave', () => {
             this.scene.wave++;
             Logger.info(LogChannel.GAME, `Skipped to wave ${this.scene.wave}`);
         });
         addBtn('💀 Kill All', () => {
-            this.scene.enemies.forEach(e => e.takeDamage(999999));
+            for (let i = 0; i < this.scene.enemies.length; i++) {
+                this.scene.enemies[i].takeDamage(999999);
+            }
             Logger.info(LogChannel.GAME, 'Killed all enemies');
         });
-        addBtn('🗑 Garbage Collect (Sim)', () => {
-            // Can't force GC in JS, but we can clear some internal pools if we had them or reload textures
-            Logger.warn(LogChannel.SYSTEM, 'GC Simulation - clearing loose refs not implemented');
+
+        // === PERFORMANCE TOOLS ===
+        addSection('⚡ PERFORMANCE');
+        addBtn('📊 Toggle FPS Overlay', () => {
+            // Will be connected to PerformanceMonitor
+            (window as any).__PERF_OVERLAY = !(window as any).__PERF_OVERLAY;
+            Logger.info(LogChannel.SYSTEM, `FPS Overlay: ${(window as any).__PERF_OVERLAY ? 'ON' : 'OFF'}`);
         });
+        addBtn('🔥 Profile 5 sec', () => {
+            Logger.warn(LogChannel.SYSTEM, 'Profiling started for 5 seconds...');
+            (window as any).__PERF_PROFILING = true;
+            setTimeout(() => {
+                (window as any).__PERF_PROFILING = false;
+                Logger.info(LogChannel.SYSTEM, 'Profiling complete. Check console for results.');
+            }, 5000);
+        });
+        addBtn('📈 Stress Test (+50 enemies)', () => {
+            for (let i = 0; i < 50; i++) {
+                const types = ['GRUNT', 'RUNNER', 'TANK'];
+                const type = types[Math.floor(Math.random() * types.length)];
+                this.scene.spawnEnemy?.(type);
+            }
+            Logger.warn(LogChannel.SYSTEM, 'Spawned 50 random enemies for stress test');
+        });
+        addBtn('📉 Show Entity Stats', () => {
+            const stats = {
+                enemies: this.scene.enemies?.length || 0,
+                towers: this.scene.towers?.length || 0,
+                projectiles: this.scene.projectiles?.length || 0,
+                effects: this.scene.effects?.activeEffects?.length || 0
+            };
+            Logger.info(LogChannel.SYSTEM, `Entities: ${JSON.stringify(stats)}`);
+        });
+
+        // === DEBUG ===
+        addSection('🐛 DEBUG');
         addBtn('📋 Copy Full Report', () => {
-            // This will link to CrashHandler later, for now simple dump
             const dump = SafeJson.stringify({ scene: this.scene }, 2);
             navigator.clipboard.writeText(dump);
             Logger.info(LogChannel.SYSTEM, 'State copied to clipboard');

@@ -62,7 +62,13 @@ export class CollisionSystem {
 
     private handleHit(p: Projectile, target: Enemy, allEnemies: Enemy[]) {
         // Apply damage with projectile reference (for tracking kills)
-        const wasSlowed = target.statuses.some(s => s.type === 'slow');
+        let wasSlowed = false;
+        for (let i = 0; i < target.statuses.length; i++) {
+            if (target.statuses[i].type === 'slow') {
+                wasSlowed = true;
+                break;
+            }
+        }
 
         target.takeDamage(p.damage, p);
 
@@ -129,7 +135,13 @@ export class CollisionSystem {
         }
 
         // Splash damage effect
-        const splash = p.effects.find((ef) => ef.type === 'splash');
+        let splash = null;
+        for (let i = 0; i < p.effects.length; i++) {
+            if (p.effects[i].type === 'splash') {
+                splash = p.effects[i];
+                break;
+            }
+        }
         if (splash) {
             this.effects.add({
                 type: 'explosion',
@@ -150,7 +162,13 @@ export class CollisionSystem {
         }
 
         // Slow effect (with damage modifier)
-        const slow = p.effects.find((ef) => ef.type === 'slow');
+        let slow = null;
+        for (let i = 0; i < p.effects.length; i++) {
+            if (p.effects[i].type === 'slow') {
+                slow = p.effects[i];
+                break;
+            }
+        }
         if (slow) {
             const damageBonus = slow.damageToSlowed || 1.0;
             // Default 60 frames -> 1.0 second. Assuming slow.dur/slowDuration are already converted in Card files, 

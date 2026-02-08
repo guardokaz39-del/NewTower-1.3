@@ -11,8 +11,14 @@ export class ProjectileSystem {
     }
 
     public spawn(x: number, y: number, target: { x: number, y: number }, stats: any): Projectile {
-        // 1. Try to find an inactive projectile
-        let p = this.pool.find(p => !p.alive);
+        // 1. Try to find an inactive projectile (for loop instead of .find())
+        let p: Projectile | undefined;
+        for (let i = 0; i < this.pool.length; i++) {
+            if (!this.pool[i].alive) {
+                p = this.pool[i];
+                break;
+            }
+        }
 
         if (!p) {
             // 2. If not found, create new and add to pool

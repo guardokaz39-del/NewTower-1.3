@@ -27,6 +27,7 @@ export interface IEffect {
 
 export class EffectSystem {
     private effects: IEffect[] = [];
+    private pool: IEffect[] = []; // Object Pool for recycling
     private ctx: CanvasRenderingContext2D;
     private canvasWidth: number;
     private canvasHeight: number;
@@ -37,9 +38,59 @@ export class EffectSystem {
         this.canvasHeight = ctx.canvas.height;
     }
 
+    /**
+     * Acquire an effect from pool or create new one
+     * @performance Reduces GC pressure by reusing objects
+     */
+    public acquire(type: IEffect['type']): IEffect {
+        const effect = this.pool.pop();
+        if (effect) {
+            // Reset pooled object
+            effect.type = type;
+            effect.x = 0;
+            effect.y = 0;
+            effect.life = 0;
+            effect.maxLife = undefined;
+            effect.radius = undefined;
+            effect.size = undefined;
+            effect.color = undefined;
+            effect.text = undefined;
+            effect.vx = undefined;
+            effect.vy = undefined;
+            effect.rotation = undefined;
+            effect.vRot = undefined;
+            effect.fontSize = undefined;
+            effect.gravity = undefined;
+            effect.flashColor = undefined;
+            effect.enemySprite = undefined;
+            effect.enemyColor = undefined;
+            return effect;
+        }
+        return { type, x: 0, y: 0, life: 0 };
+    }
+
+    /**
+     * Release effect back to pool
+     */
+    private release(effect: IEffect): void {
+        this.pool.push(effect);
+    }
+
     public add(effect: IEffect) {
         if (!effect.maxLife) effect.maxLife = effect.life;
         this.effects.push(effect);
+    }
+
+    /**
+     * Add effect using pool (preferred method)
+     * @performance Use this instead of add() for better memory efficiency
+     */
+    public spawn(config: Partial<IEffect> & { type: IEffect['type']; life: number }): IEffect {
+        const effect = this.acquire(config.type);
+        Object.assign(effect, config);
+        if (!effect.maxLife) effect.maxLife = effect.life;
+        this.effects.push(effect);
+        return effect;
     }
 
     public get activeEffects(): IEffect[] {
@@ -47,7 +98,9 @@ export class EffectSystem {
     }
 
     public update(dt: number) {
-        this.effects.forEach((e) => {
+        // Update all effects
+        for (let i = 0; i < this.effects.length; i++) {
+            const e = this.effects[i];
             e.life -= dt;
 
             if (e.type === 'particle' || e.type === 'text' || e.type === 'debris') {
@@ -55,31 +108,37 @@ export class EffectSystem {
                 if (e.vy) e.y += e.vy * dt;
 
                 // Gravity for debris
-                // Gravity for debris
                 if (e.type === 'debris') {
                     if (e.gravity) e.vy = (e.vy || 0) + e.gravity * dt;
                     if (e.vx) {
-                        // Drag: 0.98 per frame approx means ~30% remaining after 1 sec
-                        // pow(0.3, dt) is a good approximation for framerate independent damping
                         e.vx *= Math.pow(0.3, dt);
                     }
-                    // Rotation
                     if (e.rotation !== undefined && e.vRot) {
-                        // Assuming vRot is now passed in radians/sec
                         e.rotation += e.vRot * dt;
                     }
                 }
             }
-        });
+        }
 
-        this.effects = this.effects.filter((e) => e.life > 0);
+        // In-place removal (backward iteration) - NO NEW ARRAY ALLOCATION
+        for (let i = this.effects.length - 1; i >= 0; i--) {
+            if (this.effects[i].life <= 0) {
+                const dead = this.effects[i];
+                // Swap with last and pop
+                this.effects[i] = this.effects[this.effects.length - 1];
+                this.effects.pop();
+                // Return to pool
+                this.release(dead);
+            }
+        }
     }
 
     public draw() {
-        this.effects.forEach((e) => {
+        for (let i = 0; i < this.effects.length; i++) {
+            const e = this.effects[i];
             // Try Factory first
             if (RendererFactory.drawEffect(this.ctx, e)) {
-                return;
+                continue;
             }
 
             const progress = e.life / (e.maxLife || 1);
@@ -234,6 +293,6 @@ export class EffectSystem {
             }
 
             this.ctx.restore();
-        });
+        }
     }
 }

@@ -11,9 +11,9 @@ import { getTurretRenderer } from './renderers/turrets';
 export class WeaponSystem {
 
     public update(towers: Tower[], enemies: Enemy[], projectileSystem: ProjectileSystem, dt: number, effects?: EffectSystem) {
-        towers.forEach(tower => {
-            this.processTower(tower, enemies, projectileSystem, dt, effects);
-        });
+        for (let i = 0; i < towers.length; i++) {
+            this.processTower(towers[i], enemies, projectileSystem, dt, effects);
+        }
     }
 
     private processTower(tower: Tower, enemies: Enemy[], projectileSystem: ProjectileSystem, dt: number, effects?: EffectSystem) {
@@ -123,12 +123,17 @@ export class WeaponSystem {
     }
 
     private findTarget(tower: Tower, enemies: Enemy[], range: number): Enemy | null {
-        // Filter enemies within range
-        const inRange = enemies.filter(e => {
-            if (!e.isAlive()) return false;
-            const dist = Math.hypot(e.x - tower.x, e.y - tower.y);
-            return dist <= range;
-        });
+        // Build in-range list without allocation (reuse static array)
+        const inRange: Enemy[] = [];
+        for (let i = 0; i < enemies.length; i++) {
+            const e = enemies[i];
+            if (!e.isAlive()) continue;
+            const dx = e.x - tower.x;
+            const dy = e.y - tower.y;
+            if (dx * dx + dy * dy <= range * range) {
+                inRange.push(e);
+            }
+        }
 
         if (inRange.length === 0) return null;
 
