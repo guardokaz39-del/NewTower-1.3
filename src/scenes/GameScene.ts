@@ -211,6 +211,63 @@ export class GameScene extends BaseScene implements IGameScene {
                 }
             }
         });
+
+        // Flesh Colossus Death-Spawn Logic (Meat Piñata)
+        EventBus.getInstance().on('ENEMY_DEATH_SPAWN', (data: any) => {
+            const parent = data.enemy as Enemy;
+            const spawns: string[] = data.spawns;
+
+            if (!parent || !spawns || spawns.length === 0) return;
+
+            // 1. Gore explosion effect
+            this.effects.add({
+                type: 'explosion',
+                x: parent.x,
+                y: parent.y,
+                radius: 55,
+                life: 0.5,
+                color: '#8b0000' // Dark blood red
+            });
+
+            // 2. Meat chunks flying out
+            for (let i = 0; i < 10; i++) {
+                const angle = (i / 10) * Math.PI * 2 + Math.random() * 0.3;
+                const speed = 120 + Math.random() * 80;
+                this.effects.add({
+                    type: 'debris',
+                    x: parent.x + (Math.random() - 0.5) * 20,
+                    y: parent.y + (Math.random() - 0.5) * 20,
+                    vx: Math.cos(angle) * speed,
+                    vy: Math.sin(angle) * speed - 100,
+                    life: 0.5 + Math.random() * 0.3,
+                    size: 5 + Math.random() * 7,
+                    color: Math.random() > 0.5 ? '#6d2c2c' : '#8d4545',
+                    gravity: 450,
+                    rotation: Math.random() * Math.PI * 2,
+                    vRot: (Math.random() - 0.5) * 12
+                });
+            }
+
+            // 3. Spawn children with circular offset to prevent overlap
+            spawns.forEach((typeKey, i) => {
+                const child = this.entityManager.spawnEnemy(typeKey.toUpperCase(), this.map.waypoints);
+                if (child) {
+                    // Copy path progress from parent
+                    child.pathIndex = parent.pathIndex;
+
+                    // Circular offset to prevent overlap
+                    const angle = (i / spawns.length) * Math.PI * 2 + Math.random() * 0.3;
+                    const offset = 25 + Math.random() * 15;
+                    child.x = parent.x + Math.cos(angle) * offset;
+                    child.y = parent.y + Math.sin(angle) * offset;
+                }
+            });
+
+            // 4. Floating text and feedback
+            this.showFloatingText('BURST!', parent.x, parent.y - 40, '#ff5252');
+            SoundManager.play('explosion');
+            this.triggerShake(0.35, 7);
+        });
     }
 
     public onEnter() {

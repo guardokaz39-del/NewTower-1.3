@@ -160,6 +160,16 @@ export class Enemy {
             if (projectile) {
                 this.killedByProjectile = projectile;
             }
+
+            // Check for Death Spawns (Flesh Colossus mechanic)
+            const typeConfig = getEnemyType(this.typeId);
+            if (typeConfig?.deathSpawns && typeConfig.deathSpawns.length > 0) {
+                EventBus.getInstance().emit('ENEMY_DEATH_SPAWN', {
+                    enemy: this,
+                    spawns: typeConfig.deathSpawns
+                });
+            }
+
             EventBus.getInstance().emit(Events.ENEMY_DIED, { enemy: this });
         }
     }

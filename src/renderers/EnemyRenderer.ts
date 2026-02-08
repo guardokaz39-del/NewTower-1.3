@@ -14,6 +14,7 @@ import { SkeletonCommanderUnitRenderer } from './units/SkeletonCommanderUnitRend
 import { TrollUnitRenderer } from './units/TrollUnitRenderer';
 import { RatUnitRenderer } from './units/RatUnitRenderer';
 import { MagmaUnitRenderer } from './units/MagmaUnitRenderer';
+import { FleshUnitRenderer } from './units/FleshUnitRenderer';
 
 export class EnemyRenderer {
     // Registry of specific renderers (Singleton/Stateless instances)
@@ -30,6 +31,7 @@ export class EnemyRenderer {
         'SKELETON_COMMANDER': new SkeletonCommanderUnitRenderer(),
         'RAT': new RatUnitRenderer(),
         'MAGMA': new MagmaUnitRenderer(),
+        'FLESH': new FleshUnitRenderer(),
     };
 
     static drawSprite(ctx: CanvasRenderingContext2D, enemy: Enemy) {

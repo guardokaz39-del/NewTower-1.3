@@ -122,6 +122,15 @@ export class TowerRenderer {
     }
 
     private static drawActiveSprite(ctx: CanvasRenderingContext2D, tower: Tower, size: number) {
+        // 0. Draw Shadow (Phase 3: Visual Polish)
+        ctx.save();
+        ctx.globalAlpha = 0.25;
+        ctx.fillStyle = '#000';
+        ctx.beginPath();
+        ctx.ellipse(tower.x + 3, tower.y + 5, 22, 14, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+
         // 1. Draw Base (Static - NO Rotation, NO Recoil)
         const halfSize = size / 2;
         const baseImg = Assets.get('base_default');

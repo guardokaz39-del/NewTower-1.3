@@ -32,11 +32,12 @@ export interface IEnemyTypeConfig {
     color: string;
     desc: string;
     // Modular Visuals
-    archetype?: 'SKELETON' | 'WOLF' | 'TROLL' | 'SPIDER' | 'HELLHOUND' | 'ORC' | 'WRAITH' | 'GOBLIN' | 'SKELETON_COMMANDER' | 'RAT' | 'MAGMA';
+    archetype?: 'SKELETON' | 'WOLF' | 'TROLL' | 'SPIDER' | 'HELLHOUND' | 'ORC' | 'WRAITH' | 'GOBLIN' | 'SKELETON_COMMANDER' | 'RAT' | 'MAGMA' | 'FLESH';
     scale?: number;
     props?: string[]; // IDs of props
     tint?: string;    // Hex color override
     isHidden?: boolean; // If true, hidden from Editor/Bestiary lists
+    deathSpawns?: string[]; // Enemy types to spawn on death (Flesh Colossus)
 }
 
 // ============================================

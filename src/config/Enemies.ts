@@ -143,5 +143,19 @@ export const ENEMY_TYPES: Record<string, IEnemyTypeConfig> = {
         scale: 1.0,
         armor: 15,
         isHidden: true,
+    },
+    FLESH_COLOSSUS: {
+        id: 'flesh_colossus',
+        name: 'Мясной Колосс',
+        symbol: '🧟',
+        hpMod: 8.0,
+        speed: 45,
+        reward: 0, // No direct reward — reward comes from spawns
+        armor: 5,
+        color: '#8d4545',
+        desc: 'Троянский конь. При смерти из него вырываются 2 скелета и адская гончая.',
+        archetype: 'FLESH',
+        scale: 1.5,
+        deathSpawns: ['GRUNT', 'GRUNT', 'SCOUT']
     }
 };
