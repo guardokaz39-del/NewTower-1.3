@@ -2,6 +2,7 @@ import { Tower } from './Tower';
 import { Enemy } from './Enemy';
 import { Projectile } from './Projectile';
 import { CONFIG } from './Config';
+import { VISUALS } from './VisualConfig';
 import { EffectSystem } from './EffectSystem';
 import { SoundManager, SoundPriority } from './SoundManager';
 import { ProjectileSystem } from './systems/ProjectileSystem';
@@ -72,6 +73,9 @@ export class WeaponSystem {
                 const maxSpinupSeconds = spinupEffect.maxSpinupSeconds || 5;
                 tower.maxHeat = maxSpinupSeconds; // Sync for visual bar
 
+                // VISUAL STATE UPDATE
+                tower.heatLevel = Math.min(1, tower.spinupTime / tower.maxHeat);
+
                 // Check if tower has Ice card (for overheat extension)
                 const hasIceCard = tower.cards.some(c => c.type.id === 'ice');
                 const overheatExtension = hasIceCard ? (spinupEffect.overheatExtensionWithIce || 0) : 0;
@@ -106,9 +110,9 @@ export class WeaponSystem {
             if (tower.spinupTime > 0) {
                 // Cool down rate: 
                 // User wants 1.5 seconds to cool down from max heat
-                // Rate = MaxHeat / 1.5
                 const coolRate = (tower.maxHeat / 1.5) * dt;
                 tower.spinupTime = Math.max(0, tower.spinupTime - coolRate);
+                tower.heatLevel = Math.min(1, tower.spinupTime / tower.maxHeat);
             }
             if (tower.isOverheated) {
                 // If we lost target but are overheated, we still cool down the overheat timer?
@@ -204,12 +208,41 @@ export class WeaponSystem {
 
         // === MUZZLE FLASH EFFECT ===
         if (effects) {
+            let flashColor = VISUALS.TOWER.MUZZLE_FLASH.STANDARD;
+            let flashRadius = 15;
+
+            // Determine color based on projectile type
+            switch (stats.projectileType) {
+                case 'fire':
+                case 'explosive':
+                    flashColor = VISUALS.TOWER.MUZZLE_FLASH.FIRE;
+                    flashRadius = 20;
+                    break;
+                case 'ice':
+                    flashColor = VISUALS.TOWER.MUZZLE_FLASH.ICE;
+                    flashRadius = 18;
+                    break;
+                case 'sniper':
+                    flashColor = VISUALS.TOWER.MUZZLE_FLASH.SNIPER;
+                    flashRadius = 12; // Smaller but intense
+                    break;
+                case 'split':
+                    flashColor = VISUALS.TOWER.MUZZLE_FLASH.SPLIT;
+                    flashRadius = 22; // Wide flash
+                    break;
+                case 'minigun':
+                    flashColor = VISUALS.TOWER.MUZZLE_FLASH.MINIGUN;
+                    flashRadius = 14;
+                    break;
+            }
+
             effects.add({
                 type: 'muzzle_flash',
                 x: muzzleX,
                 y: muzzleY,
-                radius: 15,
+                radius: flashRadius,
                 life: 0.08,
+                color: flashColor
             });
 
             // === SHELL CASING EFFECT ===
@@ -268,20 +301,18 @@ export class WeaponSystem {
                 tower.recoilTimer = 0.2;
                 tower.recoilIntensity = 3;
             } else {
-                // Standard recoil
-                tower.barrelRecoil = -4;
+                // Standard recoil (Single shot kickback)
+                // specific types might handle their own recoil (e.g. Minigun vibrates)
+                if (stats.projectileType !== 'minigun') {
+                    tower.barrelRecoil = -4;
+                }
             }
         }
 
         // Minigun vibration (constant while firing)
         if (stats.projectileType === 'minigun') {
             tower.recoilTimer = 0.1; // 0.1s duration (was 5 frames)
-            // tower.recoilIntensity = 0.5; // OLD: Caused constant shaking
-            // Only purely visual recoil for the tower itself, do not trigger screen shake here if possible
-            // But if recoilFrames is used for screen shake, we need to be careful.
-            // GameScene uses gameState.shakeTimer for screen shake. 
-            // Tower.recoilFrames usually just shakes the tower sprite.
-            // Let's verify Tower.ts usage of recoil.
+            // Vibration is handled in renderer via heatLevel
         }
 
         // Play Sound

@@ -52,7 +52,7 @@ export class TowerRenderer {
         // Draw Turret (if card selected)
         if (cardId) {
             const renderer = getTurretRenderer(cardId);
-            const turretImg = Assets.get(renderer.getTurretAsset());
+            const turretImg = Assets.get(renderer.getTurretAsset(1));
 
             // Should also draw preview modules? Maybe too much detail.
             // Just draw the main turret for now.
@@ -132,7 +132,13 @@ export class TowerRenderer {
         // 2. Get turret renderer via Strategy Pattern
         const mainCard = tower.cards[0];
         const renderer = getTurretRenderer(mainCard?.type.id || 'default');
-        const turretName = renderer.getTurretAsset();
+
+        // Progressive scaling based on HIGHEST card level
+        const cardLevel = tower.cards.length > 0
+            ? Math.max(...tower.cards.map(c => c.level))
+            : 1;
+
+        const turretName = renderer.getTurretAsset(cardLevel);
 
         // 3. Draw Turret (Rotated + Recoiled)
         const turretImg = Assets.get(turretName);
@@ -151,10 +157,6 @@ export class TowerRenderer {
             // For now, standard rotation towards target:
             ctx.rotate(tower.angle);
 
-            // Progressive scaling based on HIGHEST card level
-            const cardLevel = tower.cards.length > 0
-                ? Math.max(...tower.cards.map(c => c.level))
-                : 1;
             const scaleMultiplier = 1.0 + ((cardLevel - 1) * 0.15);
             ctx.scale(scaleMultiplier, scaleMultiplier);
 
@@ -162,12 +164,19 @@ export class TowerRenderer {
             // Move along the negative X axis (since we are rotated, X is "forward")
             // Wait, standard canvas rotation: 0 is right (East).
             // So translates X moves forward/back.
+            // Apply Barrel Recoil (Kickback)
             if (tower.barrelRecoil) {
                 ctx.translate(tower.barrelRecoil, 0);
             }
 
             // Draw turret body
-            ctx.drawImage(turretImg, -halfSize, -halfSize);
+            if (renderer.drawTurret) {
+                // Custom renderer handles the turret body + moving parts
+                renderer.drawTurret(ctx, tower);
+            } else {
+                // Standard Sprite Drawing
+                ctx.drawImage(turretImg, -halfSize, -halfSize);
+            }
 
             // 4. Draw Modules (Attachments) - Attached to turret body?
             // If modules are attached to the rotating turret (like side-mounted guns), draw here.
@@ -366,5 +375,13 @@ export class TowerRenderer {
         // Draw from bottom up
         const fillH = barH * pct;
         ctx.fillRect(barX + 1, barY + (barH - fillH) - 1, barW - 2, fillH);
+    }
+    static update(dt: number, tower: Tower) {
+        if (tower.cards.length > 0) {
+            const renderer = getTurretRenderer(tower.cards[0].type.id);
+            if (renderer.update) {
+                renderer.update(dt, tower);
+            }
+        }
     }
 }

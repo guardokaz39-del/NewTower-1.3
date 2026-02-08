@@ -292,7 +292,10 @@ export class GameScene extends BaseScene implements IGameScene {
             );
 
             // Update tower visual states
-            this.gameState.towers.forEach((t) => t.updateBuilding(this.effects, dt));
+            this.gameState.towers.forEach((t) => {
+                t.updateBuilding(this.effects, dt);
+                RendererFactory.updateTower(dt, t);
+            });
 
             this.collision.update(this.projectileSystem.projectiles, this.gameState.enemies);
             this.entityManager.updateEnemies(dt);

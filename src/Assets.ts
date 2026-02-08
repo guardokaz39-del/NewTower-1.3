@@ -756,6 +756,8 @@ export class Assets {
 
         // -- 2. Turrets --
 
+        // -- 2. Turrets --
+
         // Standard / Default
         this.generateTexture('turret_standard', size, (ctx, w, h) => {
             const cx = w / 2;
@@ -772,136 +774,646 @@ export class Assets {
             ctx.stroke();
         });
 
-        // Ice Turret (Crystal/Prism, Blue)
-        this.generateTexture('turret_ice', size, (ctx, w, h) => {
-            const cx = w / 2;
-            const cy = h / 2;
-            ctx.translate(cx, cy);
+        // Loop for 3 levels
+        for (let level = 1; level <= 3; level++) {
 
-            // Barrel - Crystal spike
-            ctx.fillStyle = VISUALS.TOWER.TURRET.ICE.SPIKE; // Cyan 300
-            ctx.beginPath();
-            ctx.moveTo(0, -4);
-            ctx.lineTo(24, 0);
-            ctx.lineTo(0, 4);
-            ctx.fill();
+            // --- FIRE TURRET (Mortar) ---
+            this.generateTexture(`turret_fire_${level}`, size, (ctx, w, h) => {
+                const cx = w / 2;
+                const cy = h / 2;
+                ctx.translate(cx, cy);
 
-            // Body - Hexagon
-            ctx.fillStyle = VISUALS.TOWER.TURRET.ICE.MAIN; // Cyan 600
-            ctx.beginPath();
-            for (let i = 0; i < 6; i++) {
-                const a = i * (Math.PI / 3);
-                const r = 14;
-                ctx.lineTo(Math.cos(a) * r, Math.sin(a) * r);
-            }
-            ctx.closePath();
-            ctx.fill();
-            ctx.strokeStyle = VISUALS.TOWER.TURRET.ICE.STROKE;
-            ctx.lineWidth = 2;
-            ctx.stroke();
-        });
+                // Level 1: Basic Mortar Cannon
+                // Level 2: + Heat Fins + Reinforced
+                // Level 3: + Magma Core + Glowing Cracks
 
-        // Fire Turret (Mortar/Flamethrower, Orange/Red)
-        this.generateTexture('turret_fire', size, (ctx, w, h) => {
-            const cx = w / 2;
-            const cy = h / 2;
-            ctx.translate(cx, cy);
+                // === BARREL (Conical, not flat rectangle) ===
+                const barrelLen = 18 + level * 2; // 20-24px
+                const barrelBaseW = 14 + level * 2; // 16-20px base
+                const barrelTipW = 8 + level; // 9-11px tip (tapered)
 
-            // Barrel - Wide, short
-            ctx.fillStyle = VISUALS.TOWER.TURRET.FIRE.BARREL; // Deep Orange 400
-            ctx.fillRect(0, -10, 18, 20);
-            // Barrel Tip (charred)
-            ctx.fillStyle = VISUALS.TOWER.TURRET.FIRE.TIP;
-            ctx.fillRect(14, -10, 4, 20);
+                // Barrel gradient (dark to hot)
+                const barrelGrad = ctx.createLinearGradient(0, 0, barrelLen, 0);
+                barrelGrad.addColorStop(0, '#5d4037'); // Dark brown base
+                barrelGrad.addColorStop(0.7, '#8d6e63'); // Mid brown
+                barrelGrad.addColorStop(1, '#ff5722'); // Hot orange tip
 
-            // Body - Round, massive
-            ctx.fillStyle = VISUALS.TOWER.TURRET.FIRE.MAIN; // Deep Orange 600
-            ctx.beginPath();
-            ctx.arc(0, 0, 15, 0, Math.PI * 2);
-            ctx.fill();
-            ctx.strokeStyle = VISUALS.TOWER.TURRET.FIRE.STROKE;
-            ctx.lineWidth = 2;
-            ctx.stroke();
-        });
+                ctx.fillStyle = barrelGrad;
+                ctx.beginPath();
+                ctx.moveTo(0, -barrelBaseW / 2);
+                ctx.lineTo(barrelLen, -barrelTipW / 2);
+                ctx.lineTo(barrelLen, barrelTipW / 2);
+                ctx.lineTo(0, barrelBaseW / 2);
+                ctx.closePath();
+                ctx.fill();
 
-        // Sniper Turret (Long Rifle, Green/Camo)
-        this.generateTexture('turret_sniper', size, (ctx, w, h) => {
-            const cx = w / 2;
-            const cy = h / 2;
-            ctx.translate(cx, cy);
+                // Barrel metal bands
+                ctx.fillStyle = '#3e2723'; // Dark metal
+                ctx.fillRect(4, -barrelBaseW / 2 - 1, 3, barrelBaseW + 2);
+                if (level >= 2) {
+                    ctx.fillRect(10, -barrelBaseW / 2 + 2, 2, barrelBaseW - 4);
+                }
 
-            // Barrel - Long, thin
-            ctx.fillStyle = VISUALS.TOWER.TURRET.SNIPER.BARREL; // Green 900
-            ctx.fillRect(0, -3, 30, 6);
-            // Muzzle brake
-            ctx.fillStyle = VISUALS.TOWER.TURRET.SNIPER.MUZZLE;
-            ctx.fillRect(28, -5, 4, 10);
+                // Muzzle ring
+                ctx.strokeStyle = '#ff9800';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.arc(barrelLen, 0, barrelTipW / 2, -Math.PI / 2, Math.PI / 2);
+                ctx.stroke();
 
-            // Body - Sleek, angular
-            ctx.fillStyle = VISUALS.TOWER.TURRET.SNIPER.MAIN; // Green 800
-            ctx.beginPath();
-            ctx.moveTo(-10, -8);
-            ctx.lineTo(10, -5);
-            ctx.lineTo(10, 5);
-            ctx.lineTo(-10, 8);
-            ctx.closePath();
-            ctx.fill();
-        });
+                // === BODY (Armored sphere with details) ===
+                const bodyR = 13 + level;
 
-        // Split Turret (Gatling/Tri-barrel, Yellow)
-        this.generateTexture('turret_split', size, (ctx, w, h) => {
-            const cx = w / 2;
-            const cy = h / 2;
-            ctx.translate(cx, cy);
+                // Body gradient (metallic look)
+                const bodyGrad = ctx.createRadialGradient(-3, -3, 0, 0, 0, bodyR);
+                bodyGrad.addColorStop(0, '#a1887f'); // Highlight
+                bodyGrad.addColorStop(0.5, '#795548'); // Mid
+                bodyGrad.addColorStop(1, '#4e342e'); // Shadow
 
-            // Barrels - Three spread out
-            ctx.fillStyle = VISUALS.TOWER.TURRET.SPLIT.BARREL; // Yellow 700
-            const spread = 0.3;
-            // 1
-            ctx.save(); ctx.rotate(-spread); ctx.fillRect(0, -3, 20, 6); ctx.restore();
-            // 2
-            ctx.fillRect(0, -3, 22, 6);
-            // 3
-            ctx.save(); ctx.rotate(spread); ctx.fillRect(0, -3, 20, 6); ctx.restore();
+                ctx.fillStyle = bodyGrad;
+                ctx.beginPath();
+                ctx.arc(0, 0, bodyR, 0, Math.PI * 2);
+                ctx.fill();
 
-            // Body - Wide
-            ctx.fillStyle = VISUALS.TOWER.TURRET.SPLIT.MAIN; // Yellow 900
-            ctx.beginPath();
-            ctx.arc(0, 0, 14, 0, Math.PI * 2);
-            ctx.fill();
-        });
+                // Body outline
+                ctx.strokeStyle = '#3e2723';
+                ctx.lineWidth = 2;
+                ctx.stroke();
 
-        // Minigun Turret (Gatling gun, Purple/Electric)
-        this.generateTexture('turret_minigun', size, (ctx, w, h) => {
-            const cx = w / 2;
-            const cy = h / 2;
-            ctx.translate(cx, cy);
+                // === LEVEL 2+ DETAILS ===
+                if (level >= 2) {
+                    // Heat dissipation fins (side plates)
+                    ctx.fillStyle = '#5d4037';
+                    // Top fin
+                    ctx.beginPath();
+                    ctx.moveTo(-8, -bodyR + 2);
+                    ctx.lineTo(-4, -bodyR - 4);
+                    ctx.lineTo(4, -bodyR - 4);
+                    ctx.lineTo(8, -bodyR + 2);
+                    ctx.closePath();
+                    ctx.fill();
+                    // Bottom fin
+                    ctx.beginPath();
+                    ctx.moveTo(-8, bodyR - 2);
+                    ctx.lineTo(-4, bodyR + 4);
+                    ctx.lineTo(4, bodyR + 4);
+                    ctx.lineTo(8, bodyR - 2);
+                    ctx.closePath();
+                    ctx.fill();
 
-            // Rotating barrel assembly - Multiple thin barrels
-            ctx.fillStyle = '#7b1fa2'; // Purple 700
-            const barrelCount = 6;
-            for (let i = 0; i < barrelCount; i++) {
-                const angle = (i / barrelCount) * Math.PI * 2;
-                const r = 6; // Radius of barrel circle
-                ctx.save();
-                ctx.translate(Math.cos(angle) * r, Math.sin(angle) * r);
-                ctx.fillRect(0, -1.5, 18, 3); // Thin barrel
-                ctx.restore();
-            }
+                    // Rivets on body
+                    ctx.fillStyle = '#8d6e63';
+                    const rivetAngles = [Math.PI * 0.7, Math.PI * 0.85, Math.PI * 1.15, Math.PI * 1.3];
+                    rivetAngles.forEach(a => {
+                        ctx.beginPath();
+                        ctx.arc(Math.cos(a) * (bodyR - 3), Math.sin(a) * (bodyR - 3), 1.5, 0, Math.PI * 2);
+                        ctx.fill();
+                    });
+                }
 
-            // Central motor housing
-            ctx.fillStyle = '#9c27b0'; // Purple 500
-            ctx.beginPath();
-            ctx.arc(0, 0, 10, 0, Math.PI * 2);
-            ctx.fill();
+                // === LEVEL 3 DETAILS ===
+                if (level === 3) {
+                    // Magma core glow (center)
+                    const coreGrad = ctx.createRadialGradient(0, 0, 0, 0, 0, 8);
+                    coreGrad.addColorStop(0, '#ffeb3b'); // Yellow center
+                    coreGrad.addColorStop(0.4, '#ff9800'); // Orange
+                    coreGrad.addColorStop(1, 'rgba(255,87,34,0)'); // Fade
 
-            // Electric coil detail
-            ctx.strokeStyle = '#e1bee7'; // Purple 100  (light accent)
-            ctx.lineWidth = 1.5;
-            ctx.beginPath();
-            ctx.arc(0, 0, 6, 0, Math.PI * 2);
-            ctx.stroke();
-        });
+                    ctx.fillStyle = coreGrad;
+                    ctx.beginPath();
+                    ctx.arc(0, 0, 8, 0, Math.PI * 2);
+                    ctx.fill();
+
+                    // Magma cracks radiating from center
+                    ctx.strokeStyle = '#ff5722';
+                    ctx.lineWidth = 1;
+                    ctx.beginPath();
+                    for (let i = 0; i < 4; i++) {
+                        const angle = (i * Math.PI / 2) + Math.PI / 4;
+                        ctx.moveTo(Math.cos(angle) * 4, Math.sin(angle) * 4);
+                        ctx.lineTo(Math.cos(angle) * (bodyR - 4), Math.sin(angle) * (bodyR - 4));
+                    }
+                    ctx.stroke();
+                }
+            });
+
+
+            // --- ICE TURRET (Magical Crystal) ---
+            this.generateTexture(`turret_ice_${level}`, size, (ctx, w, h) => {
+                const cx = w / 2;
+                const cy = h / 2;
+                ctx.translate(cx, cy);
+
+                // Level 1: Crystal spike + ice sphere
+                // Level 2: + Frost base + inner facets
+                // Level 3: + Floating shards + core glow
+
+                // === MAIN CRYSTAL BODY (Hexagon for crystalline look) ===
+                const bodyR = 14 + level; // 15-17px
+
+                // === FROST BASE (Level 2+) ===
+                if (level >= 2) {
+                    ctx.fillStyle = 'rgba(224, 247, 250, 0.6)';
+                    ctx.beginPath();
+                    ctx.ellipse(0, 3, bodyR + 4, 6, 0, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+
+                // Hexagon path
+                const hexPath = () => {
+                    ctx.beginPath();
+                    for (let i = 0; i < 6; i++) {
+                        const angle = (i * Math.PI / 3) - Math.PI / 6;
+                        const x = Math.cos(angle) * bodyR;
+                        const y = Math.sin(angle) * bodyR;
+                        if (i === 0) ctx.moveTo(x, y);
+                        else ctx.lineTo(x, y);
+                    }
+                    ctx.closePath();
+                };
+
+                // Gradient fill
+                const bodyGrad = ctx.createRadialGradient(-3, -3, 0, 0, 0, bodyR);
+                bodyGrad.addColorStop(0, '#e0f7fa');
+                bodyGrad.addColorStop(0.3, '#80deea');
+                bodyGrad.addColorStop(0.7, '#26c6da');
+                bodyGrad.addColorStop(1, '#00acc1');
+
+                ctx.fillStyle = bodyGrad;
+                hexPath();
+                ctx.fill();
+
+                // Outline
+                ctx.strokeStyle = '#0097a7';
+                ctx.lineWidth = 2;
+                hexPath();
+                ctx.stroke();
+
+                // === CRYSTAL SPIKE (Multi-faceted) ===
+                const spikeLen = 22 + level * 3; // 25-31px
+                const spikeBaseW = 8 + level; // 9-11px
+
+                // Spike gradient (white tip -> cyan base)
+                const spikeGrad = ctx.createLinearGradient(0, 0, spikeLen, 0);
+                spikeGrad.addColorStop(0, '#4dd0e1'); // Base cyan
+                spikeGrad.addColorStop(0.7, '#b2ebf2'); // Light cyan
+                spikeGrad.addColorStop(1, '#ffffff'); // White tip
+
+                // Main spike body
+                ctx.fillStyle = spikeGrad;
+                ctx.beginPath();
+                ctx.moveTo(bodyR - 4, -spikeBaseW / 2);
+                ctx.lineTo(spikeLen, 0);
+                ctx.lineTo(bodyR - 4, spikeBaseW / 2);
+                ctx.closePath();
+                ctx.fill();
+
+                // Spike facet (darker underside)
+                ctx.fillStyle = 'rgba(0, 151, 167, 0.4)';
+                ctx.beginPath();
+                ctx.moveTo(bodyR - 2, 0);
+                ctx.lineTo(spikeLen - 2, 0);
+                ctx.lineTo(bodyR - 2, spikeBaseW / 2 - 1);
+                ctx.closePath();
+                ctx.fill();
+
+                // Spike highlight (top edge)
+                ctx.strokeStyle = 'rgba(255, 255, 255, 0.8)';
+                ctx.lineWidth = 1;
+                ctx.beginPath();
+                ctx.moveTo(bodyR - 2, -spikeBaseW / 2 + 1);
+                ctx.lineTo(spikeLen - 3, 0);
+                ctx.stroke();
+
+                // === INNER FACETS (Level 2+) ===
+                if (level >= 2) {
+                    ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
+                    ctx.beginPath();
+                    ctx.moveTo(-bodyR + 4, -2);
+                    ctx.lineTo(0, -bodyR + 3);
+                    ctx.lineTo(bodyR - 6, -2);
+                    ctx.closePath();
+                    ctx.fill();
+
+                    // Secondary facet
+                    ctx.fillStyle = 'rgba(178, 235, 242, 0.5)';
+                    ctx.beginPath();
+                    ctx.moveTo(-bodyR + 5, 2);
+                    ctx.lineTo(0, bodyR - 4);
+                    ctx.lineTo(bodyR - 7, 2);
+                    ctx.closePath();
+                    ctx.fill();
+                }
+
+                // === CORE GLOW (Level 3) ===
+                if (level === 3) {
+                    const coreGrad = ctx.createRadialGradient(0, 0, 0, 0, 0, 6);
+                    coreGrad.addColorStop(0, 'rgba(255, 255, 255, 0.9)');
+                    coreGrad.addColorStop(0.5, 'rgba(128, 222, 234, 0.6)');
+                    coreGrad.addColorStop(1, 'rgba(77, 208, 225, 0)');
+
+                    ctx.fillStyle = coreGrad;
+                    ctx.beginPath();
+                    ctx.arc(0, 0, 6, 0, Math.PI * 2);
+                    ctx.fill();
+
+                    // Floating shards (static positions, animated in renderer)
+                    ctx.fillStyle = '#4dd0e1';
+                    const shardPositions = [
+                        { x: -10, y: -14, r: 0.3 },
+                        { x: 12, y: -10, r: -0.5 },
+                        { x: -8, y: 12, r: 0.7 }
+                    ];
+                    shardPositions.forEach(s => {
+                        ctx.save();
+                        ctx.translate(s.x, s.y);
+                        ctx.rotate(s.r);
+                        ctx.beginPath();
+                        ctx.moveTo(0, -3);
+                        ctx.lineTo(2, 0);
+                        ctx.lineTo(0, 3);
+                        ctx.lineTo(-2, 0);
+                        ctx.closePath();
+                        ctx.fill();
+                        ctx.restore();
+                    });
+                }
+            });
+
+
+            // --- SNIPER TURRET (Rail Gun) ---
+            this.generateTexture(`turret_sniper_${level}`, size, (ctx, w, h) => {
+                const cx = w / 2;
+                const cy = h / 2;
+                ctx.translate(cx, cy);
+
+                // Level 1: Precision rifle + scope
+                // Level 2: + Carbon fiber body + enhanced optics
+                // Level 3: + Energy rails + neon accents
+
+                const barrelLen = 28 + level * 4; // 32-40px
+                const barrelBaseH = 6 + level; // 7-9px
+                const barrelTipH = 3 + level; // 4-6px
+
+                // === BODY (Angular armored housing) ===
+                const bodyGrad = ctx.createLinearGradient(-12, -10, -12, 10);
+                bodyGrad.addColorStop(0, '#558b2f'); // Light green top
+                bodyGrad.addColorStop(0.5, '#33691e'); // Forest green
+                bodyGrad.addColorStop(1, '#1b5e20'); // Dark green bottom
+
+                ctx.fillStyle = bodyGrad;
+                ctx.beginPath();
+                ctx.moveTo(-12, -9);
+                ctx.lineTo(8, -6);
+                ctx.lineTo(8, 6);
+                ctx.lineTo(-12, 9);
+                ctx.closePath();
+                ctx.fill();
+
+                // Body outline
+                ctx.strokeStyle = '#1b5e20';
+                ctx.lineWidth = 1;
+                ctx.stroke();
+
+                // === BARREL (Tapered precision barrel) ===
+                const barrelGrad = ctx.createLinearGradient(6, 0, barrelLen, 0);
+                barrelGrad.addColorStop(0, '#424242'); // Gun metal
+                barrelGrad.addColorStop(0.3, '#616161');
+                barrelGrad.addColorStop(0.7, '#757575');
+                barrelGrad.addColorStop(1, '#9e9e9e'); // Light tip
+
+                ctx.fillStyle = barrelGrad;
+                ctx.beginPath();
+                ctx.moveTo(6, -barrelBaseH / 2);
+                ctx.lineTo(barrelLen, -barrelTipH / 2);
+                ctx.lineTo(barrelLen, barrelTipH / 2);
+                ctx.lineTo(6, barrelBaseH / 2);
+                ctx.closePath();
+                ctx.fill();
+
+                // Barrel highlight
+                ctx.strokeStyle = 'rgba(255,255,255,0.3)';
+                ctx.lineWidth = 1;
+                ctx.beginPath();
+                ctx.moveTo(8, -barrelBaseH / 2 + 1);
+                ctx.lineTo(barrelLen - 2, -barrelTipH / 2 + 1);
+                ctx.stroke();
+
+                // === MUZZLE BRAKE ===
+                ctx.fillStyle = '#37474f';
+                ctx.fillRect(barrelLen - 3, -barrelTipH / 2 - 2, 5, barrelTipH + 4);
+
+                // Brake slots
+                ctx.strokeStyle = '#263238';
+                ctx.lineWidth = 1;
+                ctx.beginPath();
+                ctx.moveTo(barrelLen - 1, -barrelTipH / 2 - 1);
+                ctx.lineTo(barrelLen - 1, barrelTipH / 2 + 1);
+                ctx.stroke();
+
+                // === SCOPE (Level 1+) ===
+                // Scope body
+                ctx.fillStyle = '#263238';
+                ctx.fillRect(-6, -10, 14, 4);
+
+                // Scope lens (front)
+                const lensGrad = ctx.createRadialGradient(8, -8, 0, 8, -8, 3);
+                lensGrad.addColorStop(0, '#4dd0e1'); // Cyan center
+                lensGrad.addColorStop(0.6, '#00acc1');
+                lensGrad.addColorStop(1, '#006064');
+
+                ctx.fillStyle = lensGrad;
+                ctx.beginPath();
+                ctx.arc(8, -8, 3, 0, Math.PI * 2);
+                ctx.fill();
+
+                // Lens reflection
+                ctx.fillStyle = 'rgba(255,255,255,0.5)';
+                ctx.beginPath();
+                ctx.arc(7, -9, 1, 0, Math.PI * 2);
+                ctx.fill();
+
+                // === LEVEL 2+ DETAILS ===
+                if (level >= 2) {
+                    // Carbon fiber pattern on body
+                    ctx.strokeStyle = 'rgba(0,0,0,0.2)';
+                    ctx.lineWidth = 1;
+                    for (let i = 0; i < 3; i++) {
+                        ctx.beginPath();
+                        ctx.moveTo(-10 + i * 5, -7);
+                        ctx.lineTo(-8 + i * 5, 7);
+                        ctx.stroke();
+                    }
+
+                    // Enhanced scope mount
+                    ctx.fillStyle = '#37474f';
+                    ctx.fillRect(-2, -12, 6, 3);
+                }
+
+                // === LEVEL 3: ENERGY RAILS ===
+                if (level === 3) {
+                    ctx.strokeStyle = '#69f0ae'; // Neon green
+                    ctx.lineWidth = 2;
+                    ctx.shadowColor = '#69f0ae';
+                    ctx.shadowBlur = 4;
+
+                    // Top rail
+                    ctx.beginPath();
+                    ctx.moveTo(10, -barrelBaseH / 2 - 1);
+                    ctx.lineTo(barrelLen - 5, -barrelTipH / 2 - 1);
+                    ctx.stroke();
+
+                    // Bottom rail
+                    ctx.beginPath();
+                    ctx.moveTo(10, barrelBaseH / 2 + 1);
+                    ctx.lineTo(barrelLen - 5, barrelTipH / 2 + 1);
+                    ctx.stroke();
+
+                    ctx.shadowBlur = 0;
+
+                    // Energy core in body
+                    const coreGrad = ctx.createRadialGradient(-2, 0, 0, -2, 0, 5);
+                    coreGrad.addColorStop(0, '#b9f6ca');
+                    coreGrad.addColorStop(0.5, '#69f0ae');
+                    coreGrad.addColorStop(1, 'rgba(105,240,174,0)');
+
+                    ctx.fillStyle = coreGrad;
+                    ctx.beginPath();
+                    ctx.arc(-2, 0, 5, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+            });
+
+
+            // --- SPLIT TURRET (Rocket Volley) ---
+            this.generateTexture(`turret_split_${level}`, size, (ctx, w, h) => {
+                const cx = w / 2;
+                const cy = h / 2;
+                ctx.translate(cx, cy);
+
+                // Level 1: 2 rocket tubes + base turret
+                // Level 2: 3 tubes + armor plates
+                // Level 3: 4 tubes + energy ring
+
+                const barrelCount = level + 1; // 2, 3, 4
+                const barrelLen = 20 + level * 3; // 23-29px
+                const barrelW = 5 + level; // 6-8px
+
+                const spreadAngle = 0.25; // Radians between tubes
+                const startAngle = -spreadAngle * (barrelCount - 1) / 2;
+
+                // === ROCKET TUBES ===
+                for (let i = 0; i < barrelCount; i++) {
+                    ctx.save();
+                    ctx.rotate(startAngle + i * spreadAngle);
+
+                    // Tube gradient (dark to hot)
+                    const tubeGrad = ctx.createLinearGradient(0, 0, barrelLen, 0);
+                    tubeGrad.addColorStop(0, '#5d4037'); // Dark brown base
+                    tubeGrad.addColorStop(0.6, '#8d6e63'); // Medium brown
+                    tubeGrad.addColorStop(1, '#ff8f00'); // Amber tip
+
+                    ctx.fillStyle = tubeGrad;
+                    ctx.beginPath();
+                    ctx.moveTo(8, -barrelW / 2);
+                    ctx.lineTo(barrelLen, -barrelW / 2 + 1);
+                    ctx.lineTo(barrelLen, barrelW / 2 - 1);
+                    ctx.lineTo(8, barrelW / 2);
+                    ctx.closePath();
+                    ctx.fill();
+
+                    // Tube hollow (dark interior)
+                    ctx.fillStyle = '#1a1a1a';
+                    ctx.beginPath();
+                    ctx.arc(barrelLen, 0, barrelW / 2 - 2, 0, Math.PI * 2);
+                    ctx.fill();
+
+                    // Tube band
+                    ctx.fillStyle = '#3e2723';
+                    ctx.fillRect(12, -barrelW / 2 - 1, 3, barrelW + 2);
+
+                    // Tube highlight
+                    ctx.strokeStyle = 'rgba(255,255,255,0.2)';
+                    ctx.lineWidth = 1;
+                    ctx.beginPath();
+                    ctx.moveTo(10, -barrelW / 2 + 1);
+                    ctx.lineTo(barrelLen - 2, -barrelW / 2 + 2);
+                    ctx.stroke();
+
+                    ctx.restore();
+                }
+
+                // === ARMORED BODY (Squared with chamfers - military look) ===
+                const bodySize = 13 + level; // 14-16px
+                const chamfer = 4;
+
+                // Squared body path
+                const squarePath = () => {
+                    ctx.beginPath();
+                    ctx.moveTo(-bodySize + chamfer, -bodySize);
+                    ctx.lineTo(bodySize - chamfer, -bodySize);
+                    ctx.lineTo(bodySize, -bodySize + chamfer);
+                    ctx.lineTo(bodySize, bodySize - chamfer);
+                    ctx.lineTo(bodySize - chamfer, bodySize);
+                    ctx.lineTo(-bodySize + chamfer, bodySize);
+                    ctx.lineTo(-bodySize, bodySize - chamfer);
+                    ctx.lineTo(-bodySize, -bodySize + chamfer);
+                    ctx.closePath();
+                };
+
+                const bodyGrad = ctx.createRadialGradient(-2, -2, 0, 0, 0, bodySize * 1.2);
+                bodyGrad.addColorStop(0, '#ffca28');
+                bodyGrad.addColorStop(0.4, '#ff8f00');
+                bodyGrad.addColorStop(1, '#e65100');
+
+                ctx.fillStyle = bodyGrad;
+                squarePath();
+                ctx.fill();
+
+                // Outline
+                ctx.strokeStyle = '#bf360c';
+                ctx.lineWidth = 2;
+                squarePath();
+                ctx.stroke();
+
+                // === LEVEL 2+ ARMOR PLATES ===
+                if (level >= 2) {
+                    ctx.fillStyle = '#5d4037';
+                    // Side plates
+                    ctx.fillRect(-bodySize - 2, -4, 4, 8);
+                    ctx.fillRect(bodySize - 2, -4, 4, 8);
+
+                    // Top/bottom rivets
+                    ctx.fillStyle = '#8d6e63';
+                    [-6, 0, 6].forEach(x => {
+                        ctx.beginPath();
+                        ctx.arc(x, -bodySize + 3, 1.5, 0, Math.PI * 2);
+                        ctx.fill();
+                        ctx.beginPath();
+                        ctx.arc(x, bodySize - 3, 1.5, 0, Math.PI * 2);
+                        ctx.fill();
+                    });
+                }
+
+                // === LEVEL 3: ENERGY RING ===
+                if (level === 3) {
+                    ctx.strokeStyle = '#ffab00';
+                    ctx.lineWidth = 2;
+                    ctx.shadowColor = '#ffab00';
+                    ctx.shadowBlur = 4;
+                    ctx.beginPath();
+                    ctx.arc(0, 0, bodySize + 3, 0, Math.PI * 2);
+                    ctx.stroke();
+                    ctx.shadowBlur = 0;
+
+                    // Inner core glow
+                    const coreGrad = ctx.createRadialGradient(0, 0, 0, 0, 0, 5);
+                    coreGrad.addColorStop(0, '#fff8e1');
+                    coreGrad.addColorStop(0.5, '#ffca28');
+                    coreGrad.addColorStop(1, 'rgba(255,202,40,0)');
+
+                    ctx.fillStyle = coreGrad;
+                    ctx.beginPath();
+                    ctx.arc(0, 0, 5, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+            });
+
+
+
+            // --- VOID PRISM (Magical Minigun) ---
+            // Pedestal only - floating crystal is drawn procedurally by renderer
+            this.generateTexture(`turret_minigun_${level}`, size, (ctx, w, h) => {
+                const cx = w / 2;
+                const cy = h / 2;
+                ctx.translate(cx, cy);
+
+                // Level 1: Stone pedestal
+                // Level 2: + Rune carvings
+                // Level 3: + Energy channel + glow
+
+                // === PEDESTAL BASE ===
+                const baseW = 20 + level * 2; // 22-26px
+                const baseH = 10 + level; // 11-13px
+
+                // Pedestal gradient (dark stone)
+                const baseGrad = ctx.createLinearGradient(0, 0, 0, baseH);
+                baseGrad.addColorStop(0, '#37474f'); // Blue grey 800
+                baseGrad.addColorStop(0.5, '#263238'); // Blue grey 900
+                baseGrad.addColorStop(1, '#1a1a1a'); // Near black
+
+                ctx.fillStyle = baseGrad;
+                ctx.beginPath();
+                ctx.moveTo(-baseW / 2, 0);
+                ctx.lineTo(-baseW / 2 + 4, baseH);
+                ctx.lineTo(baseW / 2 - 4, baseH);
+                ctx.lineTo(baseW / 2, 0);
+                ctx.closePath();
+                ctx.fill();
+
+                // Pedestal top rim
+                ctx.fillStyle = '#455a64';
+                ctx.fillRect(-baseW / 2 + 2, -2, baseW - 4, 4);
+
+                // Pedestal highlight
+                ctx.strokeStyle = 'rgba(255,255,255,0.15)';
+                ctx.lineWidth = 1;
+                ctx.beginPath();
+                ctx.moveTo(-baseW / 2 + 3, -1);
+                ctx.lineTo(baseW / 2 - 3, -1);
+                ctx.stroke();
+
+                // === RUNE CARVINGS (Level 2+) ===
+                if (level >= 2) {
+                    ctx.strokeStyle = '#7c4dff'; // Deep purple glow
+                    ctx.lineWidth = 1;
+
+                    // Left rune
+                    ctx.beginPath();
+                    ctx.moveTo(-8, 2);
+                    ctx.lineTo(-6, 6);
+                    ctx.lineTo(-10, 6);
+                    ctx.closePath();
+                    ctx.stroke();
+
+                    // Right rune
+                    ctx.beginPath();
+                    ctx.moveTo(8, 2);
+                    ctx.lineTo(10, 6);
+                    ctx.lineTo(6, 6);
+                    ctx.closePath();
+                    ctx.stroke();
+
+                    // Center rune
+                    ctx.beginPath();
+                    ctx.moveTo(0, 3);
+                    ctx.lineTo(0, 7);
+                    ctx.stroke();
+                }
+
+                // === ENERGY CHANNEL (Level 3) ===
+                if (level === 3) {
+                    // Glowing channel up the pedestal
+                    const channelGrad = ctx.createLinearGradient(0, baseH, 0, -5);
+                    channelGrad.addColorStop(0, 'rgba(124,77,255,0.1)');
+                    channelGrad.addColorStop(0.5, 'rgba(124,77,255,0.4)');
+                    channelGrad.addColorStop(1, 'rgba(124,77,255,0.8)');
+
+                    ctx.fillStyle = channelGrad;
+                    ctx.fillRect(-2, -5, 4, baseH + 3);
+
+                    // Side energy lines
+                    ctx.strokeStyle = '#b388ff';
+                    ctx.lineWidth = 1;
+                    ctx.beginPath();
+                    ctx.moveTo(-baseW / 2 + 5, 1);
+                    ctx.lineTo(-4, -3);
+                    ctx.moveTo(baseW / 2 - 5, 1);
+                    ctx.lineTo(4, -3);
+                    ctx.stroke();
+                }
+            });
+        }
 
 
         // -- 3. Modules (Overlay attachments) --

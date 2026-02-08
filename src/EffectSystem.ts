@@ -160,16 +160,32 @@ export class EffectSystem {
                 const s = e.size || 4;
                 this.ctx.fillRect(-s / 2, -s / 2, s, s);
             } else if (e.type === 'muzzle_flash') {
-                // Вспышка на дуле башни - BAKED
+                // Вспышка на дуле башни
+                // If we have a specific image, usage it (color tinting is hard with drawImage without composite)
+                // BUT Phase 2 requires colored flashes.
+                // Let's rely on procedural gradient for colored flashes unless we have tinted assets.
+                // Current asset 'effect_muzzle_flash' is likely yellow/orange.
+
+                // If color is specified, FORCE procedural generation for now to ensure color match
+                const useProcedural = !!e.color;
+
                 const img = Assets.get('effect_muzzle_flash');
-                if (img) {
+                if (img && !useProcedural) {
                     const r = e.radius || 12;
                     this.ctx.drawImage(img, e.x - r, e.y - r, r * 2, r * 2);
                 } else {
                     const gradient = this.ctx.createRadialGradient(e.x, e.y, 0, e.x, e.y, e.radius || 12);
-                    gradient.addColorStop(0, 'rgba(255, 255, 200, 0.9)');
-                    gradient.addColorStop(0.5, 'rgba(255, 200, 100, 0.5)');
-                    gradient.addColorStop(1, 'rgba(255, 100, 0, 0)');
+                    // Use e.color as the center/core color
+                    // Parse color or use default. 
+                    // To make a nice gradient we need RGBA.
+                    // Simple approach: Use e.color for center, fade to transparent
+
+                    const coreColor = e.color || 'rgba(255, 255, 200, 0.9)';
+
+                    gradient.addColorStop(0, coreColor);
+                    gradient.addColorStop(0.4, coreColor); // Solid core
+                    gradient.addColorStop(1, 'rgba(255, 255, 255, 0)');
+
                     this.ctx.fillStyle = gradient;
                     this.ctx.beginPath();
                     this.ctx.arc(e.x, e.y, e.radius || 12, 0, Math.PI * 2);

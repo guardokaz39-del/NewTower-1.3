@@ -43,6 +43,9 @@ export class Tower {
     public heatLevel: number = 0;          // Heat level 0-1 (Minigun visual)
     public chargeProgress: number = 0;      // Charge progress 0-1 (Sniper visual)
 
+    // Generic container for visual state (Phase 2)
+    public visualState: Record<string, any> = {};
+
     constructor(c: number, r: number) {
         this.col = c;
         this.row = r;

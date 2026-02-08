@@ -74,26 +74,52 @@ export const VISUALS = {
                 STROKE: '#212121',
                 BARREL: '#616161',
             },
-            ICE: {
-                MAIN: '#00acc1', // Cyan 600
-                STROKE: '#e0f7fa',
-                SPIKE: '#4dd0e1', // Cyan 300
-            },
             FIRE: {
                 MAIN: '#f4511e', // Deep Orange 600
                 STROKE: '#ffccbc',
                 BARREL: '#ff7043',
                 TIP: '#bf360c',
+                RUNE: '#ffcc80', // Light Orange
+                CORE: '#bf360c', // Dark Red Glow
+                BAND: '#3e2723', // Dark band
+            },
+            ICE: {
+                MAIN: '#00acc1', // Cyan 600
+                STROKE: '#e0f7fa',
+                SPIKE: '#4dd0e1', // Cyan 300
+                FACET: 'rgba(255, 255, 255, 0.3)',
+                COATING: 'rgba(255, 255, 255, 0.5)',
             },
             SNIPER: {
                 MAIN: '#2e7d32', // Green 800
                 BARREL: '#1b5e20', // Green 900
                 MUZZLE: '#4caf50',
+                DETAIL: '#1b5e20', // Darker detail
+                ENERGY: '#69f0ae', // Neon Green
             },
             SPLIT: {
                 MAIN: '#f57f17', // Yellow 900
                 BARREL: '#fbc02d', // Yellow 700
+                BAND: '#ff6f00', // Amber
+                PLATE: '#ffca28', // Gold-ish
+            },
+            MINIGUN: {
+                BARREL: '#7b1fa2', // Purple 700
+                HOUSING: '#9c27b0', // Purple 500
+                COIL: '#e1bee7', // Purple 100
+                FLASH: '#4a148c', // Darker
+                VENT: '#ce93d8', // Light Purple
+                CORE: '#e1bee7', // Almost white purple
+                GLOW: '#d500f9', // Neon Purple
             }
+        },
+        MUZZLE_FLASH: {
+            STANDARD: 'rgba(255, 200, 100, 0.9)', // Yellow
+            FIRE: 'rgba(255, 87, 34, 0.9)',    // Orange/Red
+            ICE: 'rgba(77, 208, 225, 0.9)',    // Cyan
+            SNIPER: 'rgba(105, 240, 174, 0.9)', // Green
+            SPLIT: 'rgba(255, 235, 59, 0.9)',  // Bright Yellow
+            MINIGUN: 'rgba(179, 136, 255, 0.9)' // Purple
         },
         MODULES: {
             ICE: {

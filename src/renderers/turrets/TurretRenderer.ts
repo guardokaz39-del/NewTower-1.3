@@ -8,8 +8,8 @@ export interface ITurretRenderer {
     /** Card ID for mapping */
     readonly cardId: string;
 
-    /** Get turret asset name */
-    getTurretAsset(): string;
+    /** Get turret asset name based on level */
+    getTurretAsset(level: number): string;
 
     /** Get module asset name (for slots 1-2) */
     getModuleAsset(): string;
@@ -27,12 +27,26 @@ export interface ITurretRenderer {
     drawEffects?(ctx: CanvasRenderingContext2D, tower: Tower): void;
 
     /**
+     * Update visual state (animations, particles)
+     * Called every frame
+     */
+    update?(dt: number, tower: Tower): void;
+
+    /**
      * Draw preview of turret for ghost building
      * @param ctx Context to draw to
      * @param x Center X
      * @param y Center Y
      */
     drawPreview?(ctx: CanvasRenderingContext2D, x: number, y: number): void;
+
+    /**
+     * Custom turret drawing (replaces standard sprite drawing)
+     * Called inside rotated context (0,0 is tower center)
+     * @param ctx Context to draw to
+     * @param tower Tower instance
+     */
+    drawTurret?(ctx: CanvasRenderingContext2D, tower: Tower): void;
 }
 
 /**
@@ -41,7 +55,7 @@ export interface ITurretRenderer {
 export class DefaultTurretRenderer implements ITurretRenderer {
     readonly cardId = 'default';
 
-    getTurretAsset(): string {
+    getTurretAsset(level: number): string {
         return 'turret_standard';
     }
 

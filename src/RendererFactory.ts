@@ -15,6 +15,10 @@ export class RendererFactory {
         TowerRenderer.drawUI(ctx, tower);
     }
 
+    static updateTower(dt: number, tower: Tower) {
+        TowerRenderer.update(dt, tower);
+    }
+
     static drawTowerSprite(ctx: CanvasRenderingContext2D, tower: Tower) {
         TowerRenderer.drawSprite(ctx, tower);
     }
