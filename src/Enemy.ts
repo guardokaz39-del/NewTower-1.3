@@ -54,6 +54,15 @@ export class Enemy {
     // Thresholds: [HP Percent, Duration in Seconds]
     private thresholds: { p: number, d: number, used: boolean }[] = [];
 
+    // === PERFORMANCE CACHES (Phase 3a) ===
+    public typeConfig: any = null;      // Cached getEnemyType() result
+    public moveAngle: number = 0;       // Cached Math.atan2() from move()
+
+    // Damage Text Accumulation (Phase 6)
+    public lastDamageText: any = null; // Ref to active text effect
+    public lastDamageTextTime: number = 0;
+    public currentDamageAccumulation: number = 0;
+
     constructor(config?: IEnemyConfig) {
         if (config) {
             this.init(config);
@@ -98,6 +107,9 @@ export class Enemy {
 
     public setType(id: string) {
         this.typeId = id;
+
+        // PERF: Cache typeConfig to avoid getEnemyType() calls in render loop
+        this.typeConfig = getEnemyType(id.toUpperCase()) || getEnemyType('GRUNT');
 
         // Initialize Boss Mechanics if this is a boss
         if (id.toLowerCase() === 'boss') {
@@ -203,14 +215,16 @@ export class Enemy {
         const dy = targetY - this.y;
         const dist = Math.hypot(dx, dy);
 
+        // PERF: Cache moveAngle for renderer (avoid recalculating in draw)
+        this.moveAngle = Math.atan2(dy, dx);
+
         if (dist <= currentSpeed) {
             this.x = targetX;
             this.y = targetY;
             this.pathIndex++;
         } else {
-            const angle = Math.atan2(dy, dx);
-            this.x += Math.cos(angle) * currentSpeed;
-            this.y += Math.sin(angle) * currentSpeed;
+            this.x += Math.cos(this.moveAngle) * currentSpeed;
+            this.y += Math.sin(this.moveAngle) * currentSpeed;
         }
     }
 

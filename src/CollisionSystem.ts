@@ -120,17 +120,11 @@ export class CollisionSystem {
                 vy: -120,
             });
 
-            // Enlarged damage number
-            this.effects.spawn({
-                type: 'text',
-                text: Math.floor(p.damage).toString(),
-                x: target.x + 15,
-                y: target.y - 10,
-                life: 0.5,
-                color: '#ffd700',
-                fontSize: 22,
-                vy: -90,
-            });
+            // Enlarged damage number for Crit
+            this.spawnDamageText(target, Math.floor(p.damage), true);
+        } else {
+            // Normal damage text (Accumulated)
+            this.spawnDamageText(target, Math.floor(p.damage), false);
         }
         // === END CRIT EFFECTS ===
         // -----------------------------------
@@ -256,6 +250,43 @@ export class CollisionSystem {
                     }
                 }
             }
+        }
+    }
+
+
+    private spawnDamageText(target: Enemy, amount: number, isCrit: boolean) {
+        const now = performance.now();
+        // Check if target has an active damage text
+        if (!isCrit && target.lastDamageText && (now - target.lastDamageTextTime < 100)) {
+            // Accumulate
+            target.currentDamageAccumulation += amount;
+            target.lastDamageTextTime = now;
+
+            if (target.lastDamageText.life > 0) {
+                target.lastDamageText.text = Math.floor(target.currentDamageAccumulation).toString();
+                target.lastDamageText.life = 0.6; // Refresh life
+                target.lastDamageText.y = target.y - 10; // Reset position slightly
+                target.lastDamageText.scale = 1.2; // Pop effect
+                return;
+            }
+        }
+
+        // New text
+        const textObj = this.effects.spawn({
+            type: 'text',
+            text: amount.toString(),
+            x: target.x + (Math.random() * 20 - 10),
+            y: target.y - 10,
+            life: 0.6,
+            color: isCrit ? '#ffd700' : '#fff',
+            fontSize: isCrit ? 22 : 14,
+            vy: -60,
+        });
+
+        if (!isCrit) {
+            target.lastDamageText = textObj;
+            target.lastDamageTextTime = now;
+            target.currentDamageAccumulation = amount;
         }
     }
 }

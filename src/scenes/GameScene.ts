@@ -438,8 +438,18 @@ export class GameScene extends BaseScene implements IGameScene {
         this.acidSystem.draw();
         this.commanderSystem.draw();
 
+        const viewW = this.game.canvas.width;
+        const viewH = this.game.canvas.height;
+        const cullMargin = 64; // Safe margin for large sprites/effects
+
         for (let i = 0; i < this.gameState.enemies.length; i++) {
-            this.gameState.enemies[i].draw(ctx);
+            const e = this.gameState.enemies[i];
+            // Culling: Skip if off-screen
+            if (e.x < -cullMargin || e.x > viewW + cullMargin ||
+                e.y < -cullMargin || e.y > viewH + cullMargin) {
+                continue;
+            }
+            e.draw(ctx);
         }
         this.projectileSystem.draw(ctx);
         // Draw effects

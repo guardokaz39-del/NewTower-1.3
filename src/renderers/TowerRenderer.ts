@@ -7,8 +7,8 @@ import { getTurretRenderer } from './turrets';
 export class TowerRenderer {
     static drawSprite(ctx: CanvasRenderingContext2D, tower: Tower) {
         const size = CONFIG.TILE_SIZE;
-        const drawX = tower.col * size;
-        const drawY = tower.row * size;
+        const drawX = (tower.col * size) | 0;
+        const drawY = (tower.row * size) | 0;
 
         if (tower.isBuilding) {
             TowerRenderer.drawBuildingSprite(ctx, tower, drawX, drawY, size);
@@ -19,8 +19,8 @@ export class TowerRenderer {
 
     static drawUI(ctx: CanvasRenderingContext2D, tower: Tower) {
         const size = CONFIG.TILE_SIZE;
-        const drawX = tower.col * size;
-        const drawY = tower.row * size;
+        const drawX = (tower.col * size) | 0;
+        const drawY = (tower.row * size) | 0;
 
         if (tower.isBuilding) {
             TowerRenderer.drawBuildingUI(ctx, tower, drawX, drawY, size);
@@ -206,20 +206,69 @@ export class TowerRenderer {
         }
     }
 
+    // Cache for module shapes to avoid re-drawing vectors every frame
+    private static moduleCache: Record<string, HTMLCanvasElement> = {};
+
+    private static getModuleImage(type: string, color: string): HTMLCanvasElement {
+        const key = `${type}_${color}`;
+        if (this.moduleCache[key]) return this.moduleCache[key];
+
+        const canvas = document.createElement('canvas');
+        canvas.width = 12;
+        canvas.height = 12;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return canvas;
+
+        const cx = 6;
+        const cy = 6;
+
+        ctx.fillStyle = color;
+        ctx.strokeStyle = '#fff';
+        ctx.lineWidth = 1;
+
+        ctx.beginPath();
+        switch (type) {
+            case 'fire': // Circle
+                ctx.arc(cx, cy, 4, 0, Math.PI * 2);
+                break;
+            case 'ice': // Diamond
+                ctx.moveTo(cx, cy - 5);
+                ctx.lineTo(cx + 5, cy);
+                ctx.lineTo(cx, cy + 5);
+                ctx.lineTo(cx - 5, cy);
+                ctx.closePath();
+                break;
+            case 'sniper': // Triangle
+                ctx.moveTo(cx + 5, cy);
+                ctx.lineTo(cx - 4, cy - 4);
+                ctx.lineTo(cx - 4, cy + 4);
+                ctx.closePath();
+                break;
+            case 'multi': // Hexagon (Split)
+                for (let i = 0; i < 6; i++) {
+                    const angle = i * Math.PI / 3;
+                    const vx = cx + Math.cos(angle) * 4;
+                    const vy = cy + Math.sin(angle) * 4;
+                    if (i === 0) ctx.moveTo(vx, vy); else ctx.lineTo(vx, vy);
+                }
+                ctx.closePath();
+                break;
+            case 'minigun': // Square
+                ctx.rect(cx - 4, cy - 4, 8, 8);
+                break;
+            default: // Small circle default
+                ctx.arc(cx, cy, 3, 0, Math.PI * 2);
+        }
+        ctx.fill();
+        ctx.stroke();
+
+        this.moduleCache[key] = canvas;
+        return canvas;
+    }
+
     private static drawModules(ctx: CanvasRenderingContext2D, tower: Tower) {
         tower.cards.forEach((card, index) => {
-            // Slot 0 Defines Turret Body. Modules are for Index > 0
             if (index > 0) {
-                const renderer = getTurretRenderer(card.type.id);
-                // OLD: Sprite based
-                // const modName = renderer.getModuleAsset();
-
-                // NEW: Shape based modules (Phase 1)
-                // For now, let's keep using the old sprite logic BUT
-                // Phase 1 calls for Shapes.
-                // Let's implement Shapes here as part of "Critical Fixes" 
-                // because old icons were "pixel mush".
-
                 // Determine position
                 let offX = 0;
                 let offY = 0;
@@ -227,52 +276,12 @@ export class TowerRenderer {
                 else if (index === 2) { offX = -5; offY = -12; }
                 else { offX = -12; offY = 0; }
 
-                TowerRenderer.drawModuleShape(ctx, card.type.id, offX, offY, card.type.color);
+                // PERF: Use cached image
+                const img = this.getModuleImage(card.type.id, card.type.color);
+                // Center the 12x12 image
+                ctx.drawImage(img, (offX - 6) | 0, (offY - 6) | 0);
             }
         });
-    }
-
-    private static drawModuleShape(ctx: CanvasRenderingContext2D, type: string, x: number, y: number, color: string) {
-        ctx.fillStyle = color;
-        ctx.strokeStyle = '#fff';
-        ctx.lineWidth = 1;
-
-        // Simple shapes for readability
-        ctx.beginPath();
-        switch (type) {
-            case 'fire': // Circle
-                ctx.arc(x, y, 4, 0, Math.PI * 2);
-                break;
-            case 'ice': // Diamond
-                ctx.moveTo(x, y - 5);
-                ctx.lineTo(x + 5, y);
-                ctx.lineTo(x, y + 5);
-                ctx.lineTo(x - 5, y);
-                ctx.closePath();
-                break;
-            case 'sniper': // Triangle
-                ctx.moveTo(x + 5, y);
-                ctx.lineTo(x - 4, y - 4);
-                ctx.lineTo(x - 4, y + 4);
-                ctx.closePath();
-                break;
-            case 'multi': // Hexagon (Split)
-                for (let i = 0; i < 6; i++) {
-                    const angle = i * Math.PI / 3;
-                    const vx = x + Math.cos(angle) * 4;
-                    const vy = y + Math.sin(angle) * 4;
-                    if (i === 0) ctx.moveTo(vx, vy); else ctx.lineTo(vx, vy);
-                }
-                ctx.closePath();
-                break;
-            case 'minigun': // Square
-                ctx.rect(x - 4, y - 4, 8, 8);
-                break;
-            default: // Small circle default
-                ctx.arc(x, y, 3, 0, Math.PI * 2);
-        }
-        ctx.fill();
-        ctx.stroke();
     }
 
     private static drawLevelVisuals(ctx: CanvasRenderingContext2D, tower: Tower, visualLevel: number, mainCard: any) {

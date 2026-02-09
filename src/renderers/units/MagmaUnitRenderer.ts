@@ -369,7 +369,9 @@ export class MagmaUnitRenderer implements UnitRenderer {
             p.y += p.vy;
 
             if (p.life <= 0) {
-                particles.splice(i, 1);
+                // PERF: Swap & Pop (O(1) removal instead of O(N) splice)
+                particles[i] = particles[particles.length - 1];
+                particles.pop();
                 continue;
             }
 

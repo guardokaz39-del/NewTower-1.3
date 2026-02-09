@@ -35,35 +35,22 @@ export class EnemyRenderer {
     };
 
     static drawSprite(ctx: CanvasRenderingContext2D, enemy: Enemy) {
-        const safeType = enemy.typeId ? enemy.typeId.toLowerCase() : 'grunt';
-        const typeConf = getEnemyType(safeType.toUpperCase()) || getEnemyType('GRUNT');
+        // PERF: Use cached typeConfig instead of getEnemyType() per frame
+        const typeConf = enemy.typeConfig || { scale: 1.0, archetype: 'SKELETON', props: [], color: '#fff' };
 
         // Defaults
-        const scale = typeConf?.scale || 1.0;
-        const archetype = typeConf?.archetype || 'SKELETON';
-        const props = typeConf?.props || [];
-        const baseColor = typeConf?.color || '#fff';
-        const tint = typeConf?.tint;
+        const scale = typeConf.scale || 1.0;
+        const archetype = typeConf.archetype || 'SKELETON';
+        const props = typeConf.props || [];
 
         ctx.save();
-        ctx.translate(enemy.x, enemy.y);
+        ctx.translate((enemy.x | 0), (enemy.y | 0));
 
-        // === ANIMATIONS ===
+        // PERF: Use cached moveAngle from enemy.move()
+        const moveAngle = enemy.moveAngle || 0;
 
-        // 1. Rotation towards movement
-        const path = enemy.path;
-        const pathIndex = enemy.pathIndex;
-        let moveAngle = 0;
-
-        if (path && pathIndex < path.length - 1) {
-            const next = path[pathIndex];
-            const dx = next.x * CONFIG.TILE_SIZE + CONFIG.TILE_SIZE / 2 - enemy.x;
-            const dy = next.y * CONFIG.TILE_SIZE + CONFIG.TILE_SIZE / 2 - enemy.y;
-            moveAngle = Math.atan2(dy, dx);
-        }
-
-        // 2. Breathing (pulsation)
-        const breathePhase = (Date.now() * 0.001) + (parseInt(enemy.id.slice(-3), 36) * 0.5);
+        // 2. Breathing (pulsation) - PERF: use performance.now() instead of Date.now()
+        const breathePhase = (performance.now() * 0.001) + (parseInt(enemy.id.slice(-3), 36) * 0.5);
         const breatheScale = 1.0 + Math.sin(breathePhase) * 0.03;
         ctx.scale(breatheScale, breatheScale);
 
@@ -83,14 +70,14 @@ export class EnemyRenderer {
 
         // 3. Props Layer
         if (props.length > 0) {
-            props.forEach(propId => {
-                const propImg = Assets.get(propId);
+            for (let i = 0; i < props.length; i++) {
+                const propImg = Assets.get(props[i]);
                 if (propImg) {
                     const pSize = 32 * scale;
                     const pHalf = pSize / 2;
                     ctx.drawImage(propImg, -pHalf, -pHalf, pSize, pSize);
                 }
-            });
+            }
         }
 
         // 3.5. Status Particles Layer
@@ -100,19 +87,12 @@ export class EnemyRenderer {
     }
 
     static drawUI(ctx: CanvasRenderingContext2D, enemy: Enemy) {
-        const safeType = enemy.typeId ? enemy.typeId.toLowerCase() : 'grunt';
-        const typeConf = getEnemyType(safeType.toUpperCase()) || getEnemyType('GRUNT');
-        const scale = typeConf?.scale || 1.0;
+        // PERF: Use cached typeConfig
+        const typeConf = enemy.typeConfig || { scale: 1.0 };
+        const scale = typeConf.scale || 1.0;
 
         ctx.save();
         ctx.translate(enemy.x, enemy.y);
-        // Breathing effect also affects UI position slightly if we scaled context, 
-        // but typically UI should maybe NOT oscillate?
-        // Original code DID oscillate UI because it was inside the breatheScale.
-        // Let's keep it simple and stable for UI, or replicate if strictly needed.
-        // User asked for "HP Bars bright and clear". Stability is better.
-        // I will NOT apply breatheScale to UI for better readability.
-
         EnemyRenderer.drawHealthBar(ctx, enemy, scale);
         ctx.restore();
     }
@@ -148,8 +128,10 @@ export class EnemyRenderer {
 
     private static drawStatusEffects(ctx: CanvasRenderingContext2D, enemy: Enemy) {
         if (enemy.statuses.some(s => s.type === 'slow')) {
+            // PERF: use performance.now() instead of Date.now()
+            const time = performance.now() * 0.003;
             for (let i = 0; i < 3; i++) {
-                const angle = (Date.now() * 0.003) + (i * Math.PI * 2 / 3);
+                const angle = time + (i * Math.PI * 2 / 3);
                 const orbX = Math.cos(angle) * 20;
                 const orbY = Math.sin(angle) * 20;
                 ctx.fillStyle = '#4fc3f7';
@@ -192,26 +174,18 @@ export class EnemyRenderer {
         }
     }
     static drawEmissive(ctx: CanvasRenderingContext2D, enemy: Enemy) {
-        const safeType = enemy.typeId ? enemy.typeId.toLowerCase() : 'grunt';
-        const typeConf = getEnemyType(safeType.toUpperCase()) || getEnemyType('GRUNT');
-        const scale = typeConf?.scale || 1.0;
-        const archetype = typeConf?.archetype || 'SKELETON';
+        // PERF: Use cached typeConfig
+        const typeConf = enemy.typeConfig || { scale: 1.0, archetype: 'SKELETON' };
+        const scale = typeConf.scale || 1.0;
+        const archetype = typeConf.archetype || 'SKELETON';
 
         const renderer = EnemyRenderer.renderers[archetype] || EnemyRenderer.defaultRenderer;
         if (renderer.drawEmissive) {
             ctx.save();
             ctx.translate(enemy.x, enemy.y);
 
-            // Re-calculate moveAngle (Duplicate logic, but necessary for correct pose)
-            const path = enemy.path;
-            const pathIndex = enemy.pathIndex;
-            let moveAngle = 0;
-            if (path && pathIndex < path.length - 1) {
-                const next = path[pathIndex];
-                const dx = next.x * CONFIG.TILE_SIZE + CONFIG.TILE_SIZE / 2 - enemy.x;
-                const dy = next.y * CONFIG.TILE_SIZE + CONFIG.TILE_SIZE / 2 - enemy.y;
-                moveAngle = Math.atan2(dy, dx);
-            }
+            // PERF: Use cached moveAngle instead of recalculating
+            const moveAngle = enemy.moveAngle || 0;
 
             renderer.drawEmissive(ctx, enemy, scale, moveAngle);
             ctx.restore();

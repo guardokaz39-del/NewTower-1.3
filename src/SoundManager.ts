@@ -8,6 +8,8 @@ export class SoundManager {
     private static buffers: Record<string, AudioBuffer> = {};
     private static lastPlayed: Record<string, number> = {};
     private static lastPlayedType: Record<string, number> = {}; // Track last play time by TYPE
+    private static lowPriorityCount: number = 0;
+    private static lastFrameTime: number = 0;
 
     // Config
     private static CULL_MS = 50; // Minimum time between same sounds (Legacy logic)
@@ -50,20 +52,26 @@ export class SoundManager {
         const last = this.lastPlayed[key] || 0;
 
         // 1. Culling / Ducking logic
-        // If High Priority, we always play (or maybe duck others? For now just play)
-        // If Low Priority, check time since last played
-        if (priority === SoundPriority.LOW) {
-            // Check legacy cull (per specific key/instance if unique keys used)
-            if (now - last < this.CULL_MS) {
-                return;
-            }
+        // Reset frame limits if new frame
+        if (now !== this.lastFrameTime) {
+            this.lowPriorityCount = 0;
+            this.lastFrameTime = now;
+        }
 
-            // Global Type Throttling 
-            // This prevents "shoot_basic" from playing 10 times in one frame from 10 towers
+        // If High Priority, we always play
+        // If Low Priority, apply strict limits
+        if (priority === SoundPriority.LOW) {
+            // A. Hard Limit: Max 3 low priority sounds per frame
+            if (this.lowPriorityCount >= 3) return;
+
+            // B. Time Throttling (Legacy cull)
+            if (now - last < this.CULL_MS) return;
+
+            // C. Global Type Throttling 
             const lastType = this.lastPlayedType[key] || 0;
-            if (now - lastType < this.THROTTLE_MS) {
-                return;
-            }
+            if (now - lastType < this.THROTTLE_MS) return;
+
+            this.lowPriorityCount++;
         }
 
         this.lastPlayed[key] = now;
