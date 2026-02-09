@@ -296,9 +296,16 @@ export class GameScene extends BaseScene implements IGameScene {
     public update(dt: number) {
         // PERF: Track frame timing for FPS graph
         PerformanceMonitor.beginFrame();
+        PerformanceMonitor.startTimer('Logic');
 
-        if (!this.gameState.isRunning) return;
-        if (this.gameState.paused) return;
+        if (!this.gameState.isRunning) {
+            PerformanceMonitor.endTimer('Logic');
+            return;
+        }
+        if (this.gameState.paused) {
+            PerformanceMonitor.endTimer('Logic');
+            return;
+        }
 
         this.gameState.frames++;
 
@@ -341,9 +348,12 @@ export class GameScene extends BaseScene implements IGameScene {
             this.fog.update(dt);
             // Lighting doesn't need explicit update logic for now, just render
 
+            PerformanceMonitor.startTimer('Projectiles');
             // Update projectiles
             this.projectileSystem.update(dt, this.effects);
+            PerformanceMonitor.endTimer('Projectiles');
 
+            PerformanceMonitor.startTimer('Entities');
             // Update weapon system (tower shooting)
             this.weaponSystem.update(
                 this.gameState.towers,
@@ -359,11 +369,17 @@ export class GameScene extends BaseScene implements IGameScene {
                 t.updateBuilding(this.effects, dt);
                 RendererFactory.updateTower(dt, t);
             }
+            PerformanceMonitor.endTimer('Entities');
 
+            PerformanceMonitor.startTimer('Collision');
             this.collision.update(this.projectileSystem.projectiles, this.gameState.enemies);
+            PerformanceMonitor.endTimer('Collision');
+
+            PerformanceMonitor.startTimer('Entities');
             this.entityManager.updateEnemies(dt);
             this.acidSystem.update(dt, this.gameState.enemies);
             this.commanderSystem.update(dt, this.gameState.enemies);
+            PerformanceMonitor.endTimer('Entities');
 
             this.effects.update(dt);
 
@@ -376,9 +392,12 @@ export class GameScene extends BaseScene implements IGameScene {
         // Эффекты уже обновлены в цикле выше (строка 237)
         // Раскомментировать эту строку для отката изменений:
         // this.effects.update();
+
+        PerformanceMonitor.endTimer('Logic');
     }
 
     public draw(ctx: CanvasRenderingContext2D) {
+        PerformanceMonitor.startTimer('Render');
         ctx.save();
 
         // Reset global canvas state to prevent artifacts from previous frames
@@ -442,6 +461,7 @@ export class GameScene extends BaseScene implements IGameScene {
         const viewH = this.game.canvas.height;
         const cullMargin = 64; // Safe margin for large sprites/effects
 
+        PerformanceMonitor.startTimer('RenderEntities');
         for (let i = 0; i < this.gameState.enemies.length; i++) {
             const e = this.gameState.enemies[i];
             // Culling: Skip if off-screen
@@ -451,6 +471,8 @@ export class GameScene extends BaseScene implements IGameScene {
             }
             e.draw(ctx);
         }
+        PerformanceMonitor.endTimer('RenderEntities');
+
         this.projectileSystem.draw(ctx);
         // Draw effects
         this.effects.draw();
@@ -476,6 +498,7 @@ export class GameScene extends BaseScene implements IGameScene {
         this.atmosphere.draw(ctx);
 
         ctx.restore();
+        PerformanceMonitor.endTimer('Render');
     }
 
     private drawPathPreview(ctx: CanvasRenderingContext2D) {

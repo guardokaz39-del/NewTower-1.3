@@ -1,6 +1,7 @@
 import { Enemy } from './Enemy';
 import { Projectile } from './Projectile';
-import { EffectSystem } from './EffectSystem';
+import { EffectSystem, EffectPriority } from './EffectSystem';
+import { PerformanceMonitor } from './utils/PerformanceMonitor';
 import { SoundManager, SoundPriority } from './SoundManager';
 import { SpatialGrid } from './SpatialGrid';
 
@@ -39,6 +40,11 @@ export class CollisionSystem {
             // Get only nearby enemies instead of checking all enemies
             const searchRadius = 100; // Reasonable search radius for collision
             const nearbyEnemies = this.enemyGrid.getNearby(proj.x, proj.y, searchRadius);
+
+            // PERF: Allow tracking count
+            if (PerformanceMonitor.isEnabled()) {
+                PerformanceMonitor.addCount('CollisionChecks', nearbyEnemies.length);
+            }
 
             for (let e = 0; e < nearbyEnemies.length; e++) {
                 const enemy = nearbyEnemies[e];
@@ -105,6 +111,7 @@ export class CollisionSystem {
                 x: 0,
                 y: 0,
                 life: 0.15,
+                priority: EffectPriority.HIGH, // Critical feedback
                 flashColor: 'rgba(255, 255, 255, ',
             });
 
@@ -117,6 +124,7 @@ export class CollisionSystem {
                 life: 0.6,
                 color: '#ff0',
                 fontSize: 28,
+                priority: EffectPriority.HIGH, // Critical feedback
                 vy: -120,
             });
 
@@ -150,6 +158,7 @@ export class CollisionSystem {
                 y: target.y,
                 radius: splash.splashRadius || splash.radius,
                 life: 0.25,
+                priority: EffectPriority.HIGH, // Gameplay effect
                 color: 'rgba(255, 100, 0, 0.5)',
             });
 
@@ -199,6 +208,7 @@ export class CollisionSystem {
                 y: deathY,
                 radius: killingProjectile.explosionRadius,
                 life: 0.35,
+                priority: EffectPriority.HIGH, // Gameplay effect
                 color: 'rgba(255, 69, 0, 0.8)',
             });
 
@@ -280,6 +290,7 @@ export class CollisionSystem {
             life: 0.6,
             color: isCrit ? '#ffd700' : '#fff',
             fontSize: isCrit ? 22 : 14,
+            priority: isCrit ? EffectPriority.HIGH : EffectPriority.MEDIUM, // High for crit, Med for normal
             vy: -60,
         });
 

@@ -1,5 +1,6 @@
 import { UnitRenderer } from './UnitRenderer';
 import { CONFIG } from '../../Config';
+import { Assets } from '../../Assets';
 import type { Enemy } from '../../Enemy';
 
 export class WraithUnitRenderer implements UnitRenderer {
@@ -402,19 +403,22 @@ export class WraithUnitRenderer implements UnitRenderer {
     }
 
     private drawEye(ctx: CanvasRenderingContext2D, x: number, y: number, s: number, left: boolean) {
-        ctx.translate(x, y);
-        ctx.fillStyle = WraithUnitRenderer.C_SOUL_GLOW;
-        ctx.shadowBlur = 15;
-        ctx.shadowColor = WraithUnitRenderer.C_SOUL_GLOW;
-        ctx.beginPath();
-        if (left) {
-            ctx.moveTo(-1.2 * s, -0.6 * s); ctx.lineTo(1.2 * s, 0); ctx.lineTo(0, 1.2 * s);
+        const eyeImg = Assets.get('fx_boss_eye');
+        if (eyeImg) {
+            ctx.drawImage(eyeImg, x - 16 * s, y - 16 * s, 32 * s, 32 * s);
         } else {
-            ctx.moveTo(1.2 * s, -0.6 * s); ctx.lineTo(-1.2 * s, 0); ctx.lineTo(0, 1.2 * s);
+            // Fallback
+            ctx.translate(x, y);
+            ctx.fillStyle = WraithUnitRenderer.C_SOUL_GLOW;
+            ctx.beginPath();
+            if (left) {
+                ctx.moveTo(-1.2 * s, -0.6 * s); ctx.lineTo(1.2 * s, 0); ctx.lineTo(0, 1.2 * s);
+            } else {
+                ctx.moveTo(1.2 * s, -0.6 * s); ctx.lineTo(-1.2 * s, 0); ctx.lineTo(0, 1.2 * s);
+            }
+            ctx.fill();
+            ctx.translate(-x, -y);
         }
-        ctx.fill();
-        ctx.shadowBlur = 0;
-        ctx.translate(-x, -y);
     }
 
     private drawEffects(ctx: CanvasRenderingContext2D, s: number, t: number, enemy: Enemy) {
@@ -427,6 +431,8 @@ export class WraithUnitRenderer implements UnitRenderer {
 
     private drawGhostSouls(ctx: CanvasRenderingContext2D, s: number, t: number, angry: boolean) {
         const count = 5;
+        const soulImg = Assets.get('fx_soul');
+
         for (let i = 0; i < count; i++) {
             const angle = t + (i * (Math.PI * 2) / count);
             const rx = Math.cos(angle) * 18 * s;
@@ -440,14 +446,23 @@ export class WraithUnitRenderer implements UnitRenderer {
             ctx.save();
             ctx.translate(rx, ry - 5 * s);
 
+            if (soulImg && !angry) {
+                // Use cached sprite for normal state
+                ctx.globalAlpha = alpha;
+                // Center sprite (16x16 original)
+                // Scale it up
+                const dSize = 16 * (size / 8); // approximate scaling
+                ctx.drawImage(soulImg, -dSize, -dSize, dSize * 2, dSize * 2);
+            } else {
+                // Angry or fallback
+                const color = angry ? '#ffeb3b' : WraithUnitRenderer.C_SOUL_GLOW;
+                ctx.fillStyle = color;
+                ctx.globalAlpha = alpha;
+                ctx.beginPath(); ctx.arc(0, 0, size, 0, Math.PI * 2); ctx.fill();
+            }
+
+            // Trail (Simple Line)
             const color = angry ? '#ffeb3b' : WraithUnitRenderer.C_SOUL_GLOW;
-            ctx.fillStyle = color;
-            ctx.globalAlpha = alpha;
-
-            // Ghost Head
-            ctx.beginPath(); ctx.arc(0, 0, size, 0, Math.PI * 2); ctx.fill();
-
-            // Trail
             ctx.strokeStyle = color;
             ctx.lineWidth = size * 0.8;
             ctx.lineCap = 'round';
@@ -463,20 +478,28 @@ export class WraithUnitRenderer implements UnitRenderer {
     }
 
     private drawInvulnerabilityShield(ctx: CanvasRenderingContext2D, s: number, t: number) {
-        ctx.save();
-        ctx.globalCompositeOperation = 'screen';
-        const pulse = Math.sin(t * 10) * 0.1;
-        const grad = ctx.createRadialGradient(0, -5 * s, 10 * s, 0, -5 * s, 24 * s);
-        grad.addColorStop(0, 'rgba(255, 215, 0, 0)');
-        grad.addColorStop(0.7, 'rgba(255, 215, 0, 0.15)');
-        grad.addColorStop(1, 'rgba(255, 235, 59, 0.5)');
-        ctx.fillStyle = grad;
-        ctx.beginPath(); ctx.arc(0, -5 * s, 24 * s, 0, Math.PI * 2); ctx.fill();
-
-        ctx.strokeStyle = '#fff';
-        ctx.lineWidth = 2 * s;
-        ctx.setLineDash([6 * s, 4 * s]);
-        ctx.beginPath(); ctx.arc(0, -5 * s, 24 * s + pulse * 5, 0 + t, Math.PI * 2 + t); ctx.stroke();
-        ctx.restore();
+        const shieldImg = Assets.get('fx_boss_shield');
+        if (shieldImg) {
+            ctx.save();
+            // Pulse scale
+            const pulse = Math.sin(t * 10) * 0.05 + 1.0;
+            ctx.scale(pulse, pulse);
+            // Draw centered (128x128 original)
+            const size = 64 * s;
+            ctx.drawImage(shieldImg, -size, -size, size * 2, size * 2);
+            ctx.restore();
+        } else {
+            // Fallback
+            ctx.save();
+            ctx.globalCompositeOperation = 'screen';
+            const pulse = Math.sin(t * 10) * 0.1;
+            ctx.fillStyle = 'rgba(255, 235, 59, 0.4)';
+            ctx.beginPath(); ctx.arc(0, -5 * s, 24 * s, 0, Math.PI * 2); ctx.fill();
+            ctx.strokeStyle = '#fff';
+            ctx.lineWidth = 2 * s;
+            ctx.setLineDash([6 * s, 4 * s]);
+            ctx.beginPath(); ctx.arc(0, -5 * s, 24 * s + pulse * 5, 0 + t, Math.PI * 2 + t); ctx.stroke();
+            ctx.restore();
+        }
     }
 }

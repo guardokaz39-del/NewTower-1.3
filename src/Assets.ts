@@ -240,7 +240,8 @@ export class Assets {
             'turret_standard', 'turret_ice', 'turret_fire', 'turret_sniper', 'turret_split', 'turret_minigun',
             'mod_ice', 'mod_fire', 'mod_sniper', 'mod_split', 'mod_minigun',
             'projectile_standard', 'projectile_ice', 'projectile_fire', 'projectile_sniper', 'projectile_split', 'projectile_minigun',
-            'effect_muzzle_flash', 'shadow_small'
+            'effect_muzzle_flash', 'shadow_small',
+            'fx_boss_aura', 'fx_boss_eye', 'fx_boss_shield', 'fx_soul', 'fx_glow_red'
         ];
 
         // Добавляем fog tiles
@@ -434,6 +435,79 @@ export class Assets {
         // --- PROJECTILES & EFFECTS ---
         this.generateProjectiles();
         this.generateMisc();
+        this.generateBossEffects(); // New Phase 8
+    }
+
+    private static generateBossEffects() {
+        const size = 64; // Base size for effects
+
+        // 1. Boss Aura (Pulse)
+        this.generateTexture('fx_boss_aura', size * 2, (ctx, w, h) => {
+            const cx = w / 2;
+            const cy = h / 2;
+            const grad = ctx.createRadialGradient(cx, cy, w * 0.2, cx, cy, w * 0.5);
+            grad.addColorStop(0, 'rgba(255, 111, 0, 0.0)');
+            grad.addColorStop(0.7, 'rgba(255, 111, 0, 0.4)');
+            grad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+            ctx.fillStyle = grad;
+            ctx.fillRect(0, 0, w, h);
+        });
+
+        // 2. Boss Eye (Glowing)
+        this.generateTexture('fx_boss_eye', 32, (ctx, w, h) => {
+            const cx = w / 2;
+            const cy = h / 2;
+            // Halo
+            const grad = ctx.createRadialGradient(cx, cy, 2, cx, cy, 14);
+            grad.addColorStop(0, '#00e5ff');
+            grad.addColorStop(1, 'rgba(0, 229, 255, 0)');
+            ctx.fillStyle = grad;
+            ctx.fillRect(0, 0, w, h);
+            // Core
+            ctx.fillStyle = '#e0f7fa';
+            ctx.beginPath(); ctx.arc(cx, cy, 3, 0, Math.PI * 2); ctx.fill();
+        });
+
+        // 3. Invulnerability Shield
+        this.generateTexture('fx_boss_shield', 128, (ctx, w, h) => {
+            const cx = w / 2;
+            const cy = h / 2;
+            const r = w * 0.45;
+            // Shield Body
+            const grad = ctx.createRadialGradient(cx, cy, r * 0.5, cx, cy, r);
+            grad.addColorStop(0, 'rgba(255, 215, 0, 0)');
+            grad.addColorStop(0.6, 'rgba(255, 215, 0, 0.1)');
+            grad.addColorStop(1, 'rgba(255, 235, 59, 0.4)');
+            ctx.fillStyle = grad;
+            ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.fill();
+            // Rim
+            ctx.strokeStyle = '#fff';
+            ctx.lineWidth = 2;
+            ctx.setLineDash([8, 4]);
+            ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.stroke();
+        });
+
+        // 4. Soul Particle
+        this.generateTexture('fx_soul', 16, (ctx, w, h) => {
+            const cx = w / 2;
+            const cy = h / 2;
+            const grad = ctx.createRadialGradient(cx, cy, 1, cx, cy, 8);
+            grad.addColorStop(0, '#00e5ff');
+            grad.addColorStop(1, 'rgba(0, 229, 255, 0)');
+            ctx.fillStyle = grad;
+            ctx.beginPath(); ctx.arc(cx, cy, 8, 0, Math.PI * 2); ctx.fill();
+        });
+
+        // 5. Red Glow (For Skeleton Commander)
+        this.generateTexture('fx_glow_red', 32, (ctx, w, h) => {
+            const cx = w / 2;
+            const cy = h / 2;
+            const grad = ctx.createRadialGradient(cx, cy, 2, cx, cy, 14);
+            grad.addColorStop(0, '#ff3d00');
+            grad.addColorStop(1, 'rgba(255, 61, 0, 0)');
+            ctx.fillStyle = grad;
+            ctx.fillRect(0, 0, w, h);
+        });
     }
 
     private static generateTexture(

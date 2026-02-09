@@ -6,6 +6,7 @@ import { EntityFactory } from '../EntityFactory';
 import { GameState } from './GameState';
 import { EffectSystem } from '../EffectSystem';
 import { MetricsSystem } from '../MetricsSystem';
+import { PerformanceMonitor } from '../utils/PerformanceMonitor';
 import { SoundManager } from '../SoundManager';
 import { EventBus, Events } from '../EventBus';
 import { playDeathAnimation } from '../effects';
@@ -132,6 +133,8 @@ export class EntityManager {
     public spawnEnemy(type: string, waypoints: { x: number; y: number }[]): Enemy | null {
         if (!waypoints || waypoints.length === 0) return null;
 
+        PerformanceMonitor.startTimer('Spawn');
+
         const enemy = this.state.enemyPool.obtain();
         EntityFactory.setupEnemy(enemy, type, this.state.wave, waypoints);
         this.state.enemies.push(enemy);
@@ -139,6 +142,7 @@ export class EntityManager {
         // Notify systems
         EventBus.getInstance().emit(Events.ENEMY_SPAWNED, type);
 
+        PerformanceMonitor.endTimer('Spawn');
         return enemy;
     }
 

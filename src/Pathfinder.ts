@@ -1,4 +1,5 @@
 import { Cell } from './MapData';
+import { PerformanceMonitor } from './utils/PerformanceMonitor';
 
 export class Pathfinder {
     // Path cache - avoids recalculating path on every spawn
@@ -32,12 +33,16 @@ export class Pathfinder {
         start: { x: number; y: number },
         end: { x: number; y: number },
     ): { x: number; y: number }[] {
+        PerformanceMonitor.startTimer('Pathfinding');
+        PerformanceMonitor.addCount('PathCalls', 1);
+
         const rows = grid.length;
         const cols = grid[0].length;
 
         // Check cache first
         const key = this.getCacheKey(start, end, rows, cols);
         if (key === this.cacheKey && this.cachedPath.length > 0) {
+            PerformanceMonitor.endTimer('Pathfinding');
             return this.cachedPath;
         }
 
@@ -62,6 +67,7 @@ export class Pathfinder {
                 // Cache the result
                 this.cachedPath = path;
                 this.cacheKey = key;
+                PerformanceMonitor.endTimer('Pathfinding');
                 return path;
             }
 
@@ -81,6 +87,7 @@ export class Pathfinder {
             }
         }
 
+        PerformanceMonitor.endTimer('Pathfinding');
         return [];
     }
 }

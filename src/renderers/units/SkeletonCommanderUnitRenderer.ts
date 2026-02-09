@@ -1,5 +1,6 @@
 import { UnitRenderer } from './UnitRenderer';
 import { CONFIG } from '../../Config';
+import { Assets } from '../../Assets';
 import type { Enemy } from '../../Enemy';
 
 export class SkeletonCommanderUnitRenderer implements UnitRenderer {
@@ -69,22 +70,27 @@ export class SkeletonCommanderUnitRenderer implements UnitRenderer {
     }
 
     private drawAura(ctx: CanvasRenderingContext2D, s: number, t: number) {
-        ctx.save();
-        ctx.scale(1, 0.5); // Perspective squash
-        const r = 18 * s;
-        // Pulsing Ember
-        const pulse = Math.sin(t * 3) * 0.2 + 0.8;
-
-        const grad = ctx.createRadialGradient(0, 0, r * 0.4, 0, 0, r);
-        grad.addColorStop(0, 'rgba(255, 111, 0, 0.0)'); // Center transparent
-        grad.addColorStop(0.7, `rgba(255, 111, 0, ${0.3 * pulse})`); // Ring
-        grad.addColorStop(1, 'rgba(0, 0, 0, 0)');
-
-        ctx.fillStyle = grad;
-        ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2); ctx.fill();
-
-        // Runes/Sparks floor effect (Simplified)
-        ctx.restore();
+        const auraImg = Assets.get('fx_boss_aura');
+        if (auraImg) {
+            ctx.save();
+            ctx.scale(1, 0.5);
+            const pulse = Math.sin(t * 3) * 0.2 + 0.8;
+            const size = 32 * s * pulse;
+            ctx.drawImage(auraImg, -size, -size, size * 2, size * 2);
+            ctx.restore();
+        } else {
+            ctx.save();
+            ctx.scale(1, 0.5); // Perspective squash
+            const r = 18 * s;
+            const pulse = Math.sin(t * 3) * 0.2 + 0.8;
+            const grad = ctx.createRadialGradient(0, 0, r * 0.4, 0, 0, r);
+            grad.addColorStop(0, 'rgba(255, 111, 0, 0.0)');
+            grad.addColorStop(0.7, `rgba(255, 111, 0, ${0.3 * pulse})`);
+            grad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+            ctx.fillStyle = grad;
+            ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2); ctx.fill();
+            ctx.restore();
+        }
     }
 
     // === SOPHISTICATED CLOTH PHYSICS ===
@@ -160,36 +166,34 @@ export class SkeletonCommanderUnitRenderer implements UnitRenderer {
 
     // === FRONT (AGGRESSIVE) ===
     private drawFront(ctx: CanvasRenderingContext2D, s: number, cycle: number, isMoving: boolean, breath: number, isBackLayer: boolean = false) {
-        if (isBackLayer) return; // Handled in drawBack structure usually but here for logic separation 
+        if (isBackLayer) return;
 
         const bounce = Math.abs(Math.sin(cycle)) * 1.5 * s;
         ctx.translate(0, -bounce);
 
         // -- LEGS (Dynamic Stance) --
-        // Wide stance for stability
         const ly = 12 * s;
-        const legSep = 6 * s; // Wider
-        this.drawLeg(ctx, -legSep, ly, s, 0); // Left
-        this.drawLeg(ctx, legSep, ly, s, 0);  // Right
+        const legSep = 6 * s;
+        this.drawLeg(ctx, -legSep, ly, s, 0);
+        this.drawLeg(ctx, legSep, ly, s, 0);
 
         // -- TORSO (Heavy Plate) --
-        // Scaled by breath
         ctx.save();
         ctx.scale(1 + breath, 1 + breath);
 
         // Waist
         ctx.fillStyle = SkeletonCommanderUnitRenderer.PALETTE.ARMOR_DARK;
         ctx.fillRect(-5 * s, 5 * s, 10 * s, 6 * s);
-        this.drawGoldTrim(ctx, -5 * s, 5 * s, 10 * s, 2 * s); // Belt
+        this.drawGoldTrim(ctx, -5 * s, 5 * s, 10 * s, 2 * s);
 
-        // Chest Plate (V-Taper)
+        // Chest Plate 
         ctx.fillStyle = SkeletonCommanderUnitRenderer.PALETTE.ARMOR_BASE;
         ctx.beginPath();
         ctx.moveTo(-9 * s, -12 * s); ctx.lineTo(9 * s, -12 * s);
         ctx.lineTo(6 * s, 6 * s); ctx.lineTo(-6 * s, 6 * s);
         ctx.fill();
 
-        // Chest Detail (Ribs relief)
+        // Chest Detail
         ctx.strokeStyle = SkeletonCommanderUnitRenderer.PALETTE.ARMOR_HIGHLIGHT;
         ctx.lineWidth = 1 * s;
         ctx.beginPath();
@@ -197,54 +201,43 @@ export class SkeletonCommanderUnitRenderer implements UnitRenderer {
         ctx.moveTo(-3 * s, 0); ctx.lineTo(3 * s, 0);
         ctx.stroke();
 
-        // Center Emblem (Gold Skull or Ruby)
+        // Center Emblem
         ctx.fillStyle = SkeletonCommanderUnitRenderer.PALETTE.GOLD_BASE;
         ctx.beginPath(); ctx.arc(0, -5 * s, 2 * s, 0, Math.PI * 2); ctx.fill();
 
-        // -- PAULDRONS (Massive) --
+        // -- PAULDRONS --
         this.drawPauldron(ctx, -11 * s, -13 * s, s, 1);
         this.drawPauldron(ctx, 11 * s, -13 * s, s, -1);
 
-        ctx.restore(); // End breath transform
+        ctx.restore();
 
         // -- HEAD --
         ctx.translate(0, -14 * s + (breath * 5 * s));
         this.drawHelmet(ctx, s);
         ctx.translate(0, 14 * s - (breath * 5 * s));
 
-        // -- ARMS & WEAPON (Aggressive Front) --
-        // Holding sword Diagonally across body, ready to slash up
+        // -- ARMS & WEAPON --
         const sway = Math.sin(cycle * 0.5) * 0.1;
 
         ctx.save();
-        ctx.translate(0, -2 * s); // Shoulder pivot height center
+        ctx.translate(0, -2 * s);
         ctx.rotate(sway);
 
-        // Sword Angle: Diagonally passing form bottom-left to top-right (or persistent carry)
-        // User asked "Aggressive". Pointing at player? Or Sword-Point-Forward?
-        // Let's go with "Low Guard" - Sword tip pointed at enemy throat level.
+        ctx.translate(6 * s, 4 * s);
 
-        ctx.translate(6 * s, 4 * s); // Right hand pos
-
-        // Draw Sword (Rotated to point forward/left)
+        // Draw Sword
         ctx.save();
-        ctx.rotate(-2.2); // Pointing mostly left and slightly up/down
-        this.drawGreatsword(ctx, 0, -8 * s, s); // -8s offset to hold handle
+        ctx.rotate(-2.2);
+        this.drawGreatsword(ctx, 0, -8 * s, s);
         ctx.restore();
 
-        // Right Arm (Holding sword)
+        // Right Arm 
         ctx.fillStyle = SkeletonCommanderUnitRenderer.PALETTE.ARMOR_HIGHLIGHT;
-        // Forearm
-        // FIX: strokeWidth -> lineWidth
         ctx.lineWidth = 3 * s;
-        ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(-2 * s, -6 * s); /*elbow*/  ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(-2 * s, -6 * s); ctx.stroke();
 
-        // Left Arm (Guide hand/Claw)
-        // Reaching forward? Or two-handing?
-        // Two-handing for majesty.
-        ctx.translate(-5 * s, 2 * s); // Left hand pos relative to right
-        // Just draw a gauntlet gripping the same hilt area roughly
-
+        // Left Arm 
+        ctx.translate(-5 * s, 2 * s);
         ctx.restore();
     }
 
@@ -253,22 +246,21 @@ export class SkeletonCommanderUnitRenderer implements UnitRenderer {
         const bounce = Math.abs(Math.sin(cycle)) * 1.5 * s;
         ctx.translate(0, -bounce);
 
-        // Legs (Scissor)
+        // Legs
         const stride = 8 * s;
-        const lx = isMoving ? Math.sin(cycle) * stride : -4 * s; // Idle split
+        const lx = isMoving ? Math.sin(cycle) * stride : -4 * s;
         const rx = isMoving ? -Math.sin(cycle) * stride : 4 * s;
         this.drawLeg(ctx, lx, 12 * s, s, 0);
         this.drawLeg(ctx, rx, 12 * s, s, 0);
 
         // Body Angle
         ctx.save();
-        ctx.rotate(0.1); // Lean into wind/motion
+        ctx.rotate(0.1);
 
         // Torso Side
         ctx.fillStyle = SkeletonCommanderUnitRenderer.PALETTE.ARMOR_BASE;
-        // Chest bulge
         ctx.beginPath();
-        ctx.moveTo(-4 * s, -12 * s); ctx.lineTo(6 * s, -11 * s); // Neck to Chest
+        ctx.moveTo(-4 * s, -12 * s); ctx.lineTo(6 * s, -11 * s);
         ctx.lineTo(4 * s, 8 * s); ctx.lineTo(-4 * s, 7 * s);
         ctx.fill();
 
@@ -280,8 +272,8 @@ export class SkeletonCommanderUnitRenderer implements UnitRenderer {
         this.drawHelmet(ctx, s);
         ctx.translate(-2 * s, 14 * s);
 
-        // Arms & Weapon (Thrust Stance)
-        ctx.translate(4 * s, -2 * s); // Shoulder
+        // Arms & Weapon
+        ctx.translate(4 * s, -2 * s);
 
         // Arm pointing forward
         const armAngle = -0.5 + Math.sin(cycle) * 0.1;
@@ -289,22 +281,21 @@ export class SkeletonCommanderUnitRenderer implements UnitRenderer {
 
         // Arm Plate
         ctx.fillStyle = SkeletonCommanderUnitRenderer.PALETTE.ARMOR_HIGHLIGHT;
-        ctx.fillRect(-2 * s, 0, 4 * s, 10 * s); // Upper arm
+        ctx.fillRect(-2 * s, 0, 4 * s, 10 * s);
 
         // Forearm/Hand
         ctx.translate(0, 10 * s);
-        ctx.rotate(-1.0); // Elbow bend
+        ctx.rotate(-1.0);
 
         // Gauntlet
         ctx.fillStyle = '#111';
         ctx.beginPath(); ctx.arc(0, 2 * s, 3 * s, 0, Math.PI * 2); ctx.fill();
 
-        // Sword (In hand, pointing forward/up)
-        // "Aggressive angle" -> Tip pointing at enemy face level
+        // Sword
         ctx.rotate(-0.5);
         this.drawGreatsword(ctx, 0, -6 * s, s);
 
-        ctx.restore(); // Undo Body Angle
+        ctx.restore();
     }
 
     // === BACK ===
@@ -334,18 +325,18 @@ export class SkeletonCommanderUnitRenderer implements UnitRenderer {
         ctx.rotate(angle);
 
         // Thigh / Knee
-        ctx.fillStyle = SkeletonCommanderUnitRenderer.PALETTE.ARMOR_HIGHLIGHT; // Metal
+        ctx.fillStyle = SkeletonCommanderUnitRenderer.PALETTE.ARMOR_HIGHLIGHT;
         ctx.beginPath();
         ctx.moveTo(-3 * s, -8 * s);
         ctx.lineTo(3 * s, -8 * s);
-        ctx.lineTo(2 * s, 2 * s); // Ankle taper
+        ctx.lineTo(2 * s, 2 * s);
         ctx.lineTo(-2 * s, 2 * s);
         ctx.fill();
 
-        // Knee Pad (Gold Spike)
+        // Knee Pad
         ctx.fillStyle = SkeletonCommanderUnitRenderer.PALETTE.GOLD_BASE;
         ctx.beginPath();
-        ctx.moveTo(-3 * s, -4 * s); ctx.lineTo(0, -7 * s); ctx.lineTo(3 * s, -4 * s); // Diamond shape
+        ctx.moveTo(-3 * s, -4 * s); ctx.lineTo(0, -7 * s); ctx.lineTo(3 * s, -4 * s);
         ctx.lineTo(0, -1 * s);
         ctx.fill();
 
@@ -361,9 +352,9 @@ export class SkeletonCommanderUnitRenderer implements UnitRenderer {
     private drawPauldron(ctx: CanvasRenderingContext2D, x: number, y: number, s: number, dir: number) {
         ctx.save();
         ctx.translate(x, y);
-        ctx.scale(dir, 1); // Flip if needing left/right mirroring for lighting? No, just shape.
+        ctx.scale(dir, 1);
 
-        // 3-Tiered Pauldron for AAA detail
+        // 3-Tiered Pauldron
         const colors = [
             SkeletonCommanderUnitRenderer.PALETTE.ARMOR_DARK,
             SkeletonCommanderUnitRenderer.PALETTE.ARMOR_BASE,
@@ -374,7 +365,7 @@ export class SkeletonCommanderUnitRenderer implements UnitRenderer {
             ctx.fillStyle = colors[i];
             ctx.beginPath();
             const off = i * 2 * s;
-            ctx.arc(0, 0 + off, 6 * s - (i * 1 * s), Math.PI, 0); // Layered plates
+            ctx.arc(0, 0 + off, 6 * s - (i * 1 * s), Math.PI, 0);
             ctx.fill();
         }
 
@@ -405,8 +396,14 @@ export class SkeletonCommanderUnitRenderer implements UnitRenderer {
         ctx.fill();
 
         // Eye Slit (Glowing)
-        ctx.shadowBlur = 15;
-        ctx.shadowColor = SkeletonCommanderUnitRenderer.PALETTE.MAGIC_GLOW;
+        const glowImg = Assets.get('fx_glow_red');
+        if (glowImg) {
+            ctx.drawImage(glowImg, -5 * s, -5 * s, 10 * s, 10 * s);
+        } else {
+            ctx.shadowBlur = 15;
+            ctx.shadowColor = SkeletonCommanderUnitRenderer.PALETTE.MAGIC_GLOW;
+        }
+
         ctx.fillStyle = SkeletonCommanderUnitRenderer.PALETTE.MAGIC_GLOW;
 
         // Single horizontal slit or two eyes? 
@@ -435,8 +432,18 @@ export class SkeletonCommanderUnitRenderer implements UnitRenderer {
         ctx.translate(x, y);
 
         // Blade with Glow
-        ctx.shadowBlur = 10;
-        ctx.shadowColor = 'rgba(255, 61, 0, 0.4)';
+        // Optimization: Use cached glow instead of shadowBlur
+        const glowImg = Assets.get('fx_glow_red');
+        if (glowImg) {
+            ctx.save();
+            ctx.scale(0.5, 2.0); // Stretch vertically for blade
+            ctx.globalAlpha = 0.4;
+            ctx.drawImage(glowImg, -8 * s, -2 * s, 16 * s, 16 * s);
+            ctx.restore();
+        } else {
+            ctx.shadowBlur = 10;
+            ctx.shadowColor = 'rgba(255, 61, 0, 0.4)';
+        }
 
         // Metallic Gradient for Blade
         const grad = ctx.createLinearGradient(-3 * s, 0, 3 * s, 0);

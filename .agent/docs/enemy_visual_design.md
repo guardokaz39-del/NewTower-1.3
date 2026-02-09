@@ -400,7 +400,21 @@ static readonly BLOOD_DARK = '#b71c1c';
    ctx.restore(); // Clean up transformations
    ```
 
-2. **Группировать однотипные операции**
+   ctx.restore(); // Clean up transformations
+
+   ```
+
+2. **Кэшировать Visual Assets (Boss/Elite)**
+
+   Для сложных эффектов (свечение, аура, магические снаряды) **обязательно** использовать пре-рендеренные спрайты из `Assets.ts`.
+
+   - `fx_boss_aura` — для аур боссов
+   - `fx_boss_eye` — для светящихся глаз
+   - `fx_glow_red` — для магического свечения
+
+   *Не использовать `shadowBlur` в методах `draw()`!*
+
+3. **Группировать однотипные операции**
 
    ```typescript
    // Draw all dark elements together
@@ -408,14 +422,14 @@ static readonly BLOOD_DARK = '#b71c1c';
    ctx.fill(); // Multiple paths with same color
    ```
 
-3. **Избегать частых `beginPath()`**
+4. **Избегать частых `beginPath()`**
 
    ```typescript
    // ПЛОХО: 10 beginPath calls
    // ХОРОШО: 1 beginPath для всей фигуры
    ```
 
-4. **Кэшировать вычисления**
+5. **Кэшировать вычисления**
 
    ```typescript
    const bellyPulse = 1 + Math.sin(t * 1.5) * 0.08;

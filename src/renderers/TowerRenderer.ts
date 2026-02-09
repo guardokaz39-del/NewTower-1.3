@@ -291,18 +291,19 @@ export class TowerRenderer {
 
             if (visualLevel === 2) {
                 // LVL 2: Pulse Glow
-                const pulse = 0.3 + Math.sin(Date.now() * 0.003) * 0.1;
+                // LVL 2: Pulse Glow
+                const pulse = 0.3 + Math.sin(performance.now() * 0.003) * 0.1;
                 const cardColor = mainCard?.type.color || '#fff';
-                const gradient = ctx.createRadialGradient(0, 0, 10, 0, 0, 25);
-                gradient.addColorStop(0, `${cardColor}00`);
-                gradient.addColorStop(1, `${cardColor}${Math.floor(pulse * 255).toString(16).padStart(2, '0')}`);
-                ctx.fillStyle = gradient;
+
+                ctx.globalAlpha = pulse;
+                ctx.fillStyle = cardColor;
                 ctx.beginPath();
                 ctx.arc(0, 0, 25, 0, Math.PI * 2);
                 ctx.fill();
+                ctx.globalAlpha = 1.0;
             } else if (visualLevel === 3) {
                 // LVL 3: Rotating Aura Ring
-                const rotation = (Date.now() * 0.002) % (Math.PI * 2);
+                const rotation = (performance.now() * 0.002) % (Math.PI * 2);
                 const cardColor = mainCard?.type.color || '#fff';
                 ctx.strokeStyle = cardColor;
                 ctx.lineWidth = 2;
@@ -323,8 +324,10 @@ export class TowerRenderer {
             ctx.font = 'bold 14px Arial';
             ctx.strokeStyle = '#000';
             ctx.lineWidth = 3;
-            ctx.strokeText(visualLevel.toString(), 20, -20);
-            ctx.fillText(visualLevel.toString(), 20, -20);
+            // PERF: cached string or simple cast
+            const levelStr = visualLevel.toString();
+            ctx.strokeText(levelStr, 20, -20);
+            ctx.fillText(levelStr, 20, -20);
 
             ctx.restore();
         }

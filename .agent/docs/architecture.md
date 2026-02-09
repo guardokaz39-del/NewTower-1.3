@@ -136,7 +136,7 @@ graph TB
 
 | File | Role |
 |------|------|
-| `src/Assets.ts` | Procedural texture generation (1800+ lines) |
+| `src/Assets.ts` | Procedural texture generation (1800+ lines). **Pre-bakes heavy effects (Auras, Glows) for performance.** |
 | `src/VisualConfig.ts` | Color palettes for all objects |
 | `src/ProceduralPatterns.ts` | Noise/pattern utilities |
 

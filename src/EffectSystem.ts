@@ -1,6 +1,13 @@
 import { Assets } from './Assets';
 import { RendererFactory } from './RendererFactory';
 import { CONFIG } from './Config';
+import { PerformanceMonitor } from './utils/PerformanceMonitor';
+
+export enum EffectPriority {
+    HIGH = 1, // Gameplay critical (Explosions, Muzzle Flash) - Budget: 400
+    MEDIUM = 2, // Feedback (Damage Text, Status) - Budget: 200
+    LOW = 3 // Cosmetic (Smoke, Debris, Sparks) - Budget: 200
+}
 
 export interface IEffect {
     type: 'explosion' | 'text' | 'particle' | 'scan' | 'debris' | 'screen_flash' | 'muzzle_flash' | 'scale_pop';
@@ -8,6 +15,7 @@ export interface IEffect {
     y: number;
     life: number;
     maxLife?: number;
+    priority?: EffectPriority; // Default: LOW
 
     // Параметры
     radius?: number;
@@ -32,6 +40,16 @@ export class EffectSystem {
     private canvasWidth: number;
     private canvasHeight: number;
 
+    // Budgeting Limits
+    private static LIMIT_HIGH = 400;
+    private static LIMIT_MEDIUM = 200;
+    private static LIMIT_LOW = 200;
+
+    // Current counts
+    private countHigh = 0;
+    private countMedium = 0;
+    private countLow = 0;
+
     constructor(ctx: CanvasRenderingContext2D) {
         this.ctx = ctx;
         this.canvasWidth = ctx.canvas.width;
@@ -51,6 +69,7 @@ export class EffectSystem {
             effect.y = 0;
             effect.life = 0;
             effect.maxLife = undefined;
+            effect.priority = EffectPriority.LOW; // Default reset
             effect.radius = undefined;
             effect.size = undefined;
             effect.color = undefined;
@@ -66,7 +85,7 @@ export class EffectSystem {
             effect.enemyColor = undefined;
             return effect;
         }
-        return { type, x: 0, y: 0, life: 0 };
+        return { type, x: 0, y: 0, life: 0, priority: EffectPriority.LOW };
     }
 
     /**
@@ -77,20 +96,100 @@ export class EffectSystem {
     }
 
     public add(effect: IEffect) {
+        // Enforce priority check if not already set (legacy calls)
+        if (!effect.priority) effect.priority = EffectPriority.LOW;
+
+        // Perform Check
+        if (!this.canSpawn(effect.priority, effect.x, effect.y, effect.type)) {
+            // Immediately pool it back if rejected (if it came from acquire)
+            // But wait, 'add' usually takes a created object.
+            // If we reject it here, the caller loses reference and it's GC'd.
+            // That's fine for now.
+            return;
+        }
+
         if (!effect.maxLife) effect.maxLife = effect.life;
+
         this.effects.push(effect);
+        this.incrementCount(effect.priority);
     }
 
     /**
      * Add effect using pool (preferred method)
      * @performance Use this instead of add() for better memory efficiency
      */
-    public spawn(config: Partial<IEffect> & { type: IEffect['type']; life: number }): IEffect {
+    public spawn(config: Partial<IEffect> & { type: IEffect['type']; life: number }): IEffect | null {
+        // 1. Check if we SHOULD spawn
+        const priority = config.priority || EffectPriority.LOW;
+        const x = config.x || 0;
+        const y = config.y || 0;
+
+        if (!this.canSpawn(priority, x, y, config.type)) {
+            return null;
+        }
+
         const effect = this.acquire(config.type);
         Object.assign(effect, config);
+        // Ensure priority is set from config or default
+        effect.priority = priority;
+
         if (!effect.maxLife) effect.maxLife = effect.life;
+
         this.effects.push(effect);
+        this.incrementCount(priority);
+
         return effect;
+    }
+
+    /**
+     * Intelligent Spawn Logic (LOD + Culling + Budget)
+     */
+    private canSpawn(priority: EffectPriority, x: number, y: number, type: string): boolean {
+        // 1. Spatial Culling (Skip if off-screen)
+        // Global effects (screen_flash) ignore this
+        if (type !== 'screen_flash') {
+            const margin = 50;
+            if (x < -margin || x > this.canvasWidth + margin ||
+                y < -margin || y > this.canvasHeight + margin) {
+                return false;
+            }
+        }
+
+        // 2. Dynamic LOD based on FPS
+        const fps = PerformanceMonitor.getFps();
+
+        // Critical Performance (< 30 FPS): BLOCK Low & Medium
+        if (fps < 30 && priority !== EffectPriority.HIGH) {
+            return false;
+        }
+
+        // Low Performance (< 45 FPS): BLOCK Low
+        if (fps < 45 && priority === EffectPriority.LOW) {
+            return false;
+        }
+
+        // 3. Budget Check
+        if (priority === EffectPriority.HIGH) {
+            // High priority usually spawns, but let's keep sane limit (800 total?)
+            // We implement "recycle oldest" later if needed, for now soft cap
+            return this.countHigh < EffectSystem.LIMIT_HIGH;
+        } else if (priority === EffectPriority.MEDIUM) {
+            return this.countMedium < EffectSystem.LIMIT_MEDIUM;
+        } else {
+            return this.countLow < EffectSystem.LIMIT_LOW;
+        }
+    }
+
+    private incrementCount(priority: EffectPriority) {
+        if (priority === EffectPriority.HIGH) this.countHigh++;
+        else if (priority === EffectPriority.MEDIUM) this.countMedium++;
+        else this.countLow++;
+    }
+
+    private decrementCount(priority: EffectPriority) {
+        if (priority === EffectPriority.HIGH) this.countHigh--;
+        else if (priority === EffectPriority.MEDIUM) this.countMedium--;
+        else this.countLow--;
     }
 
     public get activeEffects(): IEffect[] {
@@ -113,6 +212,9 @@ export class EffectSystem {
             this.release(this.effects[i]);
         }
         this.effects.length = 0;
+        this.countHigh = 0;
+        this.countMedium = 0;
+        this.countLow = 0;
     }
 
     public update(dt: number) {
@@ -145,6 +247,10 @@ export class EffectSystem {
                 // Swap with last and pop
                 this.effects[i] = this.effects[this.effects.length - 1];
                 this.effects.pop();
+
+                // Track count cleanup
+                this.decrementCount(dead.priority || EffectPriority.LOW);
+
                 // Return to pool
                 this.release(dead);
             }

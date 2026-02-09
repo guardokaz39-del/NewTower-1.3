@@ -78,8 +78,15 @@ export class SpatialGrid<T extends IGridEntity> {
      * Get all entities within radius of the given position
      * Only checks cells that could contain entities within the radius
      */
+    // PERF: Shared buffer for queries to avoid allocation
+    private queryBuffer: T[] = [];
+
+    /**
+     * Get all entities within radius of the given position
+     * Uses a shared buffer to avoid GC. CAUTION: Result is valid only until next call.
+     */
     public getNearby(x: number, y: number, radius: number): T[] {
-        const results: T[] = [];
+        this.queryBuffer.length = 0; // Clear without allocation
 
         // Calculate which cells to check
         const minCol = Math.max(0, Math.floor((x - radius) / this.cellSize));
@@ -92,12 +99,12 @@ export class SpatialGrid<T extends IGridEntity> {
             for (let row = minRow; row <= maxRow; row++) {
                 const cell = this.cells[this.getIndex(col, row)];
                 for (let i = 0; i < cell.length; i++) {
-                    results.push(cell[i]);
+                    this.queryBuffer.push(cell[i]);
                 }
             }
         }
 
-        return results;
+        return this.queryBuffer;
     }
 
     /**

@@ -92,8 +92,8 @@ export class Projectile {
 
         // --- TRAIL EFFECTS ---
         // Spawn trail particles approx every ~0.03s (30 fps)
-        // Spawn trail particles approx every ~0.03s (30 fps)
-        if (effects && Math.random() < dt * 30) {
+        // Spawn trail particles approx every ~0.06s (15 fps)
+        if (effects && Math.random() < dt * 15) {
             const type = this.projectileType || 'standard';
 
             // Fire Trail (Smoke/Embers)
@@ -152,6 +152,6 @@ export class Projectile {
 
     public reset() {
         this.alive = false;
-        this.hitList = [];
+        this.hitList.length = 0;
     }
 }
