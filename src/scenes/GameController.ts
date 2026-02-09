@@ -26,6 +26,7 @@ export class GameController {
         private ui: UIManager,
         private metrics: MetricsSystem,
         private mapData: IMapData,
+        private map: any, // MapManager reference (using any to avoid types circle for now or need import)
         private isBuildable: (col: number, row: number) => boolean,
         private cardSys: any, // CardSystem reference
         private events: EventEmitter,
@@ -43,7 +44,23 @@ export class GameController {
         const screenX = col * CONFIG.TILE_SIZE + CONFIG.TILE_SIZE / 2;
         const screenY = row * CONFIG.TILE_SIZE + CONFIG.TILE_SIZE / 2;
 
+
+
         const validation = this.entityManager.canBuildTower(col, row, this.mapData, this.isBuildable);
+
+        if (this.map.flowField) {
+            // Retrieve spawn points from map waypoints (usually first point is spawn)
+            // But we might need all spawns if multiple.
+            // For now, assuming first waypoint is spawn. 
+            const spawns = this.map.waypoints.length > 0 ? [this.map.waypoints[0]] : [];
+
+            // Check if blocking
+            const isSafe = this.map.flowField.checkBuildability(this.map.grid, col, row, spawns);
+            if (!isSafe) {
+                this.showFloatingText("Path Blocked!", screenX, screenY, 'red');
+                return;
+            }
+        }
 
         if (!validation.valid) {
             // Debounce error text to prevent infinite spam
@@ -57,6 +74,22 @@ export class GameController {
 
         const tower = this.entityManager.buildTower(col, row);
         this.ui.update();
+
+        // Trigger Flow Field update (Debounced)
+        this.requestFlowFieldUpdate();
+    }
+
+    private flowFieldUpdateTimer: any = null;
+    private requestFlowFieldUpdate() {
+        if (this.flowFieldUpdateTimer) {
+            clearTimeout(this.flowFieldUpdateTimer);
+        }
+        this.flowFieldUpdateTimer = setTimeout(() => {
+            if (this.map && this.map.updateFlowField) {
+                this.map.updateFlowField(this.state.towers);
+            }
+            this.flowFieldUpdateTimer = null;
+        }, 200); // 200ms debounce
     }
 
     // === Grid Click Handling ===

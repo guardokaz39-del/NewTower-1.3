@@ -2,6 +2,7 @@ import { CONFIG } from './Config';
 import { IMapData, Cell, IMapObject } from './MapData';
 import { Assets } from './Assets';
 import { Pathfinder } from './Pathfinder';
+import { FlowField } from './FlowField';
 import { LightingSystem } from './systems/LightingSystem';
 import { ObjectRenderer, ObjectType } from './ObjectRenderer';
 
@@ -16,6 +17,7 @@ export class MapManager {
     public waves: any[] = [];
     public lighting?: LightingSystem;
     public objects: IMapObject[] = []; // Objects for decoration and blocking
+    public flowField: FlowField;
 
     private cacheCanvas: HTMLCanvasElement;
 
@@ -52,6 +54,18 @@ export class MapManager {
                 this.waypoints = fullPath;
             }
         }
+
+        // Initialize FlowField
+        this.flowField = new FlowField(this.cols, this.rows);
+
+        // Find target (Base/Castle) - usually the last waypoint
+        let target = { x: 0, y: 0 };
+        if (this.waypoints.length > 0) {
+            target = this.waypoints[this.waypoints.length - 1];
+        }
+
+        // Generate Flow Field
+        this.flowField.generate(this.grid, target);
 
         // Prerender the static map logic
         this.prerender();
@@ -292,5 +306,35 @@ export class MapManager {
 
     public validatePath(_start: { x: number; y: number }, _end: { x: number; y: number }): { x: number; y: number }[] {
         return [];
+    }
+
+    /**
+     * Updates the flow field, considering dynamic obstacles (towers).
+     * @param towers Current list of towers
+     */
+    public updateFlowField(towers: any[]) { // Expecting Tower[]
+        // In current game logic (NewTower 1.4), towers are on Grass (0) and Enemies on Path (1).
+        // So towers technically don't block.
+        // However, to support "Mazing" if rules change or if mixed tiles exist:
+
+        // 1. Create a temp grid copy or modify weights
+        // For optimization, we pass the raw grid and let FlowField handle logic, 
+        // but if we want to treat towers as blocks, we need to tell FlowField.
+
+        // Since FlowField.generate takes 'grid' which is Cell[][], we can't easily inject towers without modifying grid.
+        // Let's rely on FlowField checking a separate 'obstacles' set if we want strict blocking,
+        // OR, we assume for now this is just a re-fresh in case the GRID itself changed.
+
+        // If we want to simulate blocking for future-proofing:
+        // const tempGrid = ... clone grid ...
+        // apply towers to tempGrid
+        // flowField.generate(tempGrid, target);
+
+        // For now, simple re-generation:
+        let target = { x: 0, y: 0 };
+        if (this.waypoints.length > 0) {
+            target = this.waypoints[this.waypoints.length - 1];
+        }
+        this.flowField.generate(this.grid, target);
     }
 }

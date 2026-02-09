@@ -57,6 +57,7 @@ export class Enemy {
     // === PERFORMANCE CACHES (Phase 3a) ===
     public typeConfig: any = null;      // Cached getEnemyType() result
     public moveAngle: number = 0;       // Cached Math.atan2() from move()
+    private _moveVector = { x: 0, y: 0 }; // Zero-allocation vector for movement
 
     // Damage Text Accumulation (Phase 6)
     public lastDamageText: any = null; // Ref to active text effect
@@ -195,36 +196,52 @@ export class Enemy {
     }
 
     // ИСПРАВЛЕНИЕ: метод стал public
-    public move(dt: number): void {
+    public move(dt: number, flowField: any): void { // Using 'any' briefly to avoid circular deps if types not ready, but better import FlowField interface
         let speedMod = 1;
         const slow = this.statuses.find((s) => s.type === 'slow');
         if (slow) speedMod -= slow.power;
 
         const currentSpeed = Math.max(0, this.baseSpeed * speedMod * dt); // Apply delta time
 
-        if (this.pathIndex >= this.path.length) {
-            this.finished = true;
-            return;
+        // Flow Field Movement
+        // Get vector from the field (Zero Allocation)
+        flowField.getVector(this.x, this.y, this._moveVector);
+        const vector = this._moveVector;
+
+        if (vector.x === 0 && vector.y === 0) {
+            // Reached target or stuck
+            // Check distance to center of target tile
+            const targetTile = flowField.target;
+            if (targetTile) {
+                const tx = targetTile.x * CONFIG.TILE_SIZE + CONFIG.TILE_SIZE / 2;
+                const ty = targetTile.y * CONFIG.TILE_SIZE + CONFIG.TILE_SIZE / 2;
+                const dx = tx - this.x;
+                const dy = ty - this.y;
+                const dist = Math.hypot(dx, dy);
+
+                // If close enough, finish
+                if (dist < 5) {
+                    this.finished = true;
+                    return;
+                }
+
+                // Otherwise, manually steer towards center to complete the path
+                if (dist > 0.001) {
+                    vector.x = dx / dist;
+                    vector.y = dy / dist;
+                }
+            } else {
+                return;
+            }
         }
 
-        const node = this.path[this.pathIndex];
-        const targetX = node.x * CONFIG.TILE_SIZE + CONFIG.TILE_SIZE / 2;
-        const targetY = node.y * CONFIG.TILE_SIZE + CONFIG.TILE_SIZE / 2;
+        this.x += vector.x * currentSpeed;
+        this.y += vector.y * currentSpeed;
 
-        const dx = targetX - this.x;
-        const dy = targetY - this.y;
-        const dist = Math.hypot(dx, dy);
-
-        // PERF: Cache moveAngle for renderer (avoid recalculating in draw)
-        this.moveAngle = Math.atan2(dy, dx);
-
-        if (dist <= currentSpeed) {
-            this.x = targetX;
-            this.y = targetY;
-            this.pathIndex++;
-        } else {
-            this.x += Math.cos(this.moveAngle) * currentSpeed;
-            this.y += Math.sin(this.moveAngle) * currentSpeed;
+        // Calculate angle for visual rotation
+        // Only update if moving significant amount to avoid jitter
+        if (Math.abs(vector.x) > 0.01 || Math.abs(vector.y) > 0.01) {
+            this.moveAngle = Math.atan2(vector.y, vector.x);
         }
     }
 

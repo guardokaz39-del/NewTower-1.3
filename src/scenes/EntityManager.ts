@@ -217,10 +217,10 @@ export class EntityManager {
     /**
      * Update all enemies and handle death/finish
      */
-    public updateEnemies(dt: number): void {
+    public updateEnemies(dt: number, flowField: any): void { // Using 'any' to avoid circular ref, but should be FlowField
         for (let i = this.state.enemies.length - 1; i >= 0; i--) {
             const e = this.state.enemies[i];
-            e.move(dt);
+            e.move(dt, flowField);
             e.update(dt);
 
             if (!e.isAlive()) {

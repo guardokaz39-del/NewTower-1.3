@@ -169,6 +169,7 @@ export class GameScene extends BaseScene implements IGameScene {
             this.ui,
             this.metrics,
             this.mapData,
+            this.map,
             (col, row) => this.map.isBuildable(col, row),
             this.cardSys,
             this.events,
@@ -376,7 +377,7 @@ export class GameScene extends BaseScene implements IGameScene {
             PerformanceMonitor.endTimer('Collision');
 
             PerformanceMonitor.startTimer('Entities');
-            this.entityManager.updateEnemies(dt);
+            this.entityManager.updateEnemies(dt, this.map.flowField);
             this.acidSystem.update(dt, this.gameState.enemies);
             this.commanderSystem.update(dt, this.gameState.enemies);
             PerformanceMonitor.endTimer('Entities');
