@@ -45,6 +45,99 @@ export class EffectSystem {
     private static LIMIT_MEDIUM = 200;
     private static LIMIT_LOW = 200;
 
+    // Static Gradient Cache
+    private static gradientCache: Map<string, HTMLCanvasElement> = new Map();
+
+    // Helper to get cached gradient
+    private static getCachedGradient(colorStart: string, colorEnd: string, size: number): HTMLCanvasElement {
+        const key = `${colorStart}_${colorEnd}_${size}`;
+        if (!this.gradientCache.has(key)) {
+            const cvs = document.createElement('canvas'); // Not attached to DOM, lightweight
+            cvs.width = size * 2;
+            cvs.height = size * 2;
+            const ctx = cvs.getContext('2d');
+            if (ctx) {
+                const g = ctx.createRadialGradient(size, size, 0, size, size, size);
+                g.addColorStop(0, colorStart);
+                g.addColorStop(1, colorEnd);
+                ctx.fillStyle = g;
+                ctx.fillRect(0, 0, size * 2, size * 2);
+            }
+            this.gradientCache.set(key, cvs);
+        }
+        return this.gradientCache.get(key)!;
+    }
+
+    // Static Sprite Cache
+    private static spriteCache: Map<string, HTMLCanvasElement> = new Map();
+
+    private static getSprite(type: 'ring' | 'rays'): HTMLCanvasElement {
+        if (!this.spriteCache.has(type)) {
+            const size = 64;
+            const cvs = document.createElement('canvas');
+            cvs.width = size;
+            cvs.height = size;
+            const ctx = cvs.getContext('2d');
+            if (!ctx) return cvs;
+
+            const center = size / 2;
+
+            if (type === 'ring') {
+                // High quality ring
+                ctx.strokeStyle = '#fff';
+                ctx.lineWidth = 4;
+                ctx.beginPath();
+                ctx.arc(center, center, 28, 0, Math.PI * 2);
+                ctx.stroke();
+                // Add glow to ring
+                ctx.shadowColor = '#fff';
+                ctx.shadowBlur = 6;
+                ctx.stroke();
+            } else if (type === 'rays') {
+                // Starburst rays
+                ctx.strokeStyle = '#fff';
+                ctx.lineWidth = 2;
+                ctx.lineCap = 'round';
+                const count = 8;
+                for (let i = 0; i < count; i++) {
+                    const angle = (i / count) * Math.PI * 2;
+                    ctx.beginPath();
+                    ctx.moveTo(center + Math.cos(angle) * 10, center + Math.sin(angle) * 10);
+                    ctx.lineTo(center + Math.cos(angle) * 30, center + Math.sin(angle) * 30);
+                    ctx.stroke();
+                }
+            }
+            this.spriteCache.set(type, cvs);
+        }
+        return this.spriteCache.get(type)!;
+    }
+
+    private static getGradientSprite(color: 'orange' | 'cyan'): HTMLCanvasElement {
+        if (!this.spriteCache.has(color)) {
+            const size = 64;
+            const cvs = document.createElement('canvas');
+            cvs.width = size;
+            cvs.height = size;
+            const ctx = cvs.getContext('2d');
+            if (ctx) {
+                const g = ctx.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2);
+                if (color === 'orange') {
+                    g.addColorStop(0, 'rgba(255, 255, 200, 1)');
+                    g.addColorStop(0.5, 'rgba(255, 100, 0, 0.8)');
+                    g.addColorStop(1, 'rgba(255, 0, 0, 0)');
+                } else {
+                    g.addColorStop(0, 'rgba(225, 255, 255, 1)');
+                    g.addColorStop(0.5, 'rgba(0, 200, 255, 0.8)');
+                    g.addColorStop(1, 'rgba(0, 0, 255, 0)');
+                }
+                ctx.fillStyle = g;
+                ctx.fillRect(0, 0, size, size);
+            }
+            this.spriteCache.set(color, cvs);
+        }
+        return this.spriteCache.get(color)!;
+    }
+
     // Current counts
     private countHigh = 0;
     private countMedium = 0;
@@ -286,17 +379,54 @@ export class EffectSystem {
                 // Layer 2: Inner glow core (shrinking)
                 const coreRadius = radius * 0.4 * progress;
                 if (coreRadius > 1) {
-                    const gradient = this.ctx.createRadialGradient(
-                        e.x, e.y, 0,
-                        e.x, e.y, coreRadius
+                    // OPTIMIZED: Use cached gradient
+                    const colorCore = 'rgba(255, 255, 200, 0.9)';
+                    const colorFade = 'rgba(255, 100, 0, 0)';
+
+                    // We can bake the color into the cache based on e.color if needed, 
+                    // but for now let's use a generic warm glow + composite if possible, 
+                    // or just cache specific colors.
+
+                    // Let's use the explicit color from effect or default:
+                    const mainColor = e.color || 'rgba(255, 150, 50, 0.6)';
+
+                    // Draw using cache
+                    // Note: We cache a generic white glow and tint it? 
+                    // Canvas doesn't support easy tinting without composite overhead.
+                    // Better to cache specific common colors: Fire (Orange), Ice (Cyan).
+
+                    // For now, let's cache the exact gradient needed for this effect frame? No, that's too many.
+                    // Cache the BASE gradient at fixed large size, then drawImage with scale.
+                    const cacheSize = 64;
+                    const cachedParams = e.color ? e.color : 'orange';
+                    // Simple key based on color. We assume standard fade to transparent.
+
+                    const glowCanvas = EffectSystem.getCachedGradient(
+                        'rgba(255, 255, 255, 0.9)', // White core
+                        'rgba(255, 255, 255, 0)',   // Transparent edge
+                        cacheSize
                     );
-                    gradient.addColorStop(0, 'rgba(255, 255, 200, 0.9)');
-                    gradient.addColorStop(0.5, e.color || 'rgba(255, 150, 50, 0.6)');
-                    gradient.addColorStop(1, 'rgba(255, 100, 0, 0)');
-                    this.ctx.fillStyle = gradient;
-                    this.ctx.beginPath();
-                    this.ctx.arc(e.x, e.y, coreRadius, 0, Math.PI * 2);
-                    this.ctx.fill();
+
+                    this.ctx.save();
+                    this.ctx.globalCompositeOperation = 'lighter'; // Additive blending for glow
+                    // Apply tint via color (if we used white gradient) -> actually lighter blends colors.
+                    // If we want colored glow, we should better cache colored gradients or use fillStyle.
+
+                    // Let's rely on cached colored gradients for main types.
+                    const isIce = e.color && e.color.includes('0, 188, 212');
+                    const startColor = isIce ? 'rgba(0, 255, 255, 0.8)' : 'rgba(255, 200, 50, 0.8)';
+                    const endColor = isIce ? 'rgba(0, 100, 255, 0)' : 'rgba(255, 50, 0, 0)';
+
+                    const specificGlow = EffectSystem.getCachedGradient(startColor, endColor, 32);
+
+                    this.ctx.drawImage(
+                        specificGlow,
+                        e.x - coreRadius,
+                        e.y - coreRadius,
+                        coreRadius * 2,
+                        coreRadius * 2
+                    );
+                    this.ctx.restore();
                 }
 
                 // Layer 3: Radial rays (spikes)
@@ -326,15 +456,25 @@ export class EffectSystem {
                 this.ctx.font = `bold ${fontSize}px Arial`;
                 this.ctx.textAlign = 'center';
                 this.ctx.fillText(e.text || '', e.x, e.y);
-                this.ctx.strokeStyle = 'black';
-                this.ctx.lineWidth = fontSize > 20 ? 3 : 2;
-                this.ctx.strokeText(e.text || '', e.x, e.y);
+
+                // OPTIMIZATION: Only stroke text for High Priority (Crits)
+                if (e.priority === EffectPriority.HIGH) {
+                    this.ctx.strokeStyle = 'black';
+                    this.ctx.lineWidth = 2;
+                    this.ctx.strokeText(e.text || '', e.x, e.y);
+                }
             } else if (e.type === 'particle') {
-                // Standard Spark
+                // Standard Spark - OPTIMIZED to fillRect for small particles
                 this.ctx.fillStyle = e.color || '#fff';
-                this.ctx.beginPath();
-                this.ctx.arc(e.x, e.y, e.radius || 2, 0, Math.PI * 2);
-                this.ctx.fill();
+                const r = e.radius || 2;
+                if (r < 3) {
+                    // Faster than arc
+                    this.ctx.fillRect(e.x - r, e.y - r, r * 2, r * 2);
+                } else {
+                    this.ctx.beginPath();
+                    this.ctx.arc(e.x, e.y, r, 0, Math.PI * 2);
+                    this.ctx.fill();
+                }
             } else if (e.type === 'debris') {
                 // Осколок (квадрат), который крутится и падает
                 this.ctx.translate(e.x, e.y);
@@ -357,22 +497,29 @@ export class EffectSystem {
                     const r = e.radius || 12;
                     this.ctx.drawImage(img, e.x - r, e.y - r, r * 2, r * 2);
                 } else {
-                    const gradient = this.ctx.createRadialGradient(e.x, e.y, 0, e.x, e.y, e.radius || 12);
-                    // Use e.color as the center/core color
-                    // Parse color or use default. 
-                    // To make a nice gradient we need RGBA.
-                    // Simple approach: Use e.color for center, fade to transparent
-
+                    // OPTIMIZED: Use cached gradient for muzzle flash
+                    // Determine color key
                     const coreColor = e.color || 'rgba(255, 255, 200, 0.9)';
+                    const fadeColor = 'rgba(255, 255, 255, 0)';
 
-                    gradient.addColorStop(0, coreColor);
-                    gradient.addColorStop(0.4, coreColor); // Solid core
-                    gradient.addColorStop(1, 'rgba(255, 255, 255, 0)');
+                    const flashSize = e.radius || 12;
+                    const cacheKey = `${coreColor}_${flashSize}`;
 
-                    this.ctx.fillStyle = gradient;
-                    this.ctx.beginPath();
-                    this.ctx.arc(e.x, e.y, e.radius || 12, 0, Math.PI * 2);
-                    this.ctx.fill();
+                    // Get or create specific cache
+                    let flashCanvas = EffectSystem.gradientCache.get(cacheKey);
+                    if (!flashCanvas) {
+                        flashCanvas = EffectSystem.getCachedGradient(coreColor, fadeColor, flashSize);
+                        EffectSystem.gradientCache.set(cacheKey, flashCanvas);
+                    }
+
+                    this.ctx.save();
+                    this.ctx.globalCompositeOperation = 'lighter';
+                    this.ctx.drawImage(
+                        flashCanvas,
+                        e.x - flashSize,
+                        e.y - flashSize
+                    );
+                    this.ctx.restore();
                 }
             } else if (e.type === 'screen_flash') {
                 // Flash по краям экрана

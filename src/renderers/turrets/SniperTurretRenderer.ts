@@ -86,13 +86,19 @@ export class SniperTurretRenderer implements ITurretRenderer {
         ctx.arc(range, 0, 2 + level * 0.5, 0, Math.PI * 2);
         ctx.fill();
 
-        // Dot glow
-        const dotGrad = ctx.createRadialGradient(range, 0, 0, range, 0, 6);
-        dotGrad.addColorStop(0, 'rgba(255,23,68,0.5)');
-        dotGrad.addColorStop(1, 'rgba(0,0,0,0)');
-        ctx.fillStyle = dotGrad;
+        // Dot glow (Simple transparency layers instead of gradient)
+        // PERF: Replaced createRadialGradient with multiple arc fills or just simple glow
+
+        // Layer 1: Outer soft glow
+        ctx.fillStyle = 'rgba(255, 23, 68, 0.2)';
         ctx.beginPath();
         ctx.arc(range, 0, 6, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Layer 2: Inner core
+        ctx.fillStyle = 'rgba(255, 23, 68, 0.8)';
+        ctx.beginPath();
+        ctx.arc(range, 0, 2 + level * 0.5, 0, Math.PI * 2);
         ctx.fill();
 
         ctx.restore();

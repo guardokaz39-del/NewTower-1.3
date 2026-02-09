@@ -2,46 +2,35 @@ import { Projectile } from '../Projectile';
 import { EffectSystem } from '../EffectSystem';
 
 export class ProjectileSystem {
-    // Single pool array containing both active and inactive projectiles
+    // Stack-based pooling
+    // 'pool' contains inactive projectiles ready for reuse
+    // 'active' contains currently live projectiles
     private pool: Projectile[] = [];
+    private active: Projectile[] = [];
 
     // Getter for other systems (Collision, etc)
     public get projectiles(): Projectile[] {
-        return this.pool;
+        return this.active;
     }
 
     public spawn(x: number, y: number, target: { x: number, y: number }, stats: any): Projectile {
-        // 1. Try to find an inactive projectile (for loop instead of .find())
-        let p: Projectile | undefined;
-        for (let i = 0; i < this.pool.length; i++) {
-            if (!this.pool[i].alive) {
-                p = this.pool[i];
-                break;
-            }
-        }
+        // 1. Pop from pool or create new (O(1))
+        const p = this.pool.pop() || new Projectile();
 
-        if (!p) {
-            // 2. If not found, create new and add to pool
-            p = new Projectile();
-            this.pool.push(p);
-        }
-
-        // 3. Reset/Init (active = true happens here)
+        // 2. Init
         p.init(x, y, target, stats);
+
+        // 3. Add to active list
+        this.active.push(p);
+
         return p;
     }
 
     public createExplosion(x: number, y: number, radius: number, damage: number, friendlyFire: boolean = false) {
-        // Visual Explosion (Reuse existing particle logic or spawn a dummy projectile that explodes immediately)
-        // For now, let's spawn a "stationary" projectile that dies immediately but triggers effects
-        // OR better: Just handle the logic here if we have access to effects.
-
-        // Since this system doesn't have direct access to 'enemies' list to apply damage,
-        // we will create a special projectile that acts as the explosion.
-
-        // Actually, looking at the code, ProjectileSystem.update() doesn't do collision checks.
-        // Collision is likely handled in GameScene.
-        // So we need to return a projectile that the GameScene will process as "Just Exploded"
+        // DEPRECATED/LEGACY: 
+        // Logic usually handled by CollisionSystem triggers. 
+        // If this is still used for direct spawning (e.g. from debug or abilities), 
+        // we spawn a projectile that dies instantly.
 
         const p = this.spawn(x, y, { x, y }, {
             dmg: damage,
@@ -49,46 +38,63 @@ export class ProjectileSystem {
             color: '#76ff03',
             effects: [],
             pierce: 999,
-            projectileType: 'explosion', // New type
+            projectileType: 'explosion',
             explosionRadius: radius,
             explosionDamage: damage,
-            explodeOnDeath: true // This ensures it triggers explosion logic
+            explodeOnDeath: true
         });
 
-        p.life = 0; // Die immediately next frame to trigger explosion
-
-        // Mark it specially for friendly fire if needed
-        // We'll add a runtime property or use existing fields
+        p.life = 0;
         (p as any).friendlyFire = friendlyFire;
-
         return p;
     }
 
     public update(dt: number, effects: EffectSystem) {
-        // PERF: indexed loop instead of for...of
-        for (let i = 0; i < this.pool.length; i++) {
-            const p = this.pool[i];
-            if (p.alive) {
-                p.update(effects, dt);
+        // Iterate BACKWARDS to allow swap-remove safely?
+        // Actually, with swap-remove, we can iterate forward if we handle the index correctly.
+        // Standard pattern:
+        for (let i = 0; i < this.active.length; i++) {
+            const p = this.active[i];
+
+            p.update(effects, dt); // Update logic
+
+            if (!p.alive) {
+                // Remove from active (Swap & Pop)
+                this.remove(i);
+
+                // Decrement i because we swapped a new element into this slot
+                i--;
             }
         }
     }
 
+    private remove(index: number) {
+        const p = this.active[index];
+        const last = this.active.pop();
+
+        if (last && last !== p) {
+            this.active[index] = last;
+        }
+
+        // Return to pool
+        this.pool.push(p);
+    }
+
     public draw(ctx: CanvasRenderingContext2D) {
-        // PERF: indexed loop instead of for...of
-        for (let i = 0; i < this.pool.length; i++) {
-            const p = this.pool[i];
-            if (p.alive) {
-                p.draw(ctx);
-            }
+        // Draw all active
+        for (let i = 0; i < this.active.length; i++) {
+            this.active[i].draw(ctx);
         }
     }
 
     public clear() {
-        // Mark all as dead, but keep objects in pool for reuse
-        // PERF: indexed loop instead of for...of
-        for (let i = 0; i < this.pool.length; i++) {
-            this.pool[i].alive = false;
+        // Move all active to pool
+        while (this.active.length > 0) {
+            const p = this.active.pop();
+            if (p) {
+                p.alive = false;
+                this.pool.push(p);
+            }
         }
     }
 }

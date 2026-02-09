@@ -89,6 +89,7 @@ export class CollisionSystem {
         SoundManager.play('hit', SoundPriority.LOW);
 
         // --- ВИЗУАЛ: Искры при попадании (critical hit = more particles) ---
+        // DECOUPLED: Visuals are fire-and-forget
         const particleCount = p.isCrit ? 10 : 5;
         for (let i = 0; i < particleCount; i++) {
             this.effects.spawn({
@@ -140,7 +141,7 @@ export class CollisionSystem {
         // Handle enemy death effects
         const enemyDied = !target.isAlive();
         if (enemyDied) {
-            this.handleEnemyDeath(target, p, allEnemies, wasSlowed);
+            this.handleEnemyDeath(target, p, wasSlowed);
         }
 
         // Splash damage effect
@@ -152,6 +153,7 @@ export class CollisionSystem {
             }
         }
         if (splash) {
+            // 1. VISUAL
             this.effects.spawn({
                 type: 'explosion',
                 x: target.x,
@@ -162,15 +164,19 @@ export class CollisionSystem {
                 color: 'rgba(255, 100, 0, 0.5)',
             });
 
-            // PERF: indexed loop + squared distance (no sqrt)
-            const splashRadiusSq = (splash.splashRadius || splash.radius) ** 2;
-            for (let i = 0; i < allEnemies.length; i++) {
-                const neighbor = allEnemies[i];
+            // 2. PHYSICS (Decoupled: Instant Area Damage via Grid)
+            // PERF: Use SpatialGrid instead of iterating all enemies
+            const radius = splash.splashRadius || splash.radius || 40;
+            const nearby = this.enemyGrid.getNearby(target.x, target.y, radius);
+            const radiusSq = radius * radius;
+
+            for (let i = 0; i < nearby.length; i++) {
+                const neighbor = nearby[i];
                 if (neighbor === target || !neighbor.isAlive()) continue;
+
                 const dx = neighbor.x - target.x;
                 const dy = neighbor.y - target.y;
-                const distSq = dx * dx + dy * dy;
-                if (distSq <= splashRadiusSq) {
+                if (dx * dx + dy * dy <= radiusSq) {
                     neighbor.takeDamage(p.damage * 0.7);
                 }
             }
@@ -186,22 +192,20 @@ export class CollisionSystem {
         }
         if (slow) {
             const damageBonus = slow.damageToSlowed || 1.0;
-            // Default 60 frames -> 1.0 second. Assuming slow.dur/slowDuration are already converted in Card files, 
-            // but fallback must be 1.0, not 60.
             target.applyStatus('slow', slow.slowDuration || slow.dur || 1.0, slow.slowPower || slow.power || 0.4, damageBonus);
         }
     }
 
-    private handleEnemyDeath(enemy: Enemy, killingProjectile: Projectile, allEnemies: Enemy[], wasSlowed: boolean) {
+    private handleEnemyDeath(enemy: Enemy, killingProjectile: Projectile, wasSlowed: boolean) {
         const deathX = enemy.x;
         const deathY = enemy.y;
 
         // Sound Death
-        // Boss death sound? (Checking enemy type or size)
         SoundManager.play('death', SoundPriority.LOW);
 
         // Fire Level 3: Explosion on death
         if (killingProjectile.explodeOnDeath) {
+            // 1. VISUAL
             this.effects.spawn({
                 type: 'explosion',
                 x: deathX,
@@ -212,15 +216,19 @@ export class CollisionSystem {
                 color: 'rgba(255, 69, 0, 0.8)',
             });
 
-            // Damage nearby enemies - PERF: indexed loop + squared distance
-            const explosionRadiusSq = killingProjectile.explosionRadius ** 2;
-            for (let i = 0; i < allEnemies.length; i++) {
-                const neighbor = allEnemies[i];
+            // 2. PHYSICS (Decoupled: Instant Area Damage via Grid)
+            // PERF: Use SpatialGrid
+            const radius = killingProjectile.explosionRadius || 60;
+            const nearby = this.enemyGrid.getNearby(deathX, deathY, radius);
+            const radiusSq = radius * radius;
+
+            for (let i = 0; i < nearby.length; i++) {
+                const neighbor = nearby[i];
                 if (!neighbor.isAlive()) continue;
+
                 const dx = neighbor.x - deathX;
                 const dy = neighbor.y - deathY;
-                const distSq = dx * dx + dy * dy;
-                if (distSq <= explosionRadiusSq) {
+                if (dx * dx + dy * dy <= radiusSq) {
                     neighbor.takeDamage(killingProjectile.explosionDamage);
                 }
             }
@@ -238,24 +246,30 @@ export class CollisionSystem {
                     x: deathX,
                     y: deathY,
                     radius: chainRadius,
-                    life: 20,
+                    life: 0.3, // Shortened life
                     color: 'rgba(0, 188, 212, 0.5)',
                 });
 
-                // Apply slow to nearby enemies - PERF: indexed loop + squared distance
-                const chainRadiusSq = chainRadius ** 2;
-                for (let i = 0; i < allEnemies.length; i++) {
-                    const neighbor = allEnemies[i];
-                    if (!neighbor.isAlive()) continue;
-                    const dx = neighbor.x - deathX;
-                    const dy = neighbor.y - deathY;
-                    const distSq = dx * dx + dy * dy;
-                    if (distSq <= chainRadiusSq) {
-                        // Apply the same slow effect from the projectile
-                        const slowEffect = killingProjectile.effects.find((ef: any) => ef.type === 'slow');
-                        if (slowEffect) {
-                            const damageBonus = slowEffect.damageToSlowed || 1.0;
-                            neighbor.applyStatus('slow', slowEffect.slowDuration || slowEffect.dur || 1.0, slowEffect.slowPower || slowEffect.power || 0.4, damageBonus);
+                // Apply slow to nearby enemies - PERF: Using SpatialGrid
+                const nearby = this.enemyGrid.getNearby(deathX, deathY, chainRadius);
+                const radiusSq = chainRadius * chainRadius;
+
+                // Find original slow effect properties
+                const slowEffect = killingProjectile.effects.find((ef: any) => ef.type === 'slow');
+
+                if (slowEffect) {
+                    const damageBonus = slowEffect.damageToSlowed || 1.0;
+                    const duration = slowEffect.slowDuration || slowEffect.dur || 1.0;
+                    const power = slowEffect.slowPower || slowEffect.power || 0.4;
+
+                    for (let i = 0; i < nearby.length; i++) {
+                        const neighbor = nearby[i];
+                        if (!neighbor.isAlive()) continue;
+
+                        const dx = neighbor.x - deathX;
+                        const dy = neighbor.y - deathY;
+                        if (dx * dx + dy * dy <= radiusSq) {
+                            neighbor.applyStatus('slow', duration, power, damageBonus);
                         }
                     }
                 }
