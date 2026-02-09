@@ -50,7 +50,8 @@ export class EnemyRenderer {
         const moveAngle = enemy.moveAngle || 0;
 
         // 2. Breathing (pulsation) - PERF: use performance.now() instead of Date.now()
-        const breathePhase = (performance.now() * 0.001) + (parseInt(enemy.id.slice(-3), 36) * 0.5);
+        // FIXED: enemy.id is number now, so we use modulo for variation
+        const breathePhase = (performance.now() * 0.001) + ((enemy.id % 100) * 0.5);
         const breatheScale = 1.0 + Math.sin(breathePhase) * 0.03;
         ctx.scale(breatheScale, breatheScale);
 

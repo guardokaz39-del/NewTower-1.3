@@ -1,7 +1,7 @@
 import { Enemy } from './Enemy';
 import { Tower } from './Tower';
 import { CONFIG, getEnemyType } from './Config';
-import { generateUUID } from './Utils';
+// import { generateUUID } from './Utils'; // No longer needed
 
 export class EntityFactory {
     // ИСПРАВЛЕНИЕ: Убрали лишние аргументы, теперь ровно 3
@@ -26,7 +26,7 @@ export class EntityFactory {
         const startY = path.length > 0 ? path[0].y * CONFIG.TILE_SIZE + CONFIG.TILE_SIZE / 2 : 0;
 
         enemy.init({
-            id: `e_${generateUUID()}`,
+            // id removed - generated internally
             health: hp,
             speed: typeConf.speed,
             path: path,

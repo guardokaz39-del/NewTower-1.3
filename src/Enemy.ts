@@ -6,7 +6,7 @@ import { Projectile } from './Projectile';
 import { EnemyRenderer } from './renderers/EnemyRenderer';
 
 export interface IEnemyConfig {
-    id: string;
+    // id removed - generated internally
     health: number;
     speed: number;
     armor?: number;
@@ -22,7 +22,10 @@ interface IStatus {
 }
 
 export class Enemy {
-    public id: string;
+    // Global ID counter for session
+    public static nextId: number = 0;
+
+    public id: number = 0;
     public typeId: string = 'grunt';
 
     public currentHealth: number;
@@ -65,13 +68,16 @@ export class Enemy {
     public currentDamageAccumulation: number = 0;
 
     constructor(config?: IEnemyConfig) {
+        // Constructor only allocates memory
         if (config) {
             this.init(config);
         }
     }
 
     public init(config: IEnemyConfig) {
-        this.id = config.id;
+        // 1. Generate NEW identity
+        this.id = ++Enemy.nextId;
+
         this.maxHealth = config.health;
         this.currentHealth = config.health;
         this.baseSpeed = config.speed;
@@ -88,12 +94,14 @@ export class Enemy {
 
         // Reset specific fields
         this.threatPriority = 0;
-        this.spawnThresholds = [];
-        this.thresholds = [];
+        // Arrays are cleared in reset(), but here we ensure they are empty or set specific initial values if needed
+        // For pooling safety, reset() should have been called before init() or init should overwrite everything.
+        // But since init overwrites primitives, we just need to adhere to standard lifecycle.
     }
 
     public reset() {
-        this.statuses = [];
+        // 3. Clear arrays without GC (keep capacity)
+        this.statuses.length = 0;
         this.hitFlashTimer = 0;
         this.pathIndex = 0;
         this.finished = false;
@@ -101,9 +109,23 @@ export class Enemy {
         this.killedByProjectile = null;
         this.x = -1000; // Move offscreen
         this.y = -1000;
+
         this.threatPriority = 0;
-        this.spawnThresholds = [];
-        this.thresholds = [];
+        this.spawnThresholds.length = 0;
+        this.thresholds.length = 0;
+
+        // Reset Boss mechanics
+        this.isInvulnerable = false;
+        this.shieldTimer = 0;
+
+        // Reset Performance caches
+        this.typeConfig = null;
+        this.moveAngle = 0;
+
+        // Reset Damage Text
+        this.lastDamageText = null;
+        this.lastDamageTextTime = 0;
+        this.currentDamageAccumulation = 0;
     }
 
     public setType(id: string) {
@@ -124,8 +146,9 @@ export class Enemy {
         } else if (id === 'magma_statue') {
             this.threatPriority = 999; // Maximum priority
         } else {
-            this.thresholds = [];
-            this.spawnThresholds = [];
+            // Already cleared in reset, but strictly set here if strictly needed
+            // this.thresholds.length = 0; 
+            // this.spawnThresholds.length = 0;
         }
     }
 
@@ -315,3 +338,4 @@ export class Enemy {
         RendererFactory.drawEnemyUI(ctx, this);
     }
 }
+

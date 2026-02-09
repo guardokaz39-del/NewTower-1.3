@@ -31,7 +31,7 @@ export class Projectile {
     public color: string = '#fff';
     public effects: ICardEffect[] = [];
     public pierce: number = 0;
-    public hitList: string[] = [];
+    public hitList: number[] = [];
     public isCrit: boolean = false;           // Is this a critical hit
     public explodeOnDeath: boolean = false;   // Should explode on enemy death
     public explosionDamage: number = 0;       // Damage from explosion

@@ -25,6 +25,7 @@ graph TB
         GameScene --> GameState[GameState.ts]
         GameScene --> GameController[GameController.ts]
         GameScene --> MapManager[Map.ts]
+        MapManager --> FlowField[FlowField.ts]
     end
     
     subgraph Entities
@@ -97,6 +98,7 @@ graph TB
 |------|------|
 | `src/WaveManager.ts` | Wave spawning, patterns (Normal/Random/Swarm) |
 | `src/CollisionSystem.ts` | Projectile-enemy collision via SpatialGrid |
+| `src/FlowField.ts` | Vector Field pathfinding for mass unit movement |
 | `src/EffectSystem.ts` | Visual effects: explosions, particles, debris |
 | `src/CardSystem.ts` | Hand management, drag-drop to towers/forge |
 | `src/ForgeSystem.ts` | Card combining/upgrading |

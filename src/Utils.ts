@@ -146,8 +146,50 @@ export function saveMapToStorage(name: string, data: IMapData): boolean {
     }
 }
 
+
 export function deleteMapFromStorage(name: string): void {
     const maps = getSavedMaps();
     delete maps[name];
     localStorage.setItem('NEWTOWER_MAPS', JSON.stringify(maps));
+}
+
+// === GLOBAL SESSION STORAGE ===
+// To preserve Enemy.nextId and other session globals across reloads
+interface IGlobalState {
+    lastEnemyId: number;
+}
+
+export function saveGlobalState(): void {
+    const state: IGlobalState = {
+        lastEnemyId: (window as any).Enemy?.nextId || 0
+    };
+    // Need to access the Enemy class static, but importing it might cause cycles if not careful.
+    // Better to pass the value in if possible, or use the class if imported.
+    // Since we are in Utils, check imports. Enemy is NOT imported here.
+    // Let's rely on the caller to pass it or import it dynamically?
+    // Actually, Utils uses IMapData etc. It does not import Enemy class.
+    // Importing Enemy class here might be fine.
+}
+
+// Better approach: Generic Save/Load for key-values that Game.ts can call
+export function saveSessionData(key: string, value: any): void {
+    try {
+        const raw = localStorage.getItem('NEWTOWER_SESSION') || '{}';
+        const data = JSON.parse(raw);
+        data[key] = value;
+        localStorage.setItem('NEWTOWER_SESSION', JSON.stringify(data));
+    } catch (e) {
+        console.error('Failed to save session data', e);
+    }
+}
+
+export function loadSessionData(key: string): any {
+    try {
+        const raw = localStorage.getItem('NEWTOWER_SESSION');
+        if (!raw) return null;
+        const data = JSON.parse(raw);
+        return data[key];
+    } catch (e) {
+        return null;
+    }
 }

@@ -44,6 +44,26 @@ Entity.tempPos.x = entity.x;
 Entity.tempPos.y = entity.y;
 ```
 
+### 3a. Zero-Allocation (Vectors) [NEW]
+
+Для движения юнитов (50+ врагов) **ЗАПРЕЩЕНО** возвращать новые объекты векторов.
+
+```typescript
+// ❌ ЗАПРЕЩЕНО (Allocates {x,y} every call)
+public getVector(x, y): {x, number, y: number} {
+    return { x: 1, y: 0 };
+}
+
+// ✅ ПРАВИЛЬНО (Reuse output object)
+public getVector(x, y, out: {x: number, y: number}): void {
+    out.x = 1;
+    out.y = 0;
+}
+
+// В цикле:
+flowField.getVector(this.x, this.y, this._moveVector);
+```
+
 ### 4. Array filter в update
 
 ```typescript
@@ -91,6 +111,19 @@ class EffectPool {
     }
 }
 ```
+
+**Важно для Pool.reset():**
+
+- Очищайте массивы через `.length = 0`, а не `[]` (создание нового объекта).
+- Сохраняйте ссылки на существующие объекты где возможно.
+- Сбрасывайте примитивы (bool, number).
+
+### Entity IDs
+
+- **ЗАПРЕЩЕНО:** Использовать `string` / `UUID` для идентификации сущностей в игре (Enemy, Projectile).
+- **ОБЯЗАТЕЛЬНО:** Использовать `number` и статический инкрементальный счетчик (`static nextId`).
+  - Строки создают нагрузку на GC (Garbage Collector).
+  - Числа (Smi) обрабатываются движком V8 намного быстрее.
 
 ### Event Listener Cleanup
 

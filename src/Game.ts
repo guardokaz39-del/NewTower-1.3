@@ -5,6 +5,8 @@ import { MenuScene } from './scenes/MenuScene';
 import { InputSystem } from './InputSystem';
 import { SoundManager } from './SoundManager';
 import { CardSelectionUI } from './CardSelectionUI';
+import { loadSessionData, saveSessionData } from './Utils';
+import { Enemy } from './Enemy';
 
 export class Game {
     public canvas: HTMLCanvasElement;
@@ -25,10 +27,22 @@ export class Game {
 
         this.input = new InputSystem(this);
         this.loop = this.loop.bind(this);
+
+        // Auto-save session state on unload
+        window.addEventListener('beforeunload', () => {
+            saveSessionData('lastEnemyId', Enemy.nextId);
+        });
     }
 
     public async start() {
         this.drawLoadingScreen();
+
+        // Restore global state
+        const lastId = loadSessionData('lastEnemyId');
+        if (typeof lastId === 'number') {
+            Enemy.nextId = lastId;
+            console.log(`Restored Enemy.nextId: ${lastId}`);
+        }
 
         try {
             await SoundManager.init();
