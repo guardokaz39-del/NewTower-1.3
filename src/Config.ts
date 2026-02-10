@@ -27,7 +27,10 @@ export const CONFIG = {
         HAND_LIMIT: 7,
     },
 
-    ECONOMY: ECONOMY_CONFIG,
+    ECONOMY: {
+        ...ECONOMY_CONFIG,
+        SLOT_UNLOCK_COST: [0, 150, 350], // Cost to unlock Slot 1 (0), Slot 2, Slot 3
+    },
 
     TOWER: TOWER_CONFIG,
 

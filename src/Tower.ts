@@ -11,13 +11,36 @@ import { getCardUpgrade, getMultishotConfig, ICardEffect } from './cards';
 import { mergeCardsWithStacking } from './CardStackingSystem';
 import { TowerRenderer } from './renderers/TowerRenderer';
 
+export interface SlotState {
+    id: number;
+    isLocked: boolean;
+    card: ICard | null;
+}
+
 export class Tower {
     public col: number;
     public row: number;
     public x: number;
     public y: number;
 
-    public cards: ICard[] = [];
+    // Slot System (Replaces simple cards array)
+    public slots: SlotState[] = [];
+    public selectedSlotId: number = -1; // -1: None, 0-2: Slot ID selected in UI
+
+    // Backward compatibility getter: Returns all equipped cards
+    public get cards(): ICard[] {
+        return this.slots
+            .filter(s => !s.isLocked && s.card !== null)
+            .map(s => s.card!);
+    }
+
+    // Legacy setter (optional, but safer to prevent direct assignment bugs)
+    public set cards(v: ICard[]) {
+        // Clear slots
+        this.slots.forEach(s => s.card = null);
+        // Try fill
+        v.forEach(c => this.addCard(c));
+    }
     public cooldown: number = 0;
     public angle: number = 0;
     public targetingMode: string = 'first'; // Targeting priority: first, closest, strongest, weakest, last
@@ -52,6 +75,16 @@ export class Tower {
         this.x = c * CONFIG.TILE_SIZE + CONFIG.TILE_SIZE / 2;
         this.y = r * CONFIG.TILE_SIZE + CONFIG.TILE_SIZE / 2;
         this.costSpent = CONFIG.ECONOMY.TOWER_COST;
+
+        // Initialize Slots
+        // Slot 0: Open
+        // Slot 1: Locked
+        // Slot 2: Locked
+        this.slots = [
+            { id: 0, isLocked: false, card: null },
+            { id: 1, isLocked: true, card: null },
+            { id: 2, isLocked: true, card: null }
+        ];
     }
 
     public static getPreviewStats(cards: ICard[]): any {
@@ -192,18 +225,52 @@ export class Tower {
     }
 
     addCard(c: ICard): boolean {
-        if (this.cards.length < CONFIG.TOWER.MAX_CARDS) {
-            this.cards.push(c);
-            // this.costSpent += 100; // Removed cost tracking for cards
+        // Find first empty, unlocked slot
+        const emptySlot = this.slots.find(s => !s.isLocked && s.card === null);
+        if (emptySlot) {
+            emptySlot.card = c;
             return true;
         }
         return false;
     }
 
     removeCard(index: number): ICard | null {
-        if (index < 0 || index >= this.cards.length) return null;
-        const card = this.cards.splice(index, 1)[0];
-        return card || null;
+        // In legacy system, index was simple array index.
+        // In slot system, it corresponds to the equipped cards list?
+        // OR does it correspond to slot ID?
+        // For UI drag-out, we usually know the specific card or slot.
+
+        // Strategy: "index" here is treated as an index into the `this.cards` array (legacy behavior)
+        // to keep existing UI compatible if it loops through cards.
+        // HOWEVER, for the new Menu, we will call `removeCardFromSlot` directly.
+
+        // Legacy fallback: find the Nth active card
+        const activeSlots = this.slots.filter(s => !s.isLocked && s.card !== null);
+        if (index >= 0 && index < activeSlots.length) {
+            const card = activeSlots[index].card;
+            activeSlots[index].card = null;
+            return card;
+        }
+        return null;
+    }
+
+    public removeCardFromSlot(slotId: number): ICard | null {
+        const slot = this.slots.find(s => s.id === slotId);
+        if (slot && slot.card) {
+            const c = slot.card;
+            slot.card = null;
+            return c;
+        }
+        return null;
+    }
+
+    public unlockSlot(slotId: number): boolean {
+        const slot = this.slots.find(s => s.id === slotId);
+        if (slot && slot.isLocked) {
+            slot.isLocked = false;
+            return true;
+        }
+        return false;
     }
 
     updateBuilding(effects: EffectSystem, dt: number) {

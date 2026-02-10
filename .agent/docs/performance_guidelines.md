@@ -236,4 +236,43 @@ ctx.drawImage(aura, x, y);
 
 ---
 
-*Последнее обновление: 2026-02-08*
+### 6. Logic / Visual Decoupling [NEW]
+
+Физика и Визуал должны быть **полностью разделены**.
+
+- **Damage Logic**: Происходит мгновенно (в кадре события).
+- **Visual Effect**: Спавнится и живет своей жизнью ("Fire and Forget").
+- **Запрещено**: Использовать снаряды (Projectile) для визуализации взрывов (создавать объект с `life`, который наносит урон через N кадров).
+- **Правильно**:
+
+  ```typescript
+  // Frame 0:
+  CollisionSystem.applyAreaDamage(x, y, radius); // Instant Logic
+  EffectSystem.spawnExplosion(x, y); // Visual only
+  ```
+
+### 7. SpatialGrid для AOE [NEW]
+
+Для любых эффектов по площади (Splash, Explosion, Aura) **ОБЯЗАТЕЛЬНО** использовать `SpatialGrid`.
+
+- **Запрещено**: `enemies.forEach(e => dist(e, target))` (O(N))
+- **Обязательно**: `grid.getNearby(x, y, r)` (O(1))
+
+### 8. Rendering: Sprites vs Vectors [NEW]
+
+Для частых эффектов (Particles, Explosions, Projectiles):
+
+- **Запрещено**: `ctx.arc`, `ctx.lineTo`, `ctx.stroke` в каждом кадре.
+- **Обязательно**:
+  - **Particles**: `ctx.fillRect` (для r < 3).
+  - **Complex Effects**: Pre-rendered Canvas (Sprite).
+  - **Glow**: Cached Gradients.
+
+### 9. Text Rendering [NEW]
+
+- **Запрещено**: `ctx.strokeText` для обычного текста (Damage numbers). Это очень дорого.
+- **Разрешено**: Только для редких событий (Critical Hit, Level Up).
+
+---
+
+*Последнее обновление: 2026-02-09 (Optimization Phase 2)*

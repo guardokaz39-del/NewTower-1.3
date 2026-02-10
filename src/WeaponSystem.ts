@@ -18,7 +18,8 @@ export class WeaponSystem {
 
     private processTower(tower: Tower, enemies: Enemy[], projectileSystem: ProjectileSystem, dt: number, effects?: EffectSystem) {
         if (tower.isBuilding) return;
-        if (tower.cards.length === 0) return;
+        // if (tower.cards.length === 0) return; // Removed to allow base firing
+
 
         // Handle overheat cooldown
         if (tower.isOverheated) {

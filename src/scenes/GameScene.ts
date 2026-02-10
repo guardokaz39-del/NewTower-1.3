@@ -35,6 +35,7 @@ import { GameController } from './GameController';
 import { GameState } from './GameState';
 import { EntityManager } from './EntityManager';
 import { RendererFactory } from '../RendererFactory';
+
 import { EnemyRenderer } from '../renderers/EnemyRenderer';
 import { AcidPuddleSystem } from '../systems/AcidPuddleSystem';
 import { SkeletonCommanderSystem } from '../systems/SkeletonCommanderSystem';
@@ -451,6 +452,7 @@ export class GameScene extends BaseScene implements IGameScene {
         }
         this.drawSelectedTowerRange(ctx);
 
+
         // Draw targeting mode tooltip for hovered tower
         this.drawTargetingModeTooltip(ctx);
 
@@ -631,7 +633,7 @@ export class GameScene extends BaseScene implements IGameScene {
         this.gameController.startBuildingTower(col, row);
     }
 
-    public handleGridClick(col: number, row: number): void {
+    public handleGridClick(col: number, row: number) {
         this.gameController.handleGridClick(col, row);
     }
 

@@ -9,6 +9,7 @@ import { UIManager } from '../UIManager';
 import { MetricsSystem } from '../MetricsSystem';
 import { IMapData } from '../MapData';
 import { EventEmitter } from '../Events';
+import { SoundManager } from '../SoundManager';
 
 /**
  * Handles user actions and game controller logic:
@@ -34,6 +35,44 @@ export class GameController {
         this.events.on('CARD_DROPPED', (data: any) => {
             this.handleCardDrop(data.card, data.x, data.y);
         });
+    }
+
+    public handleMenuAction(action: { type: 'UNLOCK' | 'CLICK_SLOT', slotId: number }, tower: Tower) {
+        if (action.type === 'UNLOCK') {
+            const cost = CONFIG.ECONOMY.SLOT_UNLOCK_COST[action.slotId];
+            if (this.state.money >= cost) {
+                if (tower.unlockSlot(action.slotId)) {
+                    this.state.spendMoney(cost);
+                    this.showFloatingText('Slot Unlocked!', tower.x, tower.y, '#ffd700');
+                    SoundManager.play('upgrade_unlock');
+                }
+            } else {
+                this.showFloatingText('Not enough money!', tower.x, tower.y, '#ff4444');
+                SoundManager.play('error');
+            }
+        } else if (action.type === 'CLICK_SLOT') {
+            // First click selects the slot
+            if (tower.selectedSlotId !== action.slotId) {
+                tower.selectedSlotId = action.slotId;
+                // Optional: Sound for selection
+            } else {
+                // Second click on SAME slot -> Action (Remove Card)
+                // Only if there is a card
+                const slot = tower.slots.find(s => s.id === action.slotId);
+                if (slot && slot.card) {
+                    const card = tower.removeCardFromSlot(action.slotId);
+                    if (card) {
+                        this.cardSys.addCardWithEvolution(card.type.id, card.level, card.evolutionPath);
+                        this.showFloatingText('Card Removed', tower.x, tower.y, '#fff');
+                        tower.selectedSlotId = -1; // Reset selection after action
+                    }
+                } else {
+                    // Clicking empty selected slot again - maybe Deselect?
+                    tower.selectedSlotId = -1;
+                }
+            }
+        }
+        this.ui.update();
     }
 
     private lastErrorTime: number = 0;
@@ -117,7 +156,7 @@ export class GameController {
             card.type.id === 'ice' ||
             card.type.id === 'sniper' ||
             card.type.id === 'multi' ||
-            card.type.id === 'minigun'  // FIXED: Added minigun support
+            card.type.id === 'minigun'
         ) {
             const success = this.entityManager.addCardToTower(card, col, row, this.isBuildable);
 

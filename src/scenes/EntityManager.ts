@@ -99,8 +99,7 @@ export class EntityManager {
         }
 
         // Add card to tower
-        if (tower.cards.length < 3) {
-            tower.cards.push(card);
+        if (tower.addCard(card)) {
             this.metrics.trackCardUsed(card.type.id);
             return true;
         }

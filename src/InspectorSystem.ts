@@ -191,7 +191,7 @@ export class InspectorSystem {
         label.style.color = '#aaa';
         label.style.marginBottom = '5px';
         label.style.textAlign = 'center';
-        label.innerText = 'Карты (клик = продать):';
+        label.innerText = 'Слоты:';
         this.elCardsContainer.appendChild(label);
 
         const cardsRow = document.createElement('div');
@@ -201,13 +201,62 @@ export class InspectorSystem {
             justifyContent: 'center',
         });
 
-        for (let i = 0; i < 3; i++) {
+        // Create slots for all 3 positions
+        this.currentTower.slots.forEach((slot, index) => {
             const slotEl = document.createElement('div');
 
-            if (this.currentTower.cards[i]) {
-                const card = this.currentTower.cards[i];
+            if (slot.isLocked) {
+                // === LOCKED SLOT ===
+                const unlockCost = CONFIG.ECONOMY.SLOT_UNLOCK_COST[index];
+                const canAfford = this.scene.gameState.money >= unlockCost;
+
+                Object.assign(slotEl.style, {
+                    width: '50px',
+                    height: '70px',
+                    background: '#222',
+                    borderRadius: '4px',
+                    border: '1px solid #444',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    color: canAfford ? '#ffd700' : '#888',
+                    cursor: 'pointer',
+                    position: 'relative',
+                    transition: 'all 0.1s',
+                });
+
+                slotEl.innerHTML = `
+                    <div style="font-size: 20px;">🔒</div>
+                    <div style="font-size: 10px; margin-top: 5px;">${unlockCost}💰</div>
+                `;
+
+                // Unlock Click
+                slotEl.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    if (this.currentTower) {
+                        // Call GameController or do logic here? 
+                        // Better to call scene -> controller
+                        this.scene.gameController.handleMenuAction({ type: 'UNLOCK', slotId: slot.id }, this.currentTower);
+                        this.updateInfo(); // Refresh UI immediately
+                    }
+                });
+
+                // Hover
+                slotEl.onmouseenter = () => { slotEl.style.borderColor = canAfford ? '#ffd700' : '#f00'; };
+                slotEl.onmouseleave = () => { slotEl.style.borderColor = '#444'; };
+
+            } else if (slot.card) {
+                // === CARD ===
+                const card = slot.card;
                 const stars = '★'.repeat(card.level);
-                const sellPrice = CONFIG.ECONOMY.CARD_SELL_PRICES[card.level] || 5;
+                // Return to hand logic instead of sell? User asked for behavior similar to radial menu?
+                // Radial menu had: Click card -> Return to hand.
+                // Inspector sell button is global.
+                // Let's keep "Click to return to hand" for consistency with radial menu logic requested
+                // OR "Click to sell" as previous inspector?
+                // User said: "remove radial menu... logic of locking/unlocking moves to inspector".
+                // I will stick to "Return to Hand" on click, because "Sell" is a separate big button.
 
                 Object.assign(slotEl.style, {
                     width: '50px',
@@ -227,7 +276,7 @@ export class InspectorSystem {
                 slotEl.innerHTML = `
                     <div style="position: absolute; top: 2px; left: 2px; font-size: 8px; color: #fff;">${stars}</div>
                     <div style="font-size: 24px;">${card.type.icon}</div>
-                    <div style="font-size: 10px; color: #fff; margin-top: 2px;">${sellPrice}💰</div>
+                    <div style="font-size: 9px; color: #fff; margin-top: 2px;">Lvl ${card.level}</div>
                 `;
 
                 // Hover effect
@@ -240,18 +289,23 @@ export class InspectorSystem {
                     slotEl.style.boxShadow = 'none';
                 };
 
-                // Click to sell card
-                const cardIndex = i;
+                // Click to REMOVE (Return to hand)
                 slotEl.addEventListener('click', (e) => {
                     e.stopPropagation();
-                    e.preventDefault();
-                    console.log('Card sell clicked! Index:', cardIndex, 'Tower:', this.currentTower);
                     if (this.currentTower) {
-                        this.scene.sellCardFromTower(this.currentTower, cardIndex);
+                        // Using 'CLICK_SLOT' type to reuse controller logic (Select -> Remove) mechanism?
+                        // Inspector clicks are usually explicit. 
+                        // Let's use direct REMOVE or CLICK_SLOT.
+                        // Controller `handleMenuAction` handles CLICK_SLOT with 2-step verification.
+                        // Maybe for inspector single click is fine? 
+                        // Let's use CLICK_SLOT for consistency.
+                        this.scene.gameController.handleMenuAction({ type: 'CLICK_SLOT', slotId: slot.id }, this.currentTower);
+                        // Update UI handles the rest
                     }
                 });
+
             } else {
-                // Empty slot
+                // === EMPTY SLOT ===
                 Object.assign(slotEl.style, {
                     width: '50px',
                     height: '70px',
@@ -262,13 +316,17 @@ export class InspectorSystem {
                     alignItems: 'center',
                     justifyContent: 'center',
                     color: '#555',
+                    cursor: 'default',
                     fontSize: '18px',
                 });
-                slotEl.innerText = '?';
+                slotEl.innerText = '+';
+
+                // Maybe allow clicking to select this slot for something? 
+                // For now just visual.
             }
 
             cardsRow.appendChild(slotEl);
-        }
+        });
 
         this.elCardsContainer.appendChild(cardsRow);
 
