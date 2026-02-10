@@ -7,6 +7,7 @@ import { CONFIG } from '../Config';
 import { UIUtils } from '../UIUtils';
 import { Assets } from '../Assets';
 import { VISUALS } from '../VisualConfig';
+import { StressTestScene } from './StressTestScene';
 
 export class MenuScene extends BaseScene {
     private game: Game;
@@ -126,6 +127,13 @@ export class MenuScene extends BaseScene {
         UIUtils.createButton(this.container, '🛠 EDITOR', () => {
             this.game.toEditor();
         }, { width: '300px', fontSize: '24px', padding: '15px 40px' });
+
+        UIUtils.createButton(this.container, '🧪 STRESS TEST', () => {
+            // Dynamic import to avoid circular dependency if any, 
+            // but standard import is fine here as MenuScene -> StressTestScene is one way usually.
+            // However, to be safe let's use the import at top.
+            this.game.changeScene(new StressTestScene(this.game));
+        }, { width: '300px', fontSize: '24px', padding: '15px 40px', background: 'linear-gradient(135deg, #444, #222)' });
 
         document.body.appendChild(this.container);
     }

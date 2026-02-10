@@ -7,6 +7,7 @@ import { SoundManager } from './SoundManager';
 import { CardSelectionUI } from './CardSelectionUI';
 import { loadSessionData, saveSessionData } from './Utils';
 import { Enemy } from './Enemy';
+import { PerformanceMonitor } from './utils/PerformanceMonitor';
 
 export class Game {
     public canvas: HTMLCanvasElement;
@@ -137,6 +138,8 @@ export class Game {
     }
 
     private loop(timestamp: number) {
+        PerformanceMonitor.beginFrame();
+
         // 1. Вычисляем дельту (в секундах)
         const dt = (timestamp - this.lastTime) / 1000;
         this.lastTime = timestamp;
