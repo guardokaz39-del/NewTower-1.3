@@ -2,17 +2,24 @@ import { Tower } from '../Tower';
 import { Enemy } from '../Enemy';
 import { SpatialGrid } from '../SpatialGrid';
 import { FlowField } from '../FlowField';
+import { CONFIG } from '../Config';
 
 /**
  * Optimized Targeting System
  * - Zero Allocation (uses static buffer)
- * - O(1) Spatial Lookups
+ * - O(N) Single Pass Loop
  * - Supports Taunt (Threat Priority)
  * - Implements Modes: FIRST, LAST, CLOSEST, STRONGEST
+ * - Sub-tile precision for smoother tracking
  */
 export class TargetingSystem {
     // Shared buffer to avoid Garbage Collection
     private static buffer: Enemy[] = [];
+
+    // Constants for Hysteresis (Sticky Targeting)
+    // Prevents rapid switching when a new target is marginally better
+    private static readonly HYSTERESIS_FACTOR = 1.15; // 15% bias
+    private static readonly CELL_SIZE = CONFIG.TILE_SIZE;
 
     /**
      * Finds the best target for a tower based on its mode and range.
@@ -20,149 +27,87 @@ export class TargetingSystem {
     public static findTarget(tower: Tower, grid: SpatialGrid<Enemy>, flowField: FlowField): Enemy | null {
         const tx = tower.x;
         const ty = tower.y;
-        const range = tower.getRange(); // Assuming Tower has getRange or access to stats
+        const range = tower.getRange();
         const rangeSq = range * range;
 
-        // 1. Fill buffer with potential targets
-        // Note: queryInRadius is zero-alloc and clears the buffer internally
+        // 1. Zero-Alloc Query
         grid.queryInRadius(tx, ty, range, this.buffer);
 
-        if (this.buffer.length === 0) {
-            return null;
-        }
+        if (this.buffer.length === 0) return null;
 
-        // 2. Check for Taunt (High Threat Priority)
-        // Enemies with threatPriority > 0 (like Magma Statue) force attention
-        let highestPriority = 0;
+        const currentTarget = tower.target;
+        const mode = tower.targetingMode;
 
-        // First pass: Determine highest priority in range
-        // Also validate range (since grid query is approximate/padded)
+        // State for Single-Pass Selection
+        let bestTarget: Enemy | null = null;
+        let bestScore = -Infinity; // We normalize all scores to "higher is better"
+        let bestPriority = -1;
+
+        // 2. Single Pass Loop (O(N))
         for (let i = 0; i < this.buffer.length; i++) {
             const e = this.buffer[i];
+
+            // Basic Validity Checks
             if (!e.isAlive()) continue;
 
             const dx = e.x - tx;
             const dy = e.y - ty;
             const distSq = dx * dx + dy * dy;
 
-            if (distSq <= rangeSq) {
-                if (e.threatPriority > highestPriority) {
-                    highestPriority = e.threatPriority;
-                }
-            }
-        }
-
-        // 3. Select Best Target
-        let bestTarget: Enemy | null = null;
-        let bestScore = -Infinity; // For maximization (Strongest, Last)
-        let minScore = Infinity;   // For minimization (Closest, First)
-
-        const mode = tower.targetingMode;
-        const currentTarget = tower.target; // HYSTERESIS: Prefer current target
-
-        // Optimization: Single loop through buffer
-        for (let i = 0; i < this.buffer.length; i++) {
-            const e = this.buffer[i];
-
-            // Skip dead or undefined
-            if (!e || !e.isAlive()) continue;
-
-            // Strict Range Check
-            const dx = e.x - tx;
-            const dy = e.y - ty;
-            const distSq = dx * dx + dy * dy;
-
             if (distSq > rangeSq) continue;
 
-            // TAUNT LOGIC: If we found a high priority enemy, ignore lower priority ones
-            if (e.threatPriority < highestPriority) continue;
+            // --- PRIORITY LOGIC (Taunt) ---
+            // If this enemy has lower priority than the current best, skip it
+            if (e.threatPriority < bestPriority) continue;
 
-            // HYSTERESIS BIAS
-            // We want to stick to the current target unless a new one is significantly better.
+            // If we find an enemy with HIGHER priority, reset the best score
+            if (e.threatPriority > bestPriority) {
+                bestPriority = e.threatPriority;
+                bestScore = -Infinity; // Reset score because priority overrides it
+                bestTarget = null;
+            }
+
+            // --- SCORING LOGIC ---
+            // Normalize scores so that "Higher = Better"
+            let score = 0;
             const isCurrent = (e === currentTarget);
 
-            // Mode Logic
             switch (mode) {
                 case 'closest':
-                    {
-                        // Score is distance squared (Minimize)
-                        // Bias: Current target appears 20% closer
-                        let score = distSq;
-                        if (isCurrent) score *= 0.8;
-
-                        if (score < minScore) {
-                            minScore = score;
-                            bestTarget = e;
-                        }
-                    }
+                    // Lower distance is better -> Invert: -distSq
+                    score = -distSq;
                     break;
 
                 case 'strongest':
-                    {
-                        // Score is Current Health (Maximize)
-                        // Bias: Current target appears 20% stronger
-                        let score = e.currentHealth;
-                        if (isCurrent) score *= 1.2;
-
-                        if (score > bestScore) {
-                            bestScore = score;
-                            bestTarget = e;
-                        }
-                    }
+                    // Higher health is better
+                    score = e.currentHealth;
                     break;
 
                 case 'first':
-                    {
-                        // Score is Flow Dist (Minimize). 0 = Base.
-                        let dist = this.getFlowDistance(e, flowField);
-
-                        // Treat Infinity as "Very Far" (but valid for targeting if nothing else?)
-                        // No, Infinity means "unreachable" or "wall".
-                        // Use a large number instead of Infinity to compare.
-                        if (dist === Infinity) dist = 999999;
-
-                        // Bias: Current target appears 5 units closer to base (better)
-                        if (isCurrent) dist -= 5;
-
-                        if (dist < minScore) {
-                            minScore = dist;
-                            bestTarget = e;
-                        }
-                    }
+                    // Lower distance to base is better -> Invert: -dist
+                    // Uses sub-tile precision for smoothness
+                    score = -this.getPreciseFlowDistance(e, flowField);
                     break;
 
                 case 'last':
-                    {
-                        // Score is Flow Dist (Maximize). 
-                        let dist = this.getFlowDistance(e, flowField);
-
-                        // Infinity (unreachable) should probably be ignored or treated as far?
-                        // If we can't reach base, we are "furthest"? 
-                        // Let's treat valid path as priority.
-                        if (dist === Infinity) dist = -1;
-
-                        // Bias: Current target appears 5 units further (better)
-                        if (isCurrent) dist += 5;
-
-                        if (dist > bestScore) {
-                            bestScore = dist;
-                            bestTarget = e;
-                        }
-                    }
+                    // Higher distance to base is better
+                    score = this.getPreciseFlowDistance(e, flowField);
                     break;
+            }
 
-                // Fallback / Default
-                default:
-                    {
-                        let dist = this.getFlowDistance(e, flowField);
-                        if (dist === Infinity) dist = 999999;
-                        if (isCurrent) dist -= 5;
-                        if (dist < minScore) {
-                            minScore = dist;
-                            bestTarget = e;
-                        }
-                    }
-                    break;
+            // --- HYSTERESIS BIAS ---
+            // Apply bias to the current target to prevent "flickering"
+            if (isCurrent && bestTarget !== null) {
+                // If score is negative (distance based), division reduces magnitude (makes it "larger" / closer to 0)
+                // If score is positive (health based), multiplication increases magnitude
+                if (score < 0) score /= this.HYSTERESIS_FACTOR;
+                else score *= this.HYSTERESIS_FACTOR;
+            }
+
+            // Update Champion
+            if (score > bestScore) {
+                bestScore = score;
+                bestTarget = e;
             }
         }
 
@@ -170,19 +115,47 @@ export class TargetingSystem {
     }
 
     /**
-     * Safe FlowField lookup
+     * Calculates precise distance to base using FlowField + Sub-tile position
+     * Fixes the "stuttering" issue in First/Last modes.
      */
-    private static getFlowDistance(e: Enemy, flowField: FlowField): number {
-        // Optimization: Access flowField array directly if possible, or use helper
-        // Assuming flowField has a way to get distance for float coordinates
-        const col = Math.floor(e.x / 32); // Assuming 32 is flowfield cell size, or use flowField.cellSize
-        const row = Math.floor(e.y / 32);
+    private static getPreciseFlowDistance(e: Enemy, flowField: FlowField): number {
+        const cellSize = this.CELL_SIZE;
+        const col = (e.x / cellSize) | 0; // Bitwise floor is faster
+        const row = (e.y / cellSize) | 0;
 
-        // Boundary checks
-        if (row >= 0 && row < flowField.distances.length &&
-            col >= 0 && col < flowField.distances[0].length) {
-            return flowField.distances[row][col];
+        // 1. Grid Distance (Integer)
+        let gridDist = 99999;
+
+        // Safety Check & Grid Lookup
+        if (row >= 0 && row < flowField.distances.length && col >= 0 && col < flowField.distances[0].length) {
+            gridDist = flowField.distances[row][col];
         }
-        return Infinity; // Unknown position
+
+        // 2. Sub-tile Precision (Float)
+        // We use the dot product of the enemy's position within the cell 
+        // against the flow vector to determine how "far" along the flow they are.
+
+        if (gridDist !== 99999 && gridDist !== Infinity) {
+            const vect = flowField.vectors[row][col];
+            if (vect && (vect.x !== 0 || vect.y !== 0)) {
+                const cellCenterX = col * cellSize + cellSize / 2;
+                const cellCenterY = row * cellSize + cellSize / 2;
+
+                // Vector from center of cell to enemy
+                const dx = e.x - cellCenterX;
+                const dy = e.y - cellCenterY;
+
+                // Project position onto flow vector.
+                // Positive value means enemy is "ahead" of center (closer to target).
+                // Negative value means enemy is "behind" center (further from target).
+                const progress = (dx * vect.x + dy * vect.y);
+
+                // Refined Distance:
+                // Base Distance (pixels) - Progress (pixels)
+                return (gridDist * cellSize) - progress;
+            }
+        }
+
+        return (gridDist * cellSize);
     }
 }

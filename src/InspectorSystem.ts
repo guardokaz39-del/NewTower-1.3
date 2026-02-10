@@ -293,13 +293,8 @@ export class InspectorSystem {
                 slotEl.addEventListener('click', (e) => {
                     e.stopPropagation();
                     if (this.currentTower) {
-                        // Using 'CLICK_SLOT' type to reuse controller logic (Select -> Remove) mechanism?
-                        // Inspector clicks are usually explicit. 
-                        // Let's use direct REMOVE or CLICK_SLOT.
-                        // Controller `handleMenuAction` handles CLICK_SLOT with 2-step verification.
-                        // Maybe for inspector single click is fine? 
-                        // Let's use CLICK_SLOT for consistency.
-                        this.scene.gameController.handleMenuAction({ type: 'CLICK_SLOT', slotId: slot.id }, this.currentTower);
+                        // Use IMMEDIATE removal for Inspector clicks
+                        this.scene.gameController.handleMenuAction({ type: 'REMOVE_CARD', slotId: slot.id }, this.currentTower);
                         // Update UI handles the rest
                     }
                 });

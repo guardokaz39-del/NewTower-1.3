@@ -3,7 +3,7 @@ import { RendererFactory } from './RendererFactory';
 import { ICard } from './CardSystem';
 import { Enemy } from './Enemy';
 import { Projectile, IProjectileStats } from './Projectile';
-import { ObjectPool } from './Utils';
+import { ObjectPool, lerpAngle } from './Utils';
 import { EffectSystem } from './EffectSystem';
 import { Assets } from './Assets';
 import { VISUALS } from './VisualConfig';
@@ -46,6 +46,8 @@ export class Tower {
     }
     public cooldown: number = 0;
     public angle: number = 0;
+    public turnSpeed: number = 10.0; // Default turn speed (radians/sec)
+    public firingArc: number = 0.5; // Firing arc in radians (0.5 ~= 28 degrees)
     public targetingMode: string = 'first'; // Targeting priority: first, closest, strongest, weakest, last
 
     // Targeting State (Optimized)
@@ -237,9 +239,43 @@ export class Tower {
         const emptySlot = this.slots.find(s => !s.isLocked && s.card === null);
         if (emptySlot) {
             emptySlot.card = c;
+            this.updateTowerStats(); // Recalculate turn speed etc
             return true;
         }
         return false;
+    }
+
+    private updateTowerStats() {
+        // Determine Turn Speed based on Main Card (Slot 0)
+        // Default: 10.0
+        this.turnSpeed = 10.0;
+        this.firingArc = 0.5;
+
+        const mainCard = this.slots[0]?.card;
+        if (mainCard) {
+            switch (mainCard.type.id) {
+                case 'sniper':
+                    this.turnSpeed = 5.0; // Slow, heavy
+                    this.firingArc = 0.15; // Requires precise aim
+                    break;
+                case 'minigun':
+                    this.turnSpeed = 15.0; // Fast, light
+                    this.firingArc = 0.6; // Spray and pray
+                    break;
+                case 'ice':
+                    this.turnSpeed = 8.0;
+                    this.firingArc = 0.4;
+                    break;
+                case 'fire':
+                    this.turnSpeed = 6.0;
+                    this.firingArc = 0.4;
+                    break;
+                default:
+                    this.turnSpeed = 10.0;
+                    this.firingArc = 0.5;
+                    break;
+            }
+        }
     }
 
     removeCard(index: number): ICard | null {
@@ -257,6 +293,7 @@ export class Tower {
         if (index >= 0 && index < activeSlots.length) {
             const card = activeSlots[index].card;
             activeSlots[index].card = null;
+            this.updateTowerStats();
             return card;
         }
         return null;
@@ -267,6 +304,7 @@ export class Tower {
         if (slot && slot.card) {
             const c = slot.card;
             slot.card = null;
+            this.updateTowerStats();
             return c;
         }
         return null;
@@ -331,78 +369,73 @@ export class Tower {
     public update(dt: number, grid: SpatialGrid<Enemy>, flowField: FlowField) {
         // 1. Update Cooldowns
         if (this.cooldown > 0) this.cooldown -= dt;
-        if (this.searchTimer > 0) this.searchTimer -= dt;
 
-        // 2. Validate Current Target
-        if (this.target) {
-            // Check if dead or out of range
-            if (!this.target.isAlive()) {
-                this.target = null;
-            } else {
+        // --- TARGETING (Low Frequency) ---
+        // Only verify target once in a while to save CPU
+        this.searchTimer -= dt;
+
+        // Check conditions to re-target:
+        // 1. Timer expired
+        // 2. Current target is dead/invalid (immediate re-target attempt allowed)
+        // 3. We are idle and have no target (immediate search)
+
+        let needsSearch = this.searchTimer <= 0;
+
+        // Instant check if target became invalid
+        if (this.target && !this.target.isAlive()) {
+            this.target = null;
+            needsSearch = true; // Search immediately
+        }
+
+        if (needsSearch) {
+            // Validate existing target range if we have one
+            if (this.target) {
                 const dx = this.target.x - this.x;
                 const dy = this.target.y - this.y;
                 const distSq = dx * dx + dy * dy;
 
-                // Recalculate range if needed (or assume cached is valid)
+                // Recalc range only if needed
                 if (this.rangeSquared === 0) {
                     const range = this.getRange();
                     this.rangeSquared = range * range;
                 }
 
                 if (distSq > this.rangeSquared) {
-                    this.target = null;
+                    this.target = null; // Out of range, drop it
                 }
             }
-        }
 
-        // 3. Lazy Target Search & Priority Override
-        // FIX: Always check periodically (throttled) to switch to higher priority targets (Taunt)
-        // or better targets (e.g. Closer) if the situation changes.
-        // 3. Lazy Target Search & Priority Override
-        // FIX: Always check periodically (throttled) to switch to higher priority targets (Taunt)
-        // or better targets (e.g. Closer) if the situation changes.
-        // CRITICAL FIX: If we are ready to fire (cooldown <= 0) and have a target, DO NOT SWITCH.
-        // We must shoot first. Switching targets while aiming/ready causes 'jitter' and no shots.
-        const canSwitch = !this.target || this.cooldown > 0;
+            // If we need a new target (either dropped, or just periodic check for better one)
+            // We only check for BETTER target if we are ready to fire (cooldown <= 0) 
+            // OR if we have no target.
+            // Switching targets while aiming (cooldown > 0) is bad for "charged" towers, 
+            // but generally we want to stick to target until it dies or leaves range.
 
-        if (this.searchTimer <= 0 && canSwitch) {
-            // Ensure range is cached
-            if (this.rangeSquared === 0) {
-                const range = this.getRange();
-                this.rangeSquared = range * range;
-            }
+            // The user logic suggests we should search periodically.
+            // TargetingSystem now handles "Hysteresis" internally (stickiness).
+            // So we can safely call findTarget() and it will prefer current target.
 
             const newTarget = TargetingSystem.findTarget(this, grid, flowField);
 
-            // Only switch if we found a valid target. 
-            // If newTarget is null (everyone dead/gone) and we had a target...
-            // Actually, if findTarget returns null, it means NO ONE is in range/alive.
-            // So we should update this.target to null.
-            this.target = newTarget;
+            // Only update if changed (TargetingSystem handles the bias)
+            if (newTarget !== this.target) {
+                this.target = newTarget;
+            }
 
-            // Reset timer (Throttle: check 4-6 times per second)
+            // Reset Timer: 5-6 times per second (approx 0.15s - 0.25s)
             this.searchTimer = 0.15 + Math.random() * 0.1;
-
-            // NEW: If we just found a target and we are ready to fire, 
-            // maybe we should slightly delay search to ensure we stick?
-            // Already handled by searchTimer reset.
         }
 
-        // 4. Smooth Rotation (Visual)
-        if (this.target) {
-            const targetAngle = Math.atan2(this.target.y - this.y, this.target.x - this.x);
-            // Simple Lerp for rotation
-            const diff = targetAngle - this.angle;
-            // Normalize angle to -PI..PI
-            const normalizedDiff = Math.atan2(Math.sin(diff), Math.cos(diff));
+        // --- TRACKING (High Frequency: Every Frame) ---
+        // Always look at the target's CURRENT position
+        if (this.target && this.target.isAlive()) {
+            const dx = this.target.x - this.x;
+            const dy = this.target.y - this.y;
+            const targetAngle = Math.atan2(dy, dx);
 
-            // Rotate speed: 10 radians/sec
-            const rotSpeed = 10 * dt;
-            if (Math.abs(normalizedDiff) < rotSpeed) {
-                this.angle = targetAngle;
-            } else {
-                this.angle += Math.sign(normalizedDiff) * rotSpeed;
-            }
+            // Smooth Interpolation
+            // dt * turnSpeed (e.g. 0.016 * 10 = 0.16 interpolation factor)
+            this.angle = lerpAngle(this.angle, targetAngle, dt * this.turnSpeed);
         }
     }
 

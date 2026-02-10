@@ -97,7 +97,7 @@ export class WeaponSystem {
             // 3. Fire only if aimed close enough
             const angleDiff = Math.abs(this.getShortestAngleDifference(tower.angle, desiredAngle));
 
-            if (tower.cooldown <= 0 && angleDiff < CONFIG.TOWER.AIM_TOLERANCE) {
+            if (tower.cooldown <= 0 && angleDiff < tower.firingArc) {
                 this.fire(tower, target, stats, projectileSystem, effects);
                 tower.cooldown = stats.cd;
             }

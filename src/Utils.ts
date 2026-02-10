@@ -8,6 +8,23 @@ export function generateUUID(): string {
     return `id_${++_idCounter}_${Date.now().toString(36)}`;
 }
 
+/**
+ * Linearly interpolates between two angles, handling the cyclic nature of rotation.
+ * @param start Current angle (radians)
+ * @param end Target angle (radians)
+ * @param t Interpolation factor (0.0 to 1.0, usually dt * speed)
+ */
+export function lerpAngle(start: number, end: number, t: number): number {
+    let diff = end - start;
+
+    // Normalization: Force difference to be between -PI and +PI
+    while (diff < -Math.PI) diff += Math.PI * 2;
+    while (diff > Math.PI) diff -= Math.PI * 2;
+
+    // Apply interpolation
+    return start + diff * t;
+}
+
 export class ObjectPool<T> {
     private createFn: () => T;
     private pool: T[] = [];

@@ -37,7 +37,7 @@ export class GameController {
         });
     }
 
-    public handleMenuAction(action: { type: 'UNLOCK' | 'CLICK_SLOT', slotId: number }, tower: Tower) {
+    public handleMenuAction(action: { type: 'UNLOCK' | 'CLICK_SLOT' | 'REMOVE_CARD', slotId: number }, tower: Tower) {
         if (action.type === 'UNLOCK') {
             const cost = CONFIG.ECONOMY.SLOT_UNLOCK_COST[action.slotId];
             if (this.state.money >= cost) {
@@ -49,6 +49,26 @@ export class GameController {
             } else {
                 this.showFloatingText('Not enough money!', tower.x, tower.y, '#ff4444');
                 SoundManager.play('error');
+            }
+        } else if (action.type === 'REMOVE_CARD') {
+            // Immediate removal (used by Inspector) -> SELLS the card
+            const slot = tower.slots.find(s => s.id === action.slotId);
+            if (slot && slot.card) {
+                const card = tower.removeCardFromSlot(action.slotId);
+                if (card) {
+                    // SELL LOGIC
+                    const prices = CONFIG.ECONOMY.CARD_SELL_PRICES;
+                    const refund = prices[card.level] || 5;
+                    this.state.addMoney(refund);
+
+                    this.showFloatingText(`+${refund}💰`, tower.x, tower.y, 'gold');
+                    SoundManager.play('ui_click');
+
+                    tower.selectedSlotId = -1;
+
+                    // CRITICAL: Refresh Inspector to show empty slot immediately
+                    this.inspector.selectTower(tower);
+                }
             }
         } else if (action.type === 'CLICK_SLOT') {
             // First click selects the slot

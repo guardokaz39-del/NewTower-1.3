@@ -5,7 +5,7 @@ export const TOWER_CONFIG = {
     BUILD_TIME: 1.0, // 60 / 60 = 1.0 second
     MAX_CARDS: 3,
     BARREL_LENGTH: 22,
-    TURN_SPEED: 9.0, // 0.15 * 60 = 9.0 radians per second
+    TURN_SPEED: 18.0, // Increased for smoother tracking
     AIM_TOLERANCE: 0.1,
 };
 
