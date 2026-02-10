@@ -350,13 +350,28 @@ export class GameScene extends BaseScene implements IGameScene {
             this.fog.update(dt);
             // Lighting doesn't need explicit update logic for now, just render
 
-            PerformanceMonitor.startTimer('Projectiles');
-            // Update projectiles
-            this.projectileSystem.update(dt, this.effects);
-            PerformanceMonitor.endTimer('Projectiles');
+            // 1. Update Entities (Move enemies first)
+            PerformanceMonitor.startTimer('Entities');
+            this.entityManager.updateEnemies(dt, this.map.flowField);
+            this.acidSystem.update(dt, this.gameState.enemies);
+            this.commanderSystem.update(dt, this.gameState.enemies);
+            PerformanceMonitor.endTimer('Entities');
+
+            // 2. Prepare Spatial Grid (for Targeting and Collision)
+            this.collision.prepareGrid(this.gameState.enemies);
+
+            // 3. Update Towers (Targeting & Visuals)
+            for (let i = 0; i < this.gameState.towers.length; i++) {
+                const t = this.gameState.towers[i];
+                // Targeting logic
+                t.update(dt, this.collision.enemyGrid, this.map.flowField);
+                // Visual logic
+                t.updateBuilding(this.effects, dt);
+                RendererFactory.updateTower(dt, t);
+            }
 
             PerformanceMonitor.startTimer('Entities');
-            // Update weapon system (tower shooting)
+            // 4. Update weapon system (tower shooting)
             this.weaponSystem.update(
                 this.gameState.towers,
                 this.gameState.enemies,
@@ -364,24 +379,17 @@ export class GameScene extends BaseScene implements IGameScene {
                 dt,
                 this.effects
             );
-
-            // Update tower visual states
-            for (let i = 0; i < this.gameState.towers.length; i++) {
-                const t = this.gameState.towers[i];
-                t.updateBuilding(this.effects, dt);
-                RendererFactory.updateTower(dt, t);
-            }
             PerformanceMonitor.endTimer('Entities');
+
+            PerformanceMonitor.startTimer('Projectiles');
+            // 5. Update projectiles
+            this.projectileSystem.update(dt, this.effects);
+            PerformanceMonitor.endTimer('Projectiles');
 
             PerformanceMonitor.startTimer('Collision');
+            // 6. Check collisions
             this.collision.update(this.projectileSystem.projectiles, this.gameState.enemies);
             PerformanceMonitor.endTimer('Collision');
-
-            PerformanceMonitor.startTimer('Entities');
-            this.entityManager.updateEnemies(dt, this.map.flowField);
-            this.acidSystem.update(dt, this.gameState.enemies);
-            this.commanderSystem.update(dt, this.gameState.enemies);
-            PerformanceMonitor.endTimer('Entities');
 
             this.effects.update(dt);
 

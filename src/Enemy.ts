@@ -46,12 +46,14 @@ export class Enemy {
     public killedByProjectile: Projectile | null = null;   // Track what projectile killed this enemy
     public hitFlashTimer: number = 0;        // Timer for white flash on hit
 
+    // Targeting Support
+    public threatPriority: number = 0;       // 0 = Normal, >0 = High Priority (Taunt)
+
     // === BOSS MECHANICS (Spectral Shift) ===
     public isInvulnerable: boolean = false;
     private shieldTimer: number = 0;
 
     // Magma King Mechanics
-    public threatPriority: number = 0; // Higher = focused by towers first
     public spawnThresholds: number[] = []; // HP percentages to trigger spawn (0.75, 0.5, 0.25)
 
     // Thresholds: [HP Percent, Duration in Seconds]

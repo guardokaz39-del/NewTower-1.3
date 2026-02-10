@@ -32,9 +32,8 @@ export class WeaponSystem {
             return; // Can't shoot while overheated
         }
 
-        if (tower.cooldown > 0) {
-            tower.cooldown -= dt;
-        }
+        // Cooldown is handled in Tower.update()
+
 
         // Decrement recoil (seconds)
         if (tower.recoilTimer > 0) {
@@ -50,8 +49,8 @@ export class WeaponSystem {
 
         const stats = tower.getStats();
 
-        // 1. Find Target
-        const target = this.findTarget(tower, enemies, stats.range);
+        // 1. Use Cached Target (from Tower.update)
+        const target = tower.target;
 
         if (target) {
             // === SPINUP MECHANIC ===
@@ -90,13 +89,10 @@ export class WeaponSystem {
                 }
             }
 
-            // 2. Rotate Tower Smoothly
+            // 2. Aim Check (Rotation is handled in Tower.update)
             const dx = target.x - tower.x;
             const dy = target.y - tower.y;
             const desiredAngle = Math.atan2(dy, dx);
-
-            // Apply semi-smooth rotation
-            tower.angle = this.rotateTowards(tower.angle, desiredAngle, CONFIG.TOWER.TURN_SPEED * dt);
 
             // 3. Fire only if aimed close enough
             const angleDiff = Math.abs(this.getShortestAngleDifference(tower.angle, desiredAngle));
@@ -121,88 +117,6 @@ export class WeaponSystem {
                 // We don't need to force clear it here, let it run its course.
             }
         }
-    }
-
-    private findTarget(tower: Tower, enemies: Enemy[], range: number): Enemy | null {
-        // Build in-range list without allocation (reuse static array)
-        const inRange: Enemy[] = [];
-        for (let i = 0; i < enemies.length; i++) {
-            const e = enemies[i];
-            if (!e.isAlive()) continue;
-            const dx = e.x - tower.x;
-            const dy = e.y - tower.y;
-            if (dx * dx + dy * dy <= range * range) {
-                inRange.push(e);
-            }
-        }
-
-        if (inRange.length === 0) return null;
-
-        // PRIORITY CHECK: Filter for highest priority enemies (like Magma Statues)
-        // If there are enemies with priority > 0, we IGNORE all others and only target them.
-        let maxPriority = 0;
-        for (let i = 0; i < inRange.length; i++) {
-            if (inRange[i].threatPriority > maxPriority) maxPriority = inRange[i].threatPriority;
-        }
-
-        // If high priority enemies exist, reduce the pool to ONLY them
-        // This ensures the tower is "taunted" by the decoy
-        let targetPool: Enemy[];
-        if (maxPriority > 0) {
-            targetPool = [];
-            for (let i = 0; i < inRange.length; i++) {
-                if (inRange[i].threatPriority === maxPriority) {
-                    targetPool.push(inRange[i]);
-                }
-            }
-        } else {
-            targetPool = inRange;
-        }
-
-        // Apply targeting strategy based on tower's mode
-        switch (tower.targetingMode) {
-            case 'first':
-                // Enemy closest to end of path (highest pathIndex)
-                return targetPool.reduce((a, b) => a.pathIndex > b.pathIndex ? a : b);
-
-            case 'closest':
-                // Enemy nearest to tower (using squared distance - faster than hypot)
-                return targetPool.reduce((a, b) => {
-                    const dxA = a.x - tower.x;
-                    const dyA = a.y - tower.y;
-                    const dxB = b.x - tower.x;
-                    const dyB = b.y - tower.y;
-                    const distSqA = dxA * dxA + dyA * dyA;
-                    const distSqB = dxB * dxB + dyB * dyB;
-                    return distSqA < distSqB ? a : b;
-                });
-
-            case 'strongest':
-                // Enemy with highest max health
-                return targetPool.reduce((a, b) => a.maxHealth > b.maxHealth ? a : b);
-
-            case 'weakest':
-                // Enemy with lowest current health
-                return targetPool.reduce((a, b) => a.currentHealth < b.currentHealth ? a : b);
-
-            case 'last':
-                // Enemy furthest from end (lowest pathIndex)
-                return targetPool.reduce((a, b) => a.pathIndex < b.pathIndex ? a : b);
-
-            default:
-                // Default to first available
-                return targetPool[0];
-        }
-    }
-
-    private rotateTowards(current: number, target: number, maxStep: number): number {
-        const diff = this.getShortestAngleDifference(current, target);
-
-        if (Math.abs(diff) <= maxStep) {
-            return target;
-        }
-
-        return current + Math.sign(diff) * maxStep;
     }
 
     /**

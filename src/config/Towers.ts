@@ -13,6 +13,5 @@ export const TARGETING_MODES = {
     FIRST: { id: 'first', name: 'Первый', icon: '🏃', desc: 'Ближе к цели' },
     CLOSEST: { id: 'closest', name: 'Ближайший', icon: '📍', desc: 'Рядом с башней' },
     STRONGEST: { id: 'strongest', name: 'Сильный', icon: '💪', desc: 'Макс. здоровье' },
-    WEAKEST: { id: 'weakest', name: 'Слабый', icon: '💔', desc: 'Мин. здоровье' },
     LAST: { id: 'last', name: 'Последний', icon: '🐢', desc: 'Дальше от цели' },
 };

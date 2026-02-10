@@ -16,8 +16,9 @@ export class CollisionSystem {
     }
 
 
-    public update(projectiles: Projectile[], enemies: Enemy[]) {
-        // Rebuild spatial grid each frame
+    private static aoeBuffer: Enemy[] = [];
+
+    public prepareGrid(enemies: Enemy[]) {
         this.enemyGrid.clear();
         for (let i = 0; i < enemies.length; i++) {
             const enemy = enemies[i];
@@ -25,6 +26,12 @@ export class CollisionSystem {
                 this.enemyGrid.register(enemy);
             }
         }
+    }
+
+    public update(projectiles: Projectile[], enemies: Enemy[]) {
+        // PERF: Grid is now prepared externally by GameScene
+        // This allows sharing the grid with TargetingSystem
+
 
         // Check projectile collisions using spatial grid
         for (let p = 0; p < projectiles.length; p++) {
@@ -39,15 +46,15 @@ export class CollisionSystem {
 
             // Get only nearby enemies instead of checking all enemies
             const searchRadius = 100; // Reasonable search radius for collision
-            const nearbyEnemies = this.enemyGrid.getNearby(proj.x, proj.y, searchRadius);
+            const count = this.enemyGrid.queryInRadius(proj.x, proj.y, searchRadius, CollisionSystem.aoeBuffer);
 
             // PERF: Allow tracking count
             if (PerformanceMonitor.isEnabled()) {
-                PerformanceMonitor.addCount('CollisionChecks', nearbyEnemies.length);
+                PerformanceMonitor.addCount('CollisionChecks', count);
             }
 
-            for (let e = 0; e < nearbyEnemies.length; e++) {
-                const enemy = nearbyEnemies[e];
+            for (let e = 0; e < count; e++) {
+                const enemy = CollisionSystem.aoeBuffer[e];
                 if (!enemy.isAlive()) continue;
                 if (proj.hitList.includes(enemy.id)) continue;
 
@@ -167,11 +174,11 @@ export class CollisionSystem {
             // 2. PHYSICS (Decoupled: Instant Area Damage via Grid)
             // PERF: Use SpatialGrid instead of iterating all enemies
             const radius = splash.splashRadius || splash.radius || 40;
-            const nearby = this.enemyGrid.getNearby(target.x, target.y, radius);
+            const count = this.enemyGrid.queryInRadius(target.x, target.y, radius, CollisionSystem.aoeBuffer);
             const radiusSq = radius * radius;
 
-            for (let i = 0; i < nearby.length; i++) {
-                const neighbor = nearby[i];
+            for (let i = 0; i < count; i++) {
+                const neighbor = CollisionSystem.aoeBuffer[i];
                 if (neighbor === target || !neighbor.isAlive()) continue;
 
                 const dx = neighbor.x - target.x;
@@ -219,11 +226,11 @@ export class CollisionSystem {
             // 2. PHYSICS (Decoupled: Instant Area Damage via Grid)
             // PERF: Use SpatialGrid
             const radius = killingProjectile.explosionRadius || 60;
-            const nearby = this.enemyGrid.getNearby(deathX, deathY, radius);
+            const count = this.enemyGrid.queryInRadius(deathX, deathY, radius, CollisionSystem.aoeBuffer);
             const radiusSq = radius * radius;
 
-            for (let i = 0; i < nearby.length; i++) {
-                const neighbor = nearby[i];
+            for (let i = 0; i < count; i++) {
+                const neighbor = CollisionSystem.aoeBuffer[i];
                 if (!neighbor.isAlive()) continue;
 
                 const dx = neighbor.x - deathX;
@@ -251,7 +258,7 @@ export class CollisionSystem {
                 });
 
                 // Apply slow to nearby enemies - PERF: Using SpatialGrid
-                const nearby = this.enemyGrid.getNearby(deathX, deathY, chainRadius);
+                const count = this.enemyGrid.queryInRadius(deathX, deathY, chainRadius, CollisionSystem.aoeBuffer);
                 const radiusSq = chainRadius * chainRadius;
 
                 // Find original slow effect properties
@@ -262,8 +269,8 @@ export class CollisionSystem {
                     const duration = slowEffect.slowDuration || slowEffect.dur || 1.0;
                     const power = slowEffect.slowPower || slowEffect.power || 0.4;
 
-                    for (let i = 0; i < nearby.length; i++) {
-                        const neighbor = nearby[i];
+                    for (let i = 0; i < count; i++) {
+                        const neighbor = CollisionSystem.aoeBuffer[i];
                         if (!neighbor.isAlive()) continue;
 
                         const dx = neighbor.x - deathX;

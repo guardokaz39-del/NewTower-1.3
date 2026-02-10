@@ -10,6 +10,9 @@ import { VISUALS } from './VisualConfig';
 import { getCardUpgrade, getMultishotConfig, ICardEffect } from './cards';
 import { mergeCardsWithStacking } from './CardStackingSystem';
 import { TowerRenderer } from './renderers/TowerRenderer';
+import { TargetingSystem } from './systems/TargetingSystem';
+import { SpatialGrid } from './SpatialGrid';
+import { FlowField } from './FlowField';
 
 export interface SlotState {
     id: number;
@@ -44,6 +47,11 @@ export class Tower {
     public cooldown: number = 0;
     public angle: number = 0;
     public targetingMode: string = 'first'; // Targeting priority: first, closest, strongest, weakest, last
+
+    // Targeting State (Optimized)
+    public target: Enemy | null = null;
+    public searchTimer: number = Math.random() * 0.2; // Random offset to spread CPU load
+    public rangeSquared: number = 0;
 
     public isBuilding: boolean = false;
     public buildProgress: number = 0;
@@ -314,6 +322,95 @@ export class Tower {
                 effects.add({ type: 'explosion', x: this.x, y: this.y, radius: 25, life: 0.25, color: '#ffd700' });
             }
         }
+    }
+
+    /**
+     * Optimized Tower Update
+     * Handles Lazy Targeting and State Updates
+     */
+    public update(dt: number, grid: SpatialGrid<Enemy>, flowField: FlowField) {
+        // 1. Update Cooldowns
+        if (this.cooldown > 0) this.cooldown -= dt;
+        if (this.searchTimer > 0) this.searchTimer -= dt;
+
+        // 2. Validate Current Target
+        if (this.target) {
+            // Check if dead or out of range
+            if (!this.target.isAlive()) {
+                this.target = null;
+            } else {
+                const dx = this.target.x - this.x;
+                const dy = this.target.y - this.y;
+                const distSq = dx * dx + dy * dy;
+
+                // Recalculate range if needed (or assume cached is valid)
+                if (this.rangeSquared === 0) {
+                    const range = this.getRange();
+                    this.rangeSquared = range * range;
+                }
+
+                if (distSq > this.rangeSquared) {
+                    this.target = null;
+                }
+            }
+        }
+
+        // 3. Lazy Target Search & Priority Override
+        // FIX: Always check periodically (throttled) to switch to higher priority targets (Taunt)
+        // or better targets (e.g. Closer) if the situation changes.
+        // 3. Lazy Target Search & Priority Override
+        // FIX: Always check periodically (throttled) to switch to higher priority targets (Taunt)
+        // or better targets (e.g. Closer) if the situation changes.
+        // CRITICAL FIX: If we are ready to fire (cooldown <= 0) and have a target, DO NOT SWITCH.
+        // We must shoot first. Switching targets while aiming/ready causes 'jitter' and no shots.
+        const canSwitch = !this.target || this.cooldown > 0;
+
+        if (this.searchTimer <= 0 && canSwitch) {
+            // Ensure range is cached
+            if (this.rangeSquared === 0) {
+                const range = this.getRange();
+                this.rangeSquared = range * range;
+            }
+
+            const newTarget = TargetingSystem.findTarget(this, grid, flowField);
+
+            // Only switch if we found a valid target. 
+            // If newTarget is null (everyone dead/gone) and we had a target...
+            // Actually, if findTarget returns null, it means NO ONE is in range/alive.
+            // So we should update this.target to null.
+            this.target = newTarget;
+
+            // Reset timer (Throttle: check 4-6 times per second)
+            this.searchTimer = 0.15 + Math.random() * 0.1;
+
+            // NEW: If we just found a target and we are ready to fire, 
+            // maybe we should slightly delay search to ensure we stick?
+            // Already handled by searchTimer reset.
+        }
+
+        // 4. Smooth Rotation (Visual)
+        if (this.target) {
+            const targetAngle = Math.atan2(this.target.y - this.y, this.target.x - this.x);
+            // Simple Lerp for rotation
+            const diff = targetAngle - this.angle;
+            // Normalize angle to -PI..PI
+            const normalizedDiff = Math.atan2(Math.sin(diff), Math.cos(diff));
+
+            // Rotate speed: 10 radians/sec
+            const rotSpeed = 10 * dt;
+            if (Math.abs(normalizedDiff) < rotSpeed) {
+                this.angle = targetAngle;
+            } else {
+                this.angle += Math.sign(normalizedDiff) * rotSpeed;
+            }
+        }
+    }
+
+    public getRange(): number {
+        // Fast path: use cached stats if available? 
+        // For now, re-calculate stats is expense but acceptable if not every frame.
+        // Optimization: In real implementation, cache 'stats' object when cards change.
+        return this.getStats().range;
     }
 
     draw(ctx: CanvasRenderingContext2D) {

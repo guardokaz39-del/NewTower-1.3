@@ -128,6 +128,42 @@ export class SpatialGrid<T extends IGridEntity> {
     }
 
     /**
+     * Get all entities within radius of the given position
+     * Fills the provided buffer to avoid allocation.
+     * ZERO GC method.
+     * @param x Center X
+     * @param y Center Y
+     * @param radius Search radius
+     * @param outBuffer Buffer to fill (will be cleared)
+     * @returns Number of entities found
+     */
+    public queryInRadius(x: number, y: number, radius: number, outBuffer: T[]): number {
+        outBuffer.length = 0;
+
+        // PADDING: Add extra range to catch large units (e.g. Bosses) whose center
+        // might be in a neighbor cell but whose body overlaps into range.
+        const PADDING = 64;
+        const searchRadius = radius + PADDING;
+
+        const minCol = Math.max(0, Math.floor((x - searchRadius) / this.cellSize));
+        const maxCol = Math.min(this.cols - 1, Math.floor((x + searchRadius) / this.cellSize));
+        const minRow = Math.max(0, Math.floor((y - searchRadius) / this.cellSize));
+        const maxRow = Math.min(this.rows - 1, Math.floor((y + searchRadius) / this.cellSize));
+
+        for (let col = minCol; col <= maxCol; col++) {
+            for (let row = minRow; row <= maxRow; row++) {
+                const cell = this.cells[this.getIndex(col, row)];
+                // Standard for loop for performance
+                for (let i = 0; i < cell.length; i++) {
+                    outBuffer.push(cell[i]);
+                }
+            }
+        }
+
+        return outBuffer.length;
+    }
+
+    /**
      * Debug: Get grid statistics
      */
     public getStats(): { totalCells: number; occupiedCells: number; totalEntities: number } {
