@@ -45,7 +45,11 @@ export class SkeletonCommanderUnitRenderer implements UnitRenderer {
         ctx.save();
 
         // Hit Flash / Status Effects
-        if (enemy.hitFlashTimer > 0) ctx.filter = 'brightness(500%) sepia(100%) hue-rotate(-50deg)';
+        // Hit Flash / Status Effects
+        if (enemy.hitFlashTimer > 0) {
+            // optimized simple flash
+            ctx.globalAlpha = 0.6;
+        }
 
         // 1. Dynamic Aura (Ground Layer)
         this.drawAura(ctx, s, time);

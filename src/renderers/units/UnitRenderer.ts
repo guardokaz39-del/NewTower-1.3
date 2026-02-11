@@ -23,6 +23,12 @@ export interface UnitRenderer {
      * Drawn in a separate pass after lighting.
      */
     drawEmissive?(ctx: CanvasRenderingContext2D, enemy: Enemy, scale: number, rotation: number): void;
+
+    /**
+     * Optional: Draw a specific frame of animation for baking.
+     * @param t Normalized time (0.0 to 1.0) representing the animation cycle.
+     */
+    drawFrame?(ctx: CanvasRenderingContext2D, enemy: Enemy, t: number): void;
 }
 
 /**

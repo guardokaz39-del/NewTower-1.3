@@ -1,5 +1,7 @@
+import { CachedUnitRenderer } from './CachedUnitRenderer';
 import { UnitRenderer } from './UnitRenderer';
 import type { Enemy } from '../../Enemy';
+import { Assets } from '../../Assets';
 
 /**
  * FleshUnitRenderer v2.0 — "Flesh Colossus" / "Meat Piñata"
@@ -7,7 +9,7 @@ import type { Enemy } from '../../Enemy';
  * AAA-Quality Visual: Grotesque abomination of stitched flesh, embedded victims,
  * pulsating organs, tentacle appendages, dripping gore, heavy shambling animation.
  */
-export class FleshUnitRenderer implements UnitRenderer {
+export class FleshUnitRenderer extends CachedUnitRenderer {
     // 🩸 FLESH PALETTE — Layered tones for depth
     private static readonly FLESH_DEEPEST = '#3a1818';
     private static readonly FLESH_DARK = '#4a2020';
@@ -37,14 +39,45 @@ export class FleshUnitRenderer implements UnitRenderer {
     private static readonly EYE_BLOODSHOT = '#ff6666';
     private static readonly GLOW_SICKLY = '#88ff88';
 
+    constructor() {
+        super();
+        this.walkCycleMultiplier = 0.06; // Very slow shamble
+    }
+
+    // BAKING SUPPORT
+    drawFrame(ctx: CanvasRenderingContext2D, enemy: Enemy, t: number): void {
+        const cycle = t * Math.PI * 2;
+        const scale = 1.0;
+        const colossusScale = scale * 1.1;
+        const isMoving = true;
+        const time = t * 10;
+        const hp = 1.0; // Bake healthy
+        this.drawSide(ctx, colossusScale, cycle, isMoving, time, hp);
+    }
+
     drawBody(ctx: CanvasRenderingContext2D, enemy: Enemy, scale: number, rotation: number): void {
-        const time = Date.now() * 0.001;
-        const walkCycle = time * (enemy.baseSpeed * 0.06); // Very slow shamble
-        const isMoving = !enemy.finished && enemy.currentHealth > 0;
         const hpPercent = enemy.currentHealth / enemy.maxHealth;
 
-        // Moderate scale to fit on road
+        // 1. If Damaged (HP < 50%), force procedural rendering to show gore/wounds
+        if (hpPercent <= 0.5) {
+            const time = Date.now() * 0.001;
+            const walkCycle = time * (enemy.baseSpeed * this.walkCycleMultiplier);
+            const isMoving = !enemy.finished && enemy.currentHealth > 0;
+
+            this.drawProceduralFull(ctx, enemy, scale, rotation, walkCycle, isMoving, hpPercent);
+            return;
+        }
+
+        // 2. Otherwise use Cached version
+        super.drawBody(ctx, enemy, scale, rotation);
+    }
+
+    /**
+     * Full procedural rendering with directional support (Used for Damaged state or fallback)
+     */
+    private drawProceduralFull(ctx: CanvasRenderingContext2D, enemy: Enemy, scale: number, rotation: number, walkCycle: number, isMoving: boolean, hpPercent: number) {
         const colossusScale = scale * 1.1;
+        const time = Date.now() * 0.001; // Need absolute time for breathing/pulsing
 
         let facing: 'DOWN' | 'UP' | 'SIDE' = 'SIDE';
         const r = rotation;
@@ -54,8 +87,10 @@ export class FleshUnitRenderer implements UnitRenderer {
 
         ctx.save();
 
-        // Simple hit flash via globalAlpha pulse (no expensive filter)
-        // ctx.filter causes performance freeze - using manual flash instead
+        // Manual hit flash since we bypassed super.drawBody
+        if (enemy.hitFlashTimer > 0) {
+            ctx.globalAlpha = 0.7;
+        }
 
         if (facing === 'SIDE') {
             if (Math.abs(rotation) > Math.PI / 2) {
@@ -70,6 +105,7 @@ export class FleshUnitRenderer implements UnitRenderer {
 
         ctx.restore();
     }
+
 
     // =====================================================================
     // SIDE VIEW — Shambling Horror
@@ -420,12 +456,17 @@ export class FleshUnitRenderer implements UnitRenderer {
         // Pulsating organ (heart-like)
         const heartBeat = 1 + Math.sin(t * 6) * 0.2;
         ctx.fillStyle = FleshUnitRenderer.ORGAN_RED;
-        ctx.shadowBlur = 8;
-        ctx.shadowColor = FleshUnitRenderer.BLOOD_BRIGHT;
+
+        // Fake Glow
+        ctx.globalAlpha = 0.5;
+        ctx.beginPath();
+        ctx.ellipse(0, -2 * s, 2.5 * s * heartBeat, 2.0 * s * heartBeat, 0, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.globalAlpha = 1.0;
         ctx.beginPath();
         ctx.ellipse(0, -2 * s, 2 * s * heartBeat, 1.5 * s * heartBeat, 0, 0, Math.PI * 2);
         ctx.fill();
-        ctx.shadowBlur = 0;
 
         ctx.globalAlpha = 1.0;
     }

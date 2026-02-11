@@ -1,7 +1,10 @@
+import { CachedUnitRenderer } from './CachedUnitRenderer';
 import { UnitRenderer } from './UnitRenderer';
 import type { Enemy } from '../../Enemy';
+import { Assets } from '../../Assets';
+import { AssetCache } from '../../utils/AssetCache';
 
-export class RatUnitRenderer implements UnitRenderer {
+export class RatUnitRenderer extends CachedUnitRenderer {
     // 🎨 Darker Alchemical Palette
     private static readonly FUR_COLOR = '#3e2723';       // Dark Chocolate
     private static readonly FUR_LIGHT = '#5d4037';       // Muddy Brown
@@ -11,42 +14,25 @@ export class RatUnitRenderer implements UnitRenderer {
     private static readonly BARREL_WOOD = '#261b18';     // Burnt Wood
     private static readonly BARREL_RIM = '#4e342e';      // Rusted Iron
 
-    drawBody(ctx: CanvasRenderingContext2D, enemy: Enemy, scale: number, rotation: number): void {
-        const time = Date.now() * 0.005;
-        const walkCycle = time * (enemy.baseSpeed * 2.5);
-        const isMoving = !enemy.finished && enemy.currentHealth > 0;
+    constructor() {
+        super();
+        this.walkCycleMultiplier = 12.5; // High speed scurry
+    }
 
-        // Rat is low to the ground
-        const bounce = isMoving ? Math.abs(Math.sin(walkCycle)) * 1 * scale : 0;
-
-        let facing: 'DOWN' | 'UP' | 'SIDE' = 'SIDE';
-        const r = rotation;
-        if (r > -2.35 && r < -0.78) facing = 'UP';
-        else if (r > 0.78 && r < 2.35) facing = 'DOWN';
-        else facing = 'SIDE';
+    // BAKING SUPPORT
+    drawFrame(ctx: CanvasRenderingContext2D, enemy: Enemy, t: number): void {
+        const cycle = t * Math.PI * 2;
+        const scale = 1.0;
+        const isMoving = true;
+        const time = t * 10;
 
         ctx.save();
-        ctx.translate(0, -bounce);
-
-        // Shake/Wobble Effect for the unstable payload
-        if (isMoving) {
-            const wobble = Math.sin(time * 15) * 0.05; // Fast jitter
-            ctx.rotate(wobble);
-        }
-
-        if (facing === 'SIDE') {
-            if (Math.abs(rotation) > Math.PI / 2) {
-                ctx.scale(-1, 1);
-            }
-            this.drawSide(ctx, scale, walkCycle, isMoving, time);
-        } else if (facing === 'UP') {
-            this.drawBack(ctx, scale, walkCycle, isMoving, time);
-        } else {
-            this.drawFront(ctx, scale, walkCycle, isMoving, time);
-        }
-
+        // Adjust for baking centering if needed, but usually 0,0 is center
+        this.drawSide(ctx, scale, cycle, isMoving, time);
         ctx.restore();
     }
+
+    // drawBody is inherited
 
     // === FRONT ===
     private drawFront(ctx: CanvasRenderingContext2D, scale: number, walkCycle: number, isMoving: boolean, time: number) {
@@ -66,7 +52,7 @@ export class RatUnitRenderer implements UnitRenderer {
         const slosh = Math.sin(time * 8) * 0.2;
         ctx.rotate(slosh);
 
-        this.drawBarrel(ctx, scale, true);
+        this.drawBarrel(ctx, scale, true, time);
         ctx.restore();
 
         // Head
@@ -86,7 +72,7 @@ export class RatUnitRenderer implements UnitRenderer {
         // Tail (Wagging wildly)
         // More complex wave for "rat-like" feel
         const tailWag = Math.sin(time * 10) * 0.4;
-        this.drawTail(ctx, 0, 4 * scale, scale, tailWag, true);
+        this.drawTail(ctx, 0, 4 * scale, scale, tailWag, true, time);
 
         // Body
         ctx.fillStyle = RatUnitRenderer.FUR_COLOR;
@@ -97,7 +83,7 @@ export class RatUnitRenderer implements UnitRenderer {
         ctx.translate(0, -3 * scale);
         const slosh = Math.sin(time * 8) * 0.1;
         ctx.rotate(slosh);
-        this.drawBarrel(ctx, scale, false);
+        this.drawBarrel(ctx, scale, false, time);
         ctx.restore();
 
         // Ears
@@ -128,7 +114,7 @@ export class RatUnitRenderer implements UnitRenderer {
         ctx.save();
         ctx.translate(-1 * scale, -6 * scale);
         ctx.rotate(-0.2 + Math.sin(time * 10) * 0.05); // Heavy wobble
-        this.drawBarrel(ctx, scale, false);
+        this.drawBarrel(ctx, scale, false, time);
         ctx.restore();
 
         // Front Legs
@@ -161,13 +147,16 @@ export class RatUnitRenderer implements UnitRenderer {
         ctx.beginPath(); ctx.arc(-6 * scale, -3 * scale, 3 * scale, 0, Math.PI * 2); ctx.fill();
         ctx.beginPath(); ctx.arc(6 * scale, -3 * scale, 3 * scale, 0, Math.PI * 2); ctx.fill();
 
-        // Glowing Toxic Eyes
+        // Glowing Toxic Eyes (Optimized)
+        const glow = AssetCache.getGlow('rgba(100, 221, 23, 0.6)', 16);
+        const gSize = 8 * scale;
+
+        ctx.drawImage(glow, -2.5 * scale - gSize / 2, -0.5 * scale - gSize / 2, gSize, gSize);
+        ctx.drawImage(glow, 2.5 * scale - gSize / 2, -0.5 * scale - gSize / 2, gSize, gSize);
+
         ctx.fillStyle = RatUnitRenderer.POISON_GLOW;
-        ctx.shadowBlur = 8;
-        ctx.shadowColor = RatUnitRenderer.POISON_GLOW;
         ctx.beginPath(); ctx.arc(-2.5 * scale, -0.5 * scale, 1.2 * scale, 0, Math.PI * 2); ctx.fill();
         ctx.beginPath(); ctx.arc(2.5 * scale, -0.5 * scale, 1.2 * scale, 0, Math.PI * 2); ctx.fill();
-        ctx.shadowBlur = 0;
     }
 
     private drawHeadSide(ctx: CanvasRenderingContext2D, scale: number) {
@@ -185,12 +174,13 @@ export class RatUnitRenderer implements UnitRenderer {
 
         ctx.beginPath(); ctx.arc(-2 * scale, -3 * scale, 3 * scale, 0, Math.PI * 2); ctx.fill(); // Ear
 
-        // Eye
+        // Eye (Optimized)
+        const glow = AssetCache.getGlow('rgba(100, 221, 23, 0.6)', 16);
+        const gSize = 8 * scale;
+        ctx.drawImage(glow, 2 * scale - gSize / 2, -1 * scale - gSize / 2, gSize, gSize);
+
         ctx.fillStyle = RatUnitRenderer.POISON_GLOW;
-        ctx.shadowBlur = 8;
-        ctx.shadowColor = RatUnitRenderer.POISON_GLOW;
         ctx.beginPath(); ctx.arc(2 * scale, -1 * scale, 1.3 * scale, 0, Math.PI * 2); ctx.fill();
-        ctx.shadowBlur = 0;
     }
 
     private drawPaw(ctx: CanvasRenderingContext2D, x: number, y: number, scale: number) {
@@ -247,7 +237,7 @@ export class RatUnitRenderer implements UnitRenderer {
         ctx.fill();
     }
 
-    private drawBarrel(ctx: CanvasRenderingContext2D, scale: number, glow: boolean) {
+    private drawBarrel(ctx: CanvasRenderingContext2D, scale: number, glow: boolean, time: number) {
         const w = 10 * scale; // Bulky
         const h = 8 * scale;
 
@@ -264,23 +254,25 @@ export class RatUnitRenderer implements UnitRenderer {
 
         // Leak / Liquid
         if (glow) {
-            ctx.shadowBlur = 15;
-            ctx.shadowColor = RatUnitRenderer.POISON_GLOW;
+            // Optimized glow using AssetCache
+            const g = AssetCache.getGlow('rgba(100, 221, 23, 0.4)', 32);
+            ctx.drawImage(g, -16 * scale, -16 * scale, 32 * scale, 32 * scale);
         }
         ctx.fillStyle = RatUnitRenderer.POISON_LIQUID;
         ctx.beginPath(); ctx.arc(0, 0, 2.5 * scale, 0, Math.PI * 2); ctx.fill(); // Core
-        ctx.shadowBlur = 0;
 
-        // Drip
-        if (Math.random() < 0.1) {
-            // Instant drip visual (simulated)
+        // Drip (Deterministic)
+        // Use time to simulate random drip frequency
+        const dripTime = time * 2;
+        const dripCycle = dripTime % 5; // 5 second cycle roughly
+        if (dripCycle > 4.5) { // Drip at end of cycle
+            const fall = (dripCycle - 4.5) * 20 * scale;
             ctx.fillStyle = RatUnitRenderer.POISON_LIQUID;
-            ctx.beginPath(); ctx.arc(w / 2, h / 2, 1.5 * scale, 0, Math.PI * 2); ctx.fill();
+            ctx.beginPath(); ctx.arc(w / 2, h / 2 + fall, 1.5 * scale, 0, Math.PI * 2); ctx.fill();
         }
 
-        // Fuse Spark
-        const spark = (Date.now() % 100) > 50; // Fast flicker
-        if (spark) {
+        // Fuse Spark (Deterministic flicker)
+        if (Math.sin(time * 50) > 0) {
             ctx.fillStyle = '#fff176';
             ctx.beginPath();
             ctx.arc(2 * scale, -h / 2 - 2 * scale, 2 * scale, 0, Math.PI * 2);

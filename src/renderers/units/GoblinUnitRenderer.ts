@@ -1,6 +1,7 @@
 import { UnitRenderer } from './UnitRenderer';
 import { CONFIG } from '../../Config';
 import type { Enemy } from '../../Enemy';
+import { Assets } from '../../Assets';
 
 export class GoblinUnitRenderer implements UnitRenderer {
     // 🎨 Palette (Gritty & Detailed)
@@ -12,10 +13,42 @@ export class GoblinUnitRenderer implements UnitRenderer {
     private static readonly METAL_EDGE = '#cfd8dc'; // Sharpened Edge
     private static readonly EYE_COLOR = '#ffeb3b';  // Yellow Eyes
 
+    // BAKING SUPPORT
+    drawFrame(ctx: CanvasRenderingContext2D, enemy: Enemy, t: number): void {
+        const cycle = t * Math.PI * 2;
+        const scale = 1.0;
+        const isMoving = true;
+        this.drawSide(ctx, scale, cycle, isMoving);
+    }
+
     drawBody(ctx: CanvasRenderingContext2D, enemy: Enemy, scale: number, rotation: number): void {
         const time = Date.now() * 0.001;
-        // Sneaky, loping gait (slower rhythm)
         const walkCycle = time * (enemy.baseSpeed * 0.25);
+
+        // 1. Try Cached Sprite
+        const t = (walkCycle % (Math.PI * 2)) / (Math.PI * 2);
+        const frameIdx = Math.floor(t * 32) % 32;
+        const frameKey = `unit_${enemy.typeId}_walk_${frameIdx}`;
+
+        const sprite = Assets.get(frameKey);
+        if (sprite) {
+            ctx.save();
+            ctx.rotate(rotation);
+            const size = 96 * scale;
+            ctx.drawImage(sprite, -size / 2, -size / 2, size, size);
+
+            // Hit Flash (Source-Atop cheap method)
+            if (enemy.hitFlashTimer > 0) {
+                ctx.globalCompositeOperation = 'source-atop';
+                ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
+                ctx.fillRect(-size / 2, -size / 2, size, size);
+            }
+
+            ctx.restore();
+            return;
+        }
+
+        // 2. Fallback
         const isMoving = !enemy.finished && enemy.currentHealth > 0;
 
         let facing: 'DOWN' | 'UP' | 'SIDE' = 'SIDE';
@@ -27,7 +60,15 @@ export class GoblinUnitRenderer implements UnitRenderer {
 
         ctx.save();
 
-        if (enemy.hitFlashTimer > 0) ctx.filter = 'brightness(500%)';
+        // NO ctx.filter here. We handle flash inside specific draws or via overlay? 
+        // Actually, drawBody calls internal methods.
+        // Let's apply a global flash overlay manually if needed, but 'source-atop' only works on what's drawn.
+        // For procedural, we might just tint or use globalAlpha.
+        // Given complexity, let's skip expensive flash or use basic globalAlpha pulse.
+        // Or apply 'lighter' composite for hit.
+        if (enemy.hitFlashTimer > 0) {
+            ctx.globalAlpha = 0.7; // Simple visual feedback without expensive filter
+        }
 
         if (facing === 'SIDE') {
             if (Math.abs(rotation) > Math.PI / 2) ctx.scale(-1, 1);

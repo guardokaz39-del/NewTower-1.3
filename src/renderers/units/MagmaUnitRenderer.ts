@@ -1,5 +1,8 @@
+import { CachedUnitRenderer } from './CachedUnitRenderer';
 import { UnitRenderer } from './UnitRenderer';
 import type { Enemy } from '../../Enemy';
+import { Assets } from '../../Assets';
+import { AssetCache } from '../../utils/AssetCache';
 
 interface MagmaParticle {
     x: number;
@@ -10,9 +13,10 @@ interface MagmaParticle {
     life: number;
     maxLife: number;
     type: 'EMBER' | 'ASH' | 'SMOKE' | 'SPARK';
+    active: boolean; // For pooling
 }
 
-export class MagmaUnitRenderer implements UnitRenderer {
+export class MagmaUnitRenderer extends CachedUnitRenderer {
     // --- PALETTE: MOLTEN CORE ---
     // Core is blindingly bright, cooling as it goes out
     private static readonly C_CORE = '#ffffff';       // White-hot core
@@ -31,23 +35,58 @@ export class MagmaUnitRenderer implements UnitRenderer {
     // Particle System (WeakMap for instance isolation)
     private particleSystems = new WeakMap<Enemy, MagmaParticle[]>();
 
-    drawBody(ctx: CanvasRenderingContext2D, enemy: Enemy, scale: number, rotation: number): void {
-        const time = Date.now() * 0.002;
-        const isBoss = enemy.typeId === 'magma_king';
+    // Object Pool for Particles to avoid GC
+    private static particlePool: MagmaParticle[] = [];
 
-        // --- PARTICLE UPDATE ---
-        this.updateParticles(ctx, enemy, scale, isBoss);
+    constructor() {
+        super();
+        this.walkCycleMultiplier = 1.0;
+    }
 
-        ctx.save();
+    // --- POOLING UTILS ---
+    private static getParticle(): MagmaParticle {
+        // Find inactive particle in pool
+        const p = this.particlePool.find(p => !p.active);
+        if (p) {
+            p.active = true;
+            return p;
+        }
+        // Create new if pool full/empty
+        const newP: MagmaParticle = {
+            x: 0, y: 0, vx: 0, vy: 0, size: 0, life: 0, maxLife: 0, type: 'SMOKE', active: true
+        };
+        this.particlePool.push(newP);
+        return newP;
+    }
+
+    private static releaseParticle(p: MagmaParticle) {
+        p.active = false;
+    }
+
+    // BAKING SUPPORT
+    drawFrame(ctx: CanvasRenderingContext2D, enemy: Enemy, t: number): void {
+        const time = t * 10;
+        const scale = 1.0;
+        // Check local override or passed enemy type for boss status
+        const isBoss = (enemy.typeId === 'magma_king');
 
         if (isBoss) {
             this.drawDemonBoss(ctx, enemy, scale, time);
         } else {
             this.drawObsidianStatue(ctx, scale, time);
         }
-
-        ctx.restore();
     }
+
+    drawBody(ctx: CanvasRenderingContext2D, enemy: Enemy, scale: number, rotation: number): void {
+        const isBoss = enemy.typeId === 'magma_king';
+
+        // --- PARTICLE UPDATE (Always Procedural) ---
+        this.updateParticles(ctx, enemy, scale, isBoss);
+
+        // --- BODY RENDERING (Cached or Fallback) ---
+        super.drawBody(ctx, enemy, scale, rotation);
+    }
+
 
     // =========================================================================
     // 1. THE MOLTEN ARCHDEMON
@@ -57,16 +96,16 @@ export class MagmaUnitRenderer implements UnitRenderer {
         const hpPercent = enemy.currentHealth / enemy.maxHealth;
 
         // INTENSIFIED Breathing: The core expands MORE, cracking the crust
-        const breathe = Math.sin(time * 3) * 0.10 * scale; // Doubled from 0.05
+        const breathe = Math.sin(time * 3) * 0.10 * scale;
 
         // Instability: As HP drops, the crust fragments more (jitter)
-        const instability = (1 - hpPercent) * 3; // Increased from 2
+        const instability = (1 - hpPercent) * 3;
 
         // Movement Flow
         const lean = isMoving ? Math.sin(time * 4) * 5 * scale : 0;
 
         // INCREASED Heavy Step for more impact
-        const heavyStep = Math.abs(Math.sin(time * 4)) * 5 * scale; // Increased from 3
+        const heavyStep = Math.abs(Math.sin(time * 4)) * 5 * scale;
 
         // Low HP Jitter
         const jitterX = hpPercent < 0.3 ? (Math.random() - 0.5) * 2 * scale : 0;
@@ -90,7 +129,7 @@ export class MagmaUnitRenderer implements UnitRenderer {
 
     private drawLavaCore(ctx: CanvasRenderingContext2D, time: number, instability: number, hpPercent: number) {
         // More WHITE the lower HP gets (desperation)
-        const coreIntensity = 1 - (hpPercent * 0.5); // 0.5 at full HP, 1.0 at 0 HP
+        const coreIntensity = 1 - (hpPercent * 0.5);
 
         // Complex Gradient: Core -> Lava -> Cooling Edge
         const grad = ctx.createRadialGradient(0, -15, 3, 0, -12, 35);
@@ -110,15 +149,17 @@ export class MagmaUnitRenderer implements UnitRenderer {
         ctx.bezierCurveTo(-10, 5 + instability, -25, -10, -15, -25); // Torso L
         ctx.fill();
 
-        // INTENSIFIED Inner Glow (Beating Heart)
-        ctx.shadowColor = MagmaUnitRenderer.C_LAVA_LIGHT;
-        ctx.shadowBlur = 25 + (Math.sin(time * 4) * 10); // Pulsing glow
         ctx.fillStyle = MagmaUnitRenderer.C_CORE;
+        const coreSize = 6 + coreIntensity * 3;
+
+        // Fake Glow (Optimized)
+        ctx.globalAlpha = 0.5;
+        ctx.beginPath(); ctx.arc(0, -15, coreSize * 1.5, 0, Math.PI * 2); ctx.fill();
+
+        ctx.globalAlpha = 1.0;
         ctx.beginPath();
-        const coreSize = 6 + coreIntensity * 3; // Bigger at low HP
         ctx.arc(0, -15, coreSize, 0, Math.PI * 2);
         ctx.fill();
-        ctx.shadowBlur = 0;
     }
 
     private drawCrustPlates(ctx: CanvasRenderingContext2D, time: number, instability: number) {
@@ -127,7 +168,7 @@ export class MagmaUnitRenderer implements UnitRenderer {
         ctx.fillStyle = MagmaUnitRenderer.C_CRUST;
 
         // Chest Plate (Broken) - INCREASED movement
-        const shiftX = Math.sin(time * 2) * (2 + instability * 2); // Doubled amplitude
+        const shiftX = Math.sin(time * 2) * (2 + instability * 2);
         const shiftY = Math.cos(time * 2) * (2 + instability * 2);
 
         // Left Plate
@@ -160,7 +201,7 @@ export class MagmaUnitRenderer implements UnitRenderer {
 
         // Horns (Floating Obsidian Shards) - INCREASED float
         ctx.fillStyle = MagmaUnitRenderer.C_CRUST;
-        const hornFloat = Math.sin(time * 4) * 3; // Increased from 2
+        const hornFloat = Math.sin(time * 4) * 3;
 
         // Left Horn
         ctx.beginPath();
@@ -186,15 +227,22 @@ export class MagmaUnitRenderer implements UnitRenderer {
         ctx.lineTo(0, 8); // Jaw
         ctx.fill();
 
-        // Eyes (INTENSIFIED - Brighter, Larger glow)
+        // Eyes (INTENSIFIED - Brighter)
+        // Replaced shadowBlur with manual glow
         ctx.fillStyle = MagmaUnitRenderer.C_CORE;
-        ctx.shadowColor = '#ff0000';
-        ctx.shadowBlur = 20; // Increased from 15
+
+        // Fake Glow
+        ctx.globalAlpha = 0.4;
         ctx.beginPath();
-        ctx.arc(-3, -2, 2, 0, Math.PI * 2); // Slightly larger
+        ctx.arc(-3, -2, 3.5, 0, Math.PI * 2);
+        ctx.arc(3, -2, 3.5, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.globalAlpha = 1.0;
+        ctx.beginPath();
+        ctx.arc(-3, -2, 2, 0, Math.PI * 2);
         ctx.arc(3, -2, 2, 0, Math.PI * 2);
         ctx.fill();
-        ctx.shadowBlur = 0;
 
         ctx.restore();
     }
@@ -247,9 +295,6 @@ export class MagmaUnitRenderer implements UnitRenderer {
     // 2. THE OBSIDIAN STATUE (DECOY) - ENHANCED
     // =========================================================================
     private drawObsidianStatue(ctx: CanvasRenderingContext2D, scale: number, time: number) {
-        // A "Hollowed Out" shell. 
-        // Dark, jagged, lifeless but HEROIC
-
         ctx.scale(scale, scale);
 
         // Statue Body (Crystalline, Angular)
@@ -258,31 +303,27 @@ export class MagmaUnitRenderer implements UnitRenderer {
         ctx.lineWidth = 1.5;
 
         ctx.beginPath();
-        // HEROIC POSE: Arms raised (victory/defiance)
-        ctx.moveTo(-14, -28); // L Horn/shoulder
-        ctx.lineTo(-8, -20);  // L arm raised
-        ctx.lineTo(-12, -10); // L shoulder
-        ctx.lineTo(-8, 0);    // Waist
-        ctx.lineTo(-12, 10);  // Hip
-        ctx.lineTo(12, 10);   // Hip R
-        ctx.lineTo(8, 0);     // Waist R
-        ctx.lineTo(12, -10);  // Shoulder R
-        ctx.lineTo(8, -20);   // R Arm raised
-        ctx.lineTo(14, -28);  // R Horn
-        ctx.lineTo(0, -25);   // Top of head
+        // HEROIC POSE: Arms raised
+        ctx.moveTo(-14, -28);
+        ctx.lineTo(-8, -20);
+        ctx.lineTo(-12, -10);
+        ctx.lineTo(-8, 0);
+        ctx.lineTo(-12, 10);
+        ctx.lineTo(12, 10);
+        ctx.lineTo(8, 0);
+        ctx.lineTo(12, -10);
+        ctx.lineTo(8, -20);
+        ctx.lineTo(14, -28);
+        ctx.lineTo(0, -25);
         ctx.closePath();
         ctx.fill();
         ctx.stroke();
 
-        // CRACK NETWORK (More Complex)
+        // CRACK NETWORK
         ctx.strokeStyle = MagmaUnitRenderer.C_STONE_DARK;
         ctx.lineWidth = 2;
         ctx.beginPath();
-        // Main crack
-        ctx.moveTo(0, -20);
-        ctx.lineTo(-5, -10);
-        ctx.lineTo(2, -5);
-        ctx.lineTo(-3, 2);
+        ctx.moveTo(0, -20); ctx.lineTo(-5, -10); ctx.lineTo(2, -5); ctx.lineTo(-3, 2);
         ctx.stroke();
 
         // Secondary cracks
@@ -294,16 +335,17 @@ export class MagmaUnitRenderer implements UnitRenderer {
         ctx.stroke();
 
         // DYING EMBERS in Cracks (Red glow)
-        ctx.shadowColor = '#ff3d00';
-        ctx.shadowBlur = 8;
-        ctx.strokeStyle = MagmaUnitRenderer.C_EMBER_FAINT;
-        ctx.lineWidth = 1.5;
+        // REPLACED shadowBlur with stroke + alpha overlap
+        ctx.fillStyle = 'rgba(0,0,0,0)'; // No fill
+        ctx.strokeStyle = 'rgba(255, 61, 0, 0.5)'; // Orange faint glow
+        ctx.lineWidth = 3;
         ctx.beginPath();
-        ctx.moveTo(0, -20);
-        ctx.lineTo(-5, -10);
-        ctx.lineTo(2, -5);
+        ctx.moveTo(0, -20); ctx.lineTo(-5, -10); ctx.lineTo(2, -5);
         ctx.stroke();
-        ctx.shadowBlur = 0;
+
+        ctx.lineWidth = 1.5;
+        ctx.strokeStyle = MagmaUnitRenderer.C_EMBER_FAINT;
+        ctx.stroke();
 
         // Head (Frozen Scream)
         ctx.translate(0, -30);
@@ -324,7 +366,7 @@ export class MagmaUnitRenderer implements UnitRenderer {
     }
 
     // =========================================================================
-    // 3. PARTICLE SYSTEM (AAA EFFECT) - ENHANCED
+    // 3. PARTICLE SYSTEM (AAA EFFECT) - OPTIMIZED (Pooled)
     // =========================================================================
     private updateParticles(ctx: CanvasRenderingContext2D, enemy: Enemy, scale: number, isBoss: boolean) {
         let particles = this.particleSystems.get(enemy);
@@ -333,43 +375,47 @@ export class MagmaUnitRenderer implements UnitRenderer {
             this.particleSystems.set(enemy, particles);
         }
 
-        // SPAWN - INCREASED spawn rate for boss
-        const spawnRate = isBoss ? 0.6 : 0.4; // Increased from 0.3
+        // SPAWN
+        const spawnRate = isBoss ? 0.6 : 0.4;
         if (Math.random() < spawnRate) {
             let type: 'EMBER' | 'ASH' | 'SMOKE' | 'SPARK' = 'SMOKE';
 
             if (isBoss) {
                 const rand = Math.random();
-                if (rand > 0.7) type = 'SPARK'; // New bright sparks
+                if (rand > 0.7) type = 'SPARK';
                 else if (rand > 0.4) type = 'EMBER';
                 else type = 'SMOKE';
             } else {
                 type = Math.random() > 0.5 ? 'ASH' : 'SMOKE';
             }
 
-            particles.push({
-                x: (Math.random() * 30 - 15) * scale,
-                y: -(Math.random() * 30 + 10) * scale,
-                vx: (Math.random() - 0.5) * 0.8,
-                vy: type === 'SPARK' ? -(Math.random() * 3 + 2) : // Sparks fly fast
-                    type === 'EMBER' ? -(Math.random() * 2 + 1) :
-                        -(Math.random() + 0.5),
-                size: (Math.random() * 3 + 1) * scale,
-                life: 1.0,
-                maxLife: 1.0,
-                type: type
-            });
+            // USE POOL
+            const p = MagmaUnitRenderer.getParticle();
+            p.x = (Math.random() * 30 - 15) * scale;
+            p.y = -(Math.random() * 30 + 10) * scale;
+            p.vx = (Math.random() - 0.5) * 0.8;
+            p.vy = type === 'SPARK' ? -(Math.random() * 3 + 2) :
+                type === 'EMBER' ? -(Math.random() * 2 + 1) :
+                    -(Math.random() + 0.5);
+            p.size = (Math.random() * 3 + 1) * scale;
+            p.life = 1.0;
+            p.maxLife = 1.0;
+            p.type = type;
+
+            particles.push(p);
         }
 
         // UPDATE & DRAW
         for (let i = particles.length - 1; i >= 0; i--) {
             const p = particles[i];
-            p.life -= p.type === 'SPARK' ? 0.03 : 0.015; // Sparks die faster
-            p.x += p.vx + Math.sin(p.life * 10) * 0.3; // More wiggle
+            p.life -= p.type === 'SPARK' ? 0.03 : 0.015;
+            p.x += p.vx + Math.sin(p.life * 10) * 0.3;
             p.y += p.vy;
 
             if (p.life <= 0) {
-                // PERF: Swap & Pop (O(1) removal instead of O(N) splice)
+                // Return to pool
+                MagmaUnitRenderer.releaseParticle(p);
+                // Swap & Pop
                 particles[i] = particles[particles.length - 1];
                 particles.pop();
                 continue;
@@ -379,25 +425,22 @@ export class MagmaUnitRenderer implements UnitRenderer {
             ctx.globalAlpha = p.life;
             if (p.type === 'SPARK') {
                 ctx.fillStyle = MagmaUnitRenderer.C_CORE;
-                ctx.shadowColor = '#ffff00';
-                ctx.shadowBlur = 15;
+                // Fake Glow
+                ctx.globalAlpha = p.life * 0.5;
+                ctx.beginPath(); ctx.arc(p.x, p.y, p.size * 2, 0, Math.PI * 2); ctx.fill();
+                ctx.globalAlpha = p.life;
             } else if (p.type === 'EMBER') {
                 ctx.fillStyle = MagmaUnitRenderer.C_LAVA_LIGHT;
-                ctx.shadowColor = '#ff0000';
-                ctx.shadowBlur = 10;
             } else if (p.type === 'ASH') {
                 ctx.fillStyle = MagmaUnitRenderer.C_ASH;
-                ctx.shadowBlur = 0;
             } else {
                 ctx.fillStyle = 'rgba(0,0,0,0.5)'; // Smoke
-                ctx.shadowBlur = 0;
             }
 
             ctx.beginPath();
             const renderSize = p.size * (p.type === 'SPARK' ? 0.3 : p.type === 'EMBER' ? 0.5 : 1.0);
             ctx.arc(p.x, p.y, renderSize, 0, Math.PI * 2);
             ctx.fill();
-            ctx.shadowBlur = 0;
         }
         ctx.globalAlpha = 1.0;
     }
@@ -406,34 +449,30 @@ export class MagmaUnitRenderer implements UnitRenderer {
         const time = Date.now() * 0.002;
         if (enemy.typeId === 'magma_king') {
             // INTENSIFIED Heat Haze / Glow with PULSING
-            const pulse = Math.sin(time * 3) * 5 + 30; // Oscillates between 25-35
-            ctx.shadowColor = MagmaUnitRenderer.C_LAVA_LIGHT;
-            ctx.shadowBlur = pulse;
+            const pulse = (Math.sin(time * 3) + 1) * 0.5; // 0..1
 
-            // DOUBLE LAYER glow for more epic feel
-            // Layer 1: Intense close glow
-            ctx.fillStyle = 'rgba(255, 87, 34, 0.3)';
-            ctx.beginPath();
-            ctx.arc(0, -20 * scale, 20 * scale, 0, Math.PI * 2);
-            ctx.fill();
+            // Replaced shadowBlur with AssetCache.getGlow (Radial Gradient)
+            // Color #ff5722 = Orange-Red
+            const glow1 = AssetCache.getGlow('rgba(255, 87, 34, 0.4)', 64);
+            const size1 = (40 + pulse * 10) * scale;
+
+            ctx.globalCompositeOperation = 'screen';
+            ctx.drawImage(glow1, -size1, -size1, size1 * 2, size1 * 2);
 
             // Layer 2: Wide soft glow
-            ctx.shadowBlur = pulse * 1.5;
-            ctx.fillStyle = 'rgba(255, 152, 0, 0.15)';
-            ctx.beginPath();
-            ctx.arc(0, -20 * scale, 35 * scale, 0, Math.PI * 2);
-            ctx.fill();
+            const glow2 = AssetCache.getGlow('rgba(255, 152, 0, 0.2)', 100);
+            const size2 = (60 + pulse * 15) * scale;
+            ctx.drawImage(glow2, -size2, -size2, size2 * 2, size2 * 2);
 
-            ctx.shadowBlur = 0;
+            ctx.globalCompositeOperation = 'source-over';
+
         } else {
-            // Statue: Faint residual heat from cracks
-            ctx.shadowColor = '#ff3d00';
-            ctx.shadowBlur = 5;
-            ctx.fillStyle = 'rgba(62, 28, 20, 0.3)';
-            ctx.beginPath();
-            ctx.arc(0, -15 * scale, 10 * scale, 0, Math.PI * 2);
-            ctx.fill();
-            ctx.shadowBlur = 0;
+            // Statue: Faint residual heat
+            const glow = AssetCache.getGlow('rgba(255, 61, 0, 0.3)', 32);
+            const size = 20 * scale;
+            ctx.globalCompositeOperation = 'screen';
+            ctx.drawImage(glow, -size, -size, size * 2, size * 2);
+            ctx.globalCompositeOperation = 'source-over';
         }
     }
 }

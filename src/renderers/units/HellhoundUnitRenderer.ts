@@ -1,6 +1,9 @@
+import { CachedUnitRenderer } from './CachedUnitRenderer';
 import { UnitRenderer } from './UnitRenderer';
 import { CONFIG } from '../../Config';
 import type { Enemy } from '../../Enemy';
+import { Assets } from '../../Assets';
+import { AssetCache } from '../../utils/AssetCache';
 
 /**
  * HellhoundUnitRenderer v2.0 — Complete Visual Redesign
@@ -12,7 +15,7 @@ import type { Enemy } from '../../Enemy';
  * - Fangs and inner mouth fire
  * - Larger embers with trails
  */
-export class HellhoundUnitRenderer implements UnitRenderer {
+export class HellhoundUnitRenderer extends CachedUnitRenderer {
     // 🔥 Demonic Palette — Enhanced
     private static readonly OBSIDIAN = '#0a0303';         // Deepest black-red
     private static readonly OBSIDIAN_LIGHT = '#1f0f0f';   // Slightly lighter
@@ -26,39 +29,23 @@ export class HellhoundUnitRenderer implements UnitRenderer {
     private static readonly FANG_WHITE = '#fff8e1';       // Ivory fangs
     private static readonly TONGUE_RED = '#c62828';       // Dark red tongue
 
-    drawBody(ctx: CanvasRenderingContext2D, enemy: Enemy, scale: number, rotation: number): void {
-        const time = Date.now() * 0.001;
-        const runCycle = time * (enemy.baseSpeed * 0.20); // Slower, more deliberate
-        const isMoving = !enemy.finished && enemy.currentHealth > 0;
-
-        // Larger, more imposing scale
-        const beastScale = scale * 1.25;
-
-        let facing: 'DOWN' | 'UP' | 'SIDE' = 'SIDE';
-        const r = rotation;
-        if (r > -2.35 && r < -0.78) facing = 'UP';
-        else if (r > 0.78 && r < 2.35) facing = 'DOWN';
-        else facing = 'SIDE';
-
-        ctx.save();
-
-        if (enemy.hitFlashTimer > 0) {
-            ctx.filter = 'brightness(500%) sepia(100%) hue-rotate(-50deg)';
-        }
-
-        if (facing === 'SIDE') {
-            if (Math.abs(rotation) > Math.PI / 2) {
-                ctx.scale(-1, 1);
-            }
-            this.drawSide(ctx, beastScale, runCycle, isMoving, time);
-        } else if (facing === 'UP') {
-            this.drawBack(ctx, beastScale, runCycle, isMoving, time);
-        } else {
-            this.drawFront(ctx, beastScale, runCycle, isMoving, time);
-        }
-
-        ctx.restore();
+    constructor() {
+        super();
+        this.walkCycleMultiplier = 0.2;
     }
+
+    // BAKING SUPPORT
+    drawFrame(ctx: CanvasRenderingContext2D, enemy: Enemy, t: number): void {
+        const cycle = t * Math.PI * 2;
+        const scale = 1.0;
+        const beastScale = scale * 1.25;
+        const isMoving = true;
+        const time = t * 10;
+        this.drawSide(ctx, beastScale, cycle, isMoving, time);
+    }
+
+    // drawBody is inherited from CachedUnitRenderer
+
 
     // =====================================================================
     // SIDE VIEW — Predatory Hunting Stance
@@ -205,17 +192,21 @@ export class HellhoundUnitRenderer implements UnitRenderer {
         ctx.ellipse(3 * s, 1.5 * s, 3 * s, 1.5 * s, 0, 0, Math.PI);
         ctx.fill();
 
-        // EYE — Intense glow
+        // EYE — Intense glow (Optimized: No shadowBlur)
         const eyePulse = 0.9 + Math.sin(t * 10) * 0.1;
+
+        // Glow
+        const glow = AssetCache.getGlow('rgba(255, 255, 0, 0.5)', 32);
+        const glowSize = 6 * s * eyePulse;
+        ctx.drawImage(glow, 3 * s - glowSize / 2, -2 * s - glowSize / 2, glowSize, glowSize);
+
         ctx.fillStyle = HellhoundUnitRenderer.EYE_INNER;
-        ctx.shadowBlur = 18 * eyePulse;
-        ctx.shadowColor = HellhoundUnitRenderer.EYE_FIRE;
         ctx.beginPath();
         ctx.ellipse(3 * s, -2 * s, 1.2 * s * eyePulse, 0.9 * s * eyePulse, 0.2, 0, Math.PI * 2);
         ctx.fill();
+
         // Pupil slit
         ctx.fillStyle = '#000';
-        ctx.shadowBlur = 0;
         ctx.beginPath();
         ctx.ellipse(3 * s, -2 * s, 0.3 * s, 0.7 * s, 0.2, 0, Math.PI * 2);
         ctx.fill();
@@ -255,11 +246,17 @@ export class HellhoundUnitRenderer implements UnitRenderer {
         ctx.closePath();
         ctx.fill();
 
-        // Chest magma core
+        // Chest magma core (Optimized: No shadowBlur)
         const corePulse = 1 + Math.sin(t * 4) * 0.2;
+
+        ctx.save();
+        ctx.translate(0, 1 * s);
+        const glow = AssetCache.getGlow('rgba(255, 171, 0, 0.6)', 64);
+        const gSize = 25 * s * corePulse;
+        ctx.drawImage(glow, -gSize / 2, -gSize / 2, gSize, gSize);
+        ctx.restore();
+
         ctx.fillStyle = HellhoundUnitRenderer.MAGMA_CORE;
-        ctx.shadowBlur = 15;
-        ctx.shadowColor = HellhoundUnitRenderer.MAGMA_HOT;
         ctx.beginPath();
         // Inverted triangle — hellfire heart
         ctx.moveTo(-2 * s * corePulse, -2 * s);
@@ -267,19 +264,27 @@ export class HellhoundUnitRenderer implements UnitRenderer {
         ctx.lineTo(0, 4 * s * corePulse);
         ctx.closePath();
         ctx.fill();
-        ctx.shadowBlur = 0;
 
-        // Magma cracks from core
+        // Magma cracks from core (Optimized: Thick stroke + alpha)
         ctx.strokeStyle = HellhoundUnitRenderer.MAGMA_CORE;
         ctx.lineWidth = 1.5 * s;
-        ctx.shadowBlur = 8;
-        ctx.shadowColor = HellhoundUnitRenderer.MAGMA_CORE;
+
+        // Fake Glow
+        ctx.save();
+        ctx.strokeStyle = 'rgba(255, 61, 0, 0.4)';
+        ctx.lineWidth = 3.5 * s;
         ctx.beginPath();
         ctx.moveTo(-2 * s, -1 * s); ctx.lineTo(-5 * s, -4 * s);
         ctx.moveTo(2 * s, -1 * s); ctx.lineTo(5 * s, -4 * s);
         ctx.moveTo(0, 3 * s); ctx.lineTo(0, 6 * s);
         ctx.stroke();
-        ctx.shadowBlur = 0;
+        ctx.restore();
+
+        ctx.beginPath();
+        ctx.moveTo(-2 * s, -1 * s); ctx.lineTo(-5 * s, -4 * s);
+        ctx.moveTo(2 * s, -1 * s); ctx.lineTo(5 * s, -4 * s);
+        ctx.moveTo(0, 3 * s); ctx.lineTo(0, 6 * s);
+        ctx.stroke();
 
         // Front legs (wide aggressive stance)
         this.drawLegFront(ctx, -5 * s, 7 * s, cycle, 0, s, false);
@@ -311,26 +316,28 @@ export class HellhoundUnitRenderer implements UnitRenderer {
         ctx.closePath();
         ctx.fill();
 
-        // EYES — Burning
+        // EYES — Burning (Optimized)
         const eyePulse = 0.9 + Math.sin(t * 12) * 0.1;
         const drawEye = (xOff: number) => {
-            // Outer glow
+            // Glow
+            const glow = AssetCache.getGlow('rgba(255, 255, 0, 0.6)', 32);
+            const gSize = 8 * s;
+            ctx.drawImage(glow, xOff - gSize / 2, -1 * s - gSize / 2, gSize, gSize);
+
+            // Shape
             ctx.fillStyle = HellhoundUnitRenderer.EYE_FIRE;
-            ctx.shadowBlur = 20;
-            ctx.shadowColor = HellhoundUnitRenderer.EYE_FIRE;
             ctx.beginPath();
-            // Angular eye shape
             ctx.moveTo(xOff - 2.5 * s, -1 * s);
             ctx.lineTo(xOff + 1.5 * s, -2.5 * s);
             ctx.lineTo(xOff + 1.5 * s, 0.5 * s);
             ctx.closePath();
             ctx.fill();
+
             // White hot center
             ctx.fillStyle = HellhoundUnitRenderer.EYE_INNER;
             ctx.beginPath();
             ctx.arc(xOff, -1 * s, 0.6 * s * eyePulse, 0, Math.PI * 2);
             ctx.fill();
-            ctx.shadowBlur = 0;
         };
         drawEye(-2.5 * s);
         drawEye(2.5 * s);
@@ -419,16 +426,21 @@ export class HellhoundUnitRenderer implements UnitRenderer {
             ctx.beginPath();
             ctx.ellipse(0, yPos, 2 * s, 0.8 * s, 0, 0, Math.PI * 2);
             ctx.fill();
-            // Magma glow between
+            // Magma glow between (Optimized)
             if (i < 3) {
                 const glowInt = 0.6 + Math.sin(t * 5 + i) * 0.4;
                 ctx.fillStyle = `rgba(255, 61, 0, ${glowInt})`;
-                ctx.shadowBlur = 8;
-                ctx.shadowColor = HellhoundUnitRenderer.MAGMA_CORE;
+
+                // Fake Glow
+                ctx.globalAlpha = 0.5;
+                ctx.beginPath();
+                ctx.ellipse(0, yPos + 1 * s, 1.5 * s, 0.6 * s, 0, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.globalAlpha = 1.0;
+
                 ctx.beginPath();
                 ctx.ellipse(0, yPos + 1 * s, 1 * s, 0.4 * s, 0, 0, Math.PI * 2);
                 ctx.fill();
-                ctx.shadowBlur = 0;
             }
         }
 
@@ -554,15 +566,17 @@ export class HellhoundUnitRenderer implements UnitRenderer {
         ctx.quadraticCurveTo(-4 * s, -3 * s, -7 * s, -5 * s);
         ctx.stroke();
 
-        // Fire tip
+        // Fire tip (Optimized: No shadowBlur)
         const firePulse = 1 + Math.sin(t * 10) * 0.3;
+
+        const glow = AssetCache.getGlow('rgba(255, 61, 0, 0.5)', 32);
+        const gSize = 12 * s * firePulse;
+        ctx.drawImage(glow, -7 * s - gSize / 2, -5 * s - gSize / 2, gSize, gSize);
+
         ctx.fillStyle = HellhoundUnitRenderer.MAGMA_CORE;
-        ctx.shadowBlur = 12 * firePulse;
-        ctx.shadowColor = HellhoundUnitRenderer.MAGMA_HOT;
         ctx.beginPath();
         ctx.arc(-7 * s, -5 * s, 2 * s * firePulse, 0, Math.PI * 2);
         ctx.fill();
-        ctx.shadowBlur = 0;
 
         ctx.restore();
     }
@@ -582,15 +596,17 @@ export class HellhoundUnitRenderer implements UnitRenderer {
         ctx.quadraticCurveTo(0, -5 * s, 0, -8 * s);
         ctx.stroke();
 
-        // Fire tip
+        // Fire tip (Optimized)
         const firePulse = 1 + Math.sin(t * 10) * 0.3;
+
+        const glow = AssetCache.getGlow('rgba(255, 61, 0, 0.5)', 32);
+        const gSize = 15 * s * firePulse;
+        ctx.drawImage(glow, -gSize / 2, -8 * s - gSize / 2, gSize, gSize);
+
         ctx.fillStyle = HellhoundUnitRenderer.MAGMA_CORE;
-        ctx.shadowBlur = 15 * firePulse;
-        ctx.shadowColor = HellhoundUnitRenderer.MAGMA_HOT;
         ctx.beginPath();
         ctx.arc(0, -8 * s, 2.5 * s * firePulse, 0, Math.PI * 2);
         ctx.fill();
-        ctx.shadowBlur = 0;
 
         ctx.restore();
     }
@@ -600,17 +616,23 @@ export class HellhoundUnitRenderer implements UnitRenderer {
 
         ctx.strokeStyle = HellhoundUnitRenderer.MAGMA_CORE;
         ctx.lineWidth = 2 * s;
-        ctx.shadowBlur = 12;
-        ctx.shadowColor = HellhoundUnitRenderer.MAGMA_HOT;
-        ctx.globalAlpha = pulseBase;
 
+        // Fake Glow (stroke)
+        ctx.globalAlpha = pulseBase * 0.5;
+        ctx.lineWidth = 4 * s;
+        ctx.beginPath();
+        ctx.moveTo(5 * s, -5 * s);
+        ctx.bezierCurveTo(2 * s, -6 * s, -3 * s, -4 * s, -7 * s, -4 * s);
+        ctx.stroke();
+
+        ctx.globalAlpha = pulseBase;
+        ctx.lineWidth = 2 * s;
         ctx.beginPath();
         ctx.moveTo(5 * s, -5 * s);
         ctx.bezierCurveTo(2 * s, -6 * s, -3 * s, -4 * s, -7 * s, -4 * s);
         ctx.stroke();
 
         ctx.globalAlpha = 1.0;
-        ctx.shadowBlur = 0;
     }
 
     private drawMagmaCracksSide(ctx: CanvasRenderingContext2D, s: number, t: number) {
@@ -618,8 +640,18 @@ export class HellhoundUnitRenderer implements UnitRenderer {
         ctx.strokeStyle = HellhoundUnitRenderer.MAGMA_CORE;
         ctx.globalAlpha = alpha;
         ctx.lineWidth = 1.8 * s;
-        ctx.shadowBlur = 10;
-        ctx.shadowColor = HellhoundUnitRenderer.MAGMA_CORE;
+
+        // Fake Glow (Double stroke)
+        ctx.save();
+        ctx.lineWidth = 4 * s;
+        ctx.globalAlpha = alpha * 0.3;
+        ctx.beginPath();
+        ctx.moveTo(4 * s, -4 * s); ctx.lineTo(2 * s, 0);
+        ctx.moveTo(-1 * s, -2 * s); ctx.lineTo(-3 * s, 2 * s);
+        ctx.moveTo(-5 * s, -3 * s); ctx.lineTo(-6 * s, 0);
+        ctx.moveTo(-7 * s, -2 * s); ctx.lineTo(-8 * s, 1 * s);
+        ctx.stroke();
+        ctx.restore();
 
         ctx.beginPath();
         // Shoulder crack
@@ -631,7 +663,6 @@ export class HellhoundUnitRenderer implements UnitRenderer {
         ctx.moveTo(-7 * s, -2 * s); ctx.lineTo(-8 * s, 1 * s);
         ctx.stroke();
 
-        ctx.shadowBlur = 0;
         ctx.globalAlpha = 1.0;
     }
 
@@ -663,28 +694,31 @@ export class HellhoundUnitRenderer implements UnitRenderer {
     }
 
     private drawEmberTrail(ctx: CanvasRenderingContext2D, x: number, y: number, s: number, t: number) {
-        // More frequent, larger embers
+        // DETERMINISTIC EMBERS (No Math.random inside frame draw)
+        // We use sine waves based on time and index to simulate randomness
         const count = 4;
         for (let i = 0; i < count; i++) {
-            if (Math.random() > 0.7) continue; // 30% skip (was 60%)
+            // Emulate "if (Math.random() > 0.7) continue" deterministically
+            // Use a complex sine wave to decide visibility
+            const visibilityFactor = Math.sin(t * 5 + i * 132.1);
+            if (visibilityFactor > 0.4) continue; // Skip roughly 30-40% of time
 
-            const offset = Math.random() * 8 * s - 4 * s;
+            const offset = Math.sin(t * 3 + i * 4) * 4 * s;
             const px = x + offset;
-            const py = y + Math.random() * 4 * s;
+            const py = y + Math.cos(t * 4 + i * 2) * 2 * s;
 
-            const size = (0.8 + Math.random() * 0.8) * s; // Larger
-            const alpha = 0.6 + Math.random() * 0.4;
+            const size = (0.8 + Math.abs(Math.sin(t * 2 + i))) * s;
+            const alpha = 0.6 + Math.sin(t * 7 + i) * 0.4;
 
-            ctx.fillStyle = Math.random() > 0.5 ? HellhoundUnitRenderer.MAGMA_CORE : HellhoundUnitRenderer.MAGMA_HOT;
+            ctx.fillStyle = (i % 2 === 0) ? HellhoundUnitRenderer.MAGMA_CORE : HellhoundUnitRenderer.MAGMA_HOT;
+
+            // Optimized: No shadowBlur
             ctx.globalAlpha = alpha;
-            ctx.shadowBlur = 6;
-            ctx.shadowColor = HellhoundUnitRenderer.MAGMA_CORE;
             ctx.beginPath();
             ctx.arc(px, py, size, 0, Math.PI * 2);
             ctx.fill();
         }
         ctx.globalAlpha = 1.0;
-        ctx.shadowBlur = 0;
     }
 
     drawEmissive(ctx: CanvasRenderingContext2D, enemy: Enemy, scale: number, rotation: number): void {

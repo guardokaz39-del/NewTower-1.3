@@ -1,5 +1,6 @@
 import { UnitRenderer } from './UnitRenderer';
 import type { Enemy } from '../../Enemy';
+import { Assets } from '../../Assets';
 
 export class OrcUnitRenderer implements UnitRenderer {
     // Палитра: Темная, тяжелая, ржавая
@@ -9,12 +10,42 @@ export class OrcUnitRenderer implements UnitRenderer {
     private static readonly METAL_LIGHT = '#757575'; // Клепки/Лезвия
     private static readonly ARMOR_MAIN = '#616161'; // Чуть светлее
 
+    // BAKING SUPPORT
+    drawFrame(ctx: CanvasRenderingContext2D, enemy: Enemy, t: number): void {
+        const cycle = t * Math.PI * 2;
+        const scale = 1.0;
+        const isMoving = true;
+        this.drawSide(ctx, scale, cycle, isMoving);
+    }
+
     drawBody(ctx: CanvasRenderingContext2D, enemy: Enemy, scale: number, rotation: number): void {
         const time = Date.now();
-        // Снижаем скорость анимации. baseSpeed ~38-60. 
-        // Было time * 0.004 -> слишком часто перебирает ногами.
-        // 0.0015 даст примерно 1.2 шага в секунду при скорости 50.
         const walkCycle = (time * 0.0015) * (enemy.baseSpeed / 10);
+
+        // 1. Try Cached Sprite
+        const t = (walkCycle % (Math.PI * 2)) / (Math.PI * 2);
+        const frameIdx = Math.floor(t * 32) % 32;
+        const frameKey = `unit_${enemy.typeId}_walk_${frameIdx}`;
+
+        const sprite = Assets.get(frameKey);
+        if (sprite) {
+            ctx.save();
+            ctx.rotate(rotation);
+            const size = 96 * scale;
+            ctx.drawImage(sprite, -size / 2, -size / 2, size, size);
+
+            // Hit Flash (Manual)
+            if (enemy.hitFlashTimer > 0) {
+                ctx.globalCompositeOperation = 'source-atop';
+                ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
+                ctx.fillRect(-size / 2, -size / 2, size, size);
+            }
+
+            ctx.restore();
+            return;
+        }
+
+        // 2. Fallback
         const isMoving = !enemy.finished && enemy.currentHealth > 0;
 
         let facing: 'DOWN' | 'UP' | 'SIDE' = 'SIDE';
@@ -25,6 +56,8 @@ export class OrcUnitRenderer implements UnitRenderer {
         else facing = 'SIDE';
 
         ctx.save();
+
+        if (enemy.hitFlashTimer > 0) ctx.globalAlpha = 0.7;
 
         if (facing === 'SIDE') {
             if (Math.abs(rotation) > Math.PI / 2) ctx.scale(-1, 1);

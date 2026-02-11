@@ -1,5 +1,6 @@
 import { UnitRenderer } from './UnitRenderer';
 import type { Enemy } from '../../Enemy';
+import { Assets } from '../../Assets';
 
 export class TrollUnitRenderer implements UnitRenderer {
     // 🎨 Palette (Snow Troll)
@@ -14,11 +15,44 @@ export class TrollUnitRenderer implements UnitRenderer {
     private static readonly CLUB_LENGTH = 24;
     private static readonly CLUB_WIDTH = 8;
 
+    // BAKING SUPPORT
+    drawFrame(ctx: CanvasRenderingContext2D, enemy: Enemy, t: number): void {
+        const cycle = t * Math.PI * 2;
+        const scale = 1.0;
+        const isMoving = true;
+        this.drawSide(ctx, scale, cycle, isMoving);
+    }
+
     drawBody(ctx: CanvasRenderingContext2D, enemy: Enemy, scale: number, rotation: number): void {
         const time = Date.now() * 0.001;
         // Heavy, slow movement (baseSpeed is 42, ~0.7 tiles/sec)
         // Adjusted walk cycle speed for "heaviness"
         const walkCycle = time * (enemy.baseSpeed * 0.15);
+
+        // 1. Try Cached Sprite
+        const t = (walkCycle % (Math.PI * 2)) / (Math.PI * 2);
+        const frameIdx = Math.floor(t * 32) % 32;
+        const frameKey = `unit_${enemy.typeId}_walk_${frameIdx}`;
+
+        const sprite = Assets.get(frameKey);
+        if (sprite) {
+            ctx.save();
+            ctx.rotate(rotation);
+            const size = 96 * scale;
+            ctx.drawImage(sprite, -size / 2, -size / 2, size, size);
+
+            // Hit Flash
+            if (enemy.hitFlashTimer > 0) {
+                ctx.globalCompositeOperation = 'source-atop';
+                ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
+                ctx.fillRect(-size / 2, -size / 2, size, size);
+            }
+
+            ctx.restore();
+            return;
+        }
+
+        // 2. Fallback
         const isMoving = !enemy.finished && enemy.currentHealth > 0;
 
         let facing: 'DOWN' | 'UP' | 'SIDE' = 'SIDE';
@@ -31,6 +65,8 @@ export class TrollUnitRenderer implements UnitRenderer {
         else facing = 'SIDE';
 
         ctx.save();
+
+        if (enemy.hitFlashTimer > 0) ctx.globalAlpha = 0.7;
 
         if (facing === 'SIDE') {
             if (Math.abs(rotation) > Math.PI / 2) {

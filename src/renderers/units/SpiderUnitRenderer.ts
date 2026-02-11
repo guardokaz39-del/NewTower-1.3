@@ -1,8 +1,10 @@
+import { CachedUnitRenderer } from './CachedUnitRenderer';
 import { UnitRenderer } from './UnitRenderer';
 import { CONFIG } from '../../Config';
 import type { Enemy } from '../../Enemy';
+import { Assets } from '../../Assets';
 
-export class SpiderUnitRenderer implements UnitRenderer {
+export class SpiderUnitRenderer extends CachedUnitRenderer {
     // 🎨 Sinister Poison Palette
     private static readonly BODY_COLOR = '#051806'; // Nearly black green
     private static readonly ABDOMEN_COLOR = '#0f2910'; // Dark toxic green
@@ -13,47 +15,28 @@ export class SpiderUnitRenderer implements UnitRenderer {
     private static readonly ACID_GLOW = '#76ff03';  // Bright Toxic Green
     private static readonly VEIN_COLOR = '#2e7d32'; // Subtle veins
 
-    drawBody(ctx: CanvasRenderingContext2D, enemy: Enemy, scale: number, rotation: number): void {
-        const time = Date.now() * 0.001;
-        const walkCycle = time * (enemy.baseSpeed * 0.4); // Faster twitchy movement
-        const isMoving = !enemy.finished && enemy.currentHealth > 0;
-
-        const spiderScale = scale * 1.1;
-
-        // Orientation
-        let facing: 'DOWN' | 'UP' | 'SIDE' = 'SIDE';
-        const r = rotation;
-        if (r > -2.35 && r < -0.78) facing = 'UP';
-        else if (r > 0.78 && r < 2.35) facing = 'DOWN';
-        else facing = 'SIDE';
-
-        ctx.save();
-
-        if (enemy.hitFlashTimer > 0) ctx.filter = 'brightness(500%) sepia(100%) hue-rotate(50deg)';
-
-        // Twitchy breathing
-        const breathe = Math.sin(time * 8) * 0.3 * spiderScale; // Faster breath
-
-        // Draw Legs FIRST (under body)
-        this.drawLegs(ctx, facing, spiderScale, walkCycle, isMoving);
-
-        // Draw Acid Trail
-        if (isMoving && Math.random() > 0.7) {
-            this.drawAcidDrip(ctx, spiderScale);
-        }
-
-        // Draw Body
-        if (facing === 'SIDE') {
-            if (Math.abs(rotation) > Math.PI / 2) ctx.scale(-1, 1);
-            this.drawSide(ctx, spiderScale, breathe, time);
-        } else if (facing === 'UP') {
-            this.drawBack(ctx, spiderScale, breathe, time);
-        } else {
-            this.drawFront(ctx, spiderScale, breathe, time);
-        }
-
-        ctx.restore();
+    constructor() {
+        super();
+        this.walkCycleMultiplier = 0.4;
     }
+
+    // BAKING SUPPORT
+    drawFrame(ctx: CanvasRenderingContext2D, enemy: Enemy, t: number): void {
+        const cycle = t * Math.PI * 2;
+        const scale = 1.0;
+        const spiderScale = scale * 1.1;
+        const isMoving = true;
+        const time = t * 10;
+        const breathe = Math.sin(time * 8) * 0.3 * spiderScale;
+
+        // Use Side view for bake
+        // CRITICAL: Draw legs first!
+        this.drawLegs(ctx, 'SIDE', spiderScale, cycle, isMoving);
+        this.drawSide(ctx, spiderScale, breathe, time);
+    }
+
+    // drawBody is inherited
+
 
     private drawLegs(ctx: CanvasRenderingContext2D, facing: string, s: number, cycle: number, isMoving: boolean) {
         const drawLeg = (sx: number, sy: number, ex: number, ey: number, kneeDir: number, phase: number, zIndex: number = 0) => {
@@ -193,11 +176,15 @@ export class SpiderUnitRenderer implements UnitRenderer {
 
         // Eyes (Many)
         ctx.fillStyle = SpiderUnitRenderer.EYES_COLOR;
-        ctx.shadowBlur = 5; ctx.shadowColor = SpiderUnitRenderer.EYES_COLOR;
+        // Cheap fake glow (Draw larger with alpha)
         [[-1, 1], [1, 1], [-2.5, 0.5], [2.5, 0.5]].forEach(p => {
+            // Glow
+            ctx.globalAlpha = 0.3;
+            ctx.beginPath(); ctx.arc(p[0] * s, p[1] * s, 1.5 * s, 0, Math.PI * 2); ctx.fill();
+            // Core
+            ctx.globalAlpha = 1.0;
             ctx.beginPath(); ctx.arc(p[0] * s, p[1] * s, 0.8 * s, 0, Math.PI * 2); ctx.fill();
         });
-        ctx.shadowBlur = 0;
 
         // Fangs (Sharp)
         ctx.fillStyle = SpiderUnitRenderer.FANGS_COLOR;
@@ -247,9 +234,11 @@ export class SpiderUnitRenderer implements UnitRenderer {
 
         // Eyes
         ctx.fillStyle = SpiderUnitRenderer.EYES_COLOR;
-        ctx.shadowBlur = 4; ctx.shadowColor = SpiderUnitRenderer.EYES_COLOR;
+        // Fake glow
+        ctx.globalAlpha = 0.3;
+        ctx.beginPath(); ctx.arc(5.5 * s, 0.5 * s, 1.5 * s, 0, Math.PI * 2); ctx.fill();
+        ctx.globalAlpha = 1.0;
         ctx.beginPath(); ctx.arc(5.5 * s, 0.5 * s, 0.8 * s, 0, Math.PI * 2); ctx.fill();
-        ctx.shadowBlur = 0;
 
         // Fangs
         ctx.fillStyle = SpiderUnitRenderer.FANGS_COLOR;
@@ -261,15 +250,22 @@ export class SpiderUnitRenderer implements UnitRenderer {
     private drawHourglass(ctx: CanvasRenderingContext2D, x: number, y: number, s: number, t: number) {
         const glow = Math.sin(t * 5) * 5;
         ctx.fillStyle = SpiderUnitRenderer.ACID_GLOW;
-        ctx.shadowBlur = 10 + glow; ctx.shadowColor = SpiderUnitRenderer.ACID_GLOW;
+
         ctx.save();
         ctx.translate(x, y);
         ctx.scale(1, 1.5);
+
+        // Fake Halo Glow
+        ctx.globalAlpha = 0.3;
+        ctx.beginPath();
+        ctx.arc(0, 0, 4 * s, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.globalAlpha = 1.0;
         ctx.beginPath();
         ctx.moveTo(-1.5 * s, -1.5 * s); ctx.lineTo(1.5 * s, 1.5 * s); ctx.lineTo(-1.5 * s, 1.5 * s); ctx.lineTo(1.5 * s, -1.5 * s);
         ctx.fill();
         ctx.restore();
-        ctx.shadowBlur = 0;
     }
 
     private drawVeins(ctx: CanvasRenderingContext2D, x: number, y: number, r: number, t: number) {

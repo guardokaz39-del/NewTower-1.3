@@ -3,6 +3,16 @@ import { VISUALS } from './VisualConfig';
 import { ProceduralPatterns } from './ProceduralPatterns';
 import { ProceduralRoad } from './renderers/ProceduralRoad';
 import { ProceduralGrass } from './renderers/ProceduralGrass';
+import { SpriteBaker } from './utils/SpriteBaker';
+import { OrcUnitRenderer } from './renderers/units/OrcUnitRenderer';
+import { SkeletonUnitRenderer } from './renderers/units/SkeletonUnitRenderer';
+import { GoblinUnitRenderer } from './renderers/units/GoblinUnitRenderer';
+import { SpiderUnitRenderer } from './renderers/units/SpiderUnitRenderer';
+import { TrollUnitRenderer } from './renderers/units/TrollUnitRenderer';
+import { RatUnitRenderer } from './renderers/units/RatUnitRenderer';
+import { HellhoundUnitRenderer } from './renderers/units/HellhoundUnitRenderer';
+import { MagmaUnitRenderer } from './renderers/units/MagmaUnitRenderer';
+import { FleshUnitRenderer } from './renderers/units/FleshUnitRenderer';
 
 export class Assets {
     // Хранилище изображений
@@ -43,6 +53,10 @@ export class Assets {
         // Генерируем процедурные текстуры для недостающих ассетов
         console.log('[2/2] Генерация процедурных текстур для недостающих ассетов...');
         this.generateFallbackTextures();
+
+        // PHASE 3: Bake Animations
+        console.log('[3/2] Запекание анимаций врагов (Sprite Baking)...');
+        this.generateBakedSprites();
 
         console.log('\n╔════════════════════════════════════════╗');
         console.log(`║   ИТОГО: ${Object.keys(this.images).length} ассетов загружено           ║`);
@@ -834,6 +848,7 @@ export class Assets {
 
         // Standard / Default
         this.generateTexture('turret_standard', size, (ctx, w, h) => {
+            ctx.save();
             const cx = w / 2;
             const cy = h / 2;
             ctx.translate(cx, cy);
@@ -846,6 +861,7 @@ export class Assets {
             ctx.strokeStyle = VISUALS.TOWER.TURRET.STANDARD.STROKE;
             ctx.lineWidth = 2;
             ctx.stroke();
+            ctx.restore();
         });
 
         // Loop for 3 levels
@@ -853,6 +869,7 @@ export class Assets {
 
             // --- FIRE TURRET (Mortar) ---
             this.generateTexture(`turret_fire_${level}`, size, (ctx, w, h) => {
+                ctx.save();
                 const cx = w / 2;
                 const cy = h / 2;
                 ctx.translate(cx, cy);
@@ -969,11 +986,13 @@ export class Assets {
                     }
                     ctx.stroke();
                 }
+                ctx.restore();
             });
 
 
             // --- ICE TURRET (Magical Crystal) ---
             this.generateTexture(`turret_ice_${level}`, size, (ctx, w, h) => {
+                ctx.save();
                 const cx = w / 2;
                 const cy = h / 2;
                 ctx.translate(cx, cy);
@@ -1112,11 +1131,13 @@ export class Assets {
                         ctx.restore();
                     });
                 }
+                ctx.restore();
             });
 
 
             // --- SNIPER TURRET (Rail Gun) ---
             this.generateTexture(`turret_sniper_${level}`, size, (ctx, w, h) => {
+                ctx.save();
                 const cx = w / 2;
                 const cy = h / 2;
                 ctx.translate(cx, cy);
@@ -1256,11 +1277,13 @@ export class Assets {
                     ctx.arc(-2, 0, 5, 0, Math.PI * 2);
                     ctx.fill();
                 }
+                ctx.restore();
             });
 
 
             // --- SPLIT TURRET (Rocket Volley) ---
             this.generateTexture(`turret_split_${level}`, size, (ctx, w, h) => {
+                ctx.save();
                 const cx = w / 2;
                 const cy = h / 2;
                 ctx.translate(cx, cy);
@@ -1391,6 +1414,7 @@ export class Assets {
                     ctx.arc(0, 0, 5, 0, Math.PI * 2);
                     ctx.fill();
                 }
+                ctx.restore();
             });
 
 
@@ -1398,6 +1422,7 @@ export class Assets {
             // --- VOID PRISM (Magical Minigun) ---
             // Pedestal only - floating crystal is drawn procedurally by renderer
             this.generateTexture(`turret_minigun_${level}`, size, (ctx, w, h) => {
+                ctx.save();
                 const cx = w / 2;
                 const cy = h / 2;
                 ctx.translate(cx, cy);
@@ -1486,6 +1511,7 @@ export class Assets {
                     ctx.lineTo(4, -3);
                     ctx.stroke();
                 }
+                ctx.restore();
             });
         }
 
@@ -1900,5 +1926,56 @@ export class Assets {
             ctx.arc(cx, cy, 12, 0, Math.PI * 2);
             ctx.fill();
         });
+    }
+
+    /**
+     * Runtime Sprite Baking (Phase 3)
+     */
+    private static generateBakedSprites() {
+        try {
+            // 1. Orc
+            SpriteBaker.bakeWalkCycle('orc', new OrcUnitRenderer());
+            console.log('✓ Baked walk cycle for "orc"');
+
+            // 2. Skeleton
+            SpriteBaker.bakeWalkCycle('skeleton', new SkeletonUnitRenderer());
+            console.log('✓ Baked walk cycle for "skeleton"');
+
+            // 3. Goblin
+            SpriteBaker.bakeWalkCycle('goblin', new GoblinUnitRenderer());
+            console.log('✓ Baked walk cycle for "goblin"');
+
+            // 4. Spider
+            SpriteBaker.bakeWalkCycle('spider', new SpiderUnitRenderer());
+            console.log('✓ Baked walk cycle for "spider"');
+
+            // 5. Troll
+            SpriteBaker.bakeWalkCycle('troll', new TrollUnitRenderer());
+            console.log('✓ Baked walk cycle for "troll"');
+
+            // 6. Rat
+            SpriteBaker.bakeWalkCycle('rat', new RatUnitRenderer());
+            SpriteBaker.bakeWalkCycle('sapper_rat', new RatUnitRenderer());
+            console.log('✓ Baked walk cycle for "rat" & "sapper_rat"');
+
+            // 7. Hellhound
+            SpriteBaker.bakeWalkCycle('hellhound', new HellhoundUnitRenderer());
+            SpriteBaker.bakeWalkCycle('scout', new HellhoundUnitRenderer());
+            console.log('✓ Baked walk cycle for "hellhound" & "scout"');
+
+            // 8. Magma (King & Statue)
+            SpriteBaker.bakeWalkCycle('magma_king', new MagmaUnitRenderer());
+            SpriteBaker.bakeWalkCycle('magma_statue', new MagmaUnitRenderer());
+            console.log('✓ Baked walk cycle for "magma_king" & "magma_statue"');
+
+            // 9. Flesh Colossus
+            SpriteBaker.bakeWalkCycle('flesh_colossus', new FleshUnitRenderer());
+            console.log('✓ Baked walk cycle for "flesh_colossus"');
+
+            // TODO: Add more enemies here as their renderers are updated
+
+        } catch (e) {
+            console.error('Failed to bake sprites:', e);
+        }
     }
 }

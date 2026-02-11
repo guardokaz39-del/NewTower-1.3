@@ -1,7 +1,9 @@
+import { CachedUnitRenderer } from './CachedUnitRenderer';
 import { UnitRenderer } from './UnitRenderer';
 import type { Enemy } from '../../Enemy';
+import { Assets } from '../../Assets';
 
-export class SkeletonUnitRenderer implements UnitRenderer {
+export class SkeletonUnitRenderer extends CachedUnitRenderer {
     // Palette
     private static readonly BONE_LIGHT = '#e0d0b0';
     private static readonly BONE_DARK = '#a89070';
@@ -13,41 +15,15 @@ export class SkeletonUnitRenderer implements UnitRenderer {
     // Config
     private static readonly HEAD_RADIUS = 5.5;
 
-    drawBody(ctx: CanvasRenderingContext2D, enemy: Enemy, scale: number, rotation: number): void {
-        const time = Date.now() * 0.001; // Use seconds
-        // baseSpeed is ~90 px/sec. 90 * 0.15 = 13.5 rad/sec (~2 steps/sec)
-        const walkCycle = time * (enemy.baseSpeed * 0.15);
-        const isMoving = !enemy.finished && enemy.currentHealth > 0;
-
-        let facing: 'DOWN' | 'UP' | 'SIDE' = 'SIDE';
-
-        // Rotation Logic
-        const r = rotation;
-        if (r > -2.35 && r < -0.78) facing = 'UP';
-        else if (r > 0.78 && r < 2.35) facing = 'DOWN';
-        else facing = 'SIDE';
-
-        ctx.save();
-
-        // Hit Flash Effect
-        if (enemy.hitFlashTimer > 0) {
-            ctx.filter = 'brightness(1000%)';
-        }
-
-        if (facing === 'SIDE') {
-            // Flip for Left Facing
-            if (Math.abs(rotation) > Math.PI / 2) {
-                ctx.scale(-1, 1);
-            }
-            this.drawSide(ctx, scale, walkCycle, isMoving);
-        } else if (facing === 'UP') {
-            this.drawBack(ctx, scale, walkCycle, isMoving);
-        } else {
-            this.drawFront(ctx, scale, walkCycle, isMoving);
-        }
-
-        ctx.restore();
+    // BAKING SUPPORT
+    drawFrame(ctx: CanvasRenderingContext2D, enemy: Enemy, t: number): void {
+        const cycle = t * Math.PI * 2;
+        const scale = 1.0;
+        this.drawSide(ctx, scale, cycle, true);
     }
+
+    // drawBody and drawProcedural removed (using CachedUnitRenderer)
+
 
     // === FRONT VIEW (Walking Down) ===
     private drawFront(ctx: CanvasRenderingContext2D, scale: number, walkCycle: number, isMoving: boolean) {
