@@ -42,6 +42,23 @@ export class SpriteBaker {
                     renderer.drawFrame(ctx, mockEnemy, t);
                 }
             }, this.SIZE, this.SIZE);
+
+            // [NEW] Generate White Silhouette for Hit Flash (Pre-baked)
+            const sprite = AssetCache.peek(frameKey);
+            if (sprite) {
+                const silhouetteKey = frameKey + '_white';
+                // Only bake if not exists (or implement a force-bake/peek check inside)
+                // AssetCache.get checks existence, so we just provide the factory.
+                AssetCache.get(silhouetteKey, (ctxS, w, h) => {
+                    // Draw the original sprite
+                    ctxS.drawImage(sprite, 0, 0);
+
+                    // Composite white on top, keeping alpha
+                    ctxS.globalCompositeOperation = 'source-in';
+                    ctxS.fillStyle = '#ffffff';
+                    ctxS.fillRect(0, 0, w, h);
+                }, this.SIZE, this.SIZE);
+            }
         }
     }
 

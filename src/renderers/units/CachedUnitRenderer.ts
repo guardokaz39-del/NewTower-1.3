@@ -2,6 +2,9 @@ import { UnitRenderer } from './UnitRenderer';
 import { Assets } from '../../Assets';
 import type { Enemy } from '../../Enemy';
 
+export type SpriteOrientationMode = 'ROTATE' | 'FLIP' | 'DIR3';
+export type SpriteFacing = 'SIDE' | 'UP' | 'DOWN';
+
 /**
  * Base class for UnitRenderers that supports Sprite Baking.
  * Automatically handles sprite lookup, rotation, and basic hit flash.
@@ -16,6 +19,23 @@ export abstract class CachedUnitRenderer implements UnitRenderer {
 
     // Sprite size (default 96 for baked sprites)
     protected spriteSize: number = 96;
+
+    // Orientation of baked sprites
+    protected orientationMode: SpriteOrientationMode = 'FLIP';
+
+    /**
+     * If your sprite is authored “facing up” instead of “facing right” etc.
+     * Only used in ROTATE mode.
+     */
+    protected baseRotationOffset: number = 0;
+
+    /**
+     * Facing thresholds (radians). You can tweak per-project.
+     */
+    protected facingUpMin = -2.35;
+    protected facingUpMax = -0.78;
+    protected facingDownMin = 0.78;
+    protected facingDownMax = 2.35;
 
     /**
      * Draws a single frame for baking or fallback.
@@ -69,6 +89,36 @@ export abstract class CachedUnitRenderer implements UnitRenderer {
             // Draw effects for fallback too
             this.drawEffects(ctx, enemy, scale);
         }
+    }
+
+    protected getFacing(rotation: number): SpriteFacing {
+        if (rotation > this.facingUpMin && rotation < this.facingUpMax) return 'UP';
+        if (rotation > this.facingDownMin && rotation < this.facingDownMax) return 'DOWN';
+        return 'SIDE';
+    }
+
+    protected isFacingLeft(rotation: number): boolean {
+        // cos < 0 => движение “влево”
+        return Math.cos(rotation) < 0;
+    }
+
+    protected getSpriteKey(enemyTypeId: string, frameIdx: number, facing: SpriteFacing): string {
+        // Backward compatible: old baked keys without facing
+        if (this.orientationMode !== 'DIR3') return `unit_${enemyTypeId}_walk_${frameIdx}`;
+        return `unit_${enemyTypeId}_${facing.toLowerCase()}_walk_${frameIdx}`;
+    }
+
+    /**
+     * Directional draw hook for baking/fallback in DIR3 mode.
+     * Default: just call drawFrame (side).
+     */
+    protected drawFrameDirectional(
+        ctx: CanvasRenderingContext2D,
+        enemy: Enemy,
+        t: number,
+        facing: SpriteFacing
+    ): void {
+        this.drawFrame(ctx, enemy, t);
     }
 
     /**

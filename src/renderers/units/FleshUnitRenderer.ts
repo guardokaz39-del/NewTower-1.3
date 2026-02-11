@@ -12,6 +12,9 @@ import { Assets } from '../../Assets';
 export class FleshUnitRenderer extends CachedUnitRenderer {
     // 🩸 FLESH PALETTE — Layered tones for depth
     private static readonly FLESH_DEEPEST = '#3a1818';
+
+    protected walkCycleMultiplier: number = 0.2; // Slower, heavy movement
+    protected override orientationMode = 'FLIP' as const;
     private static readonly FLESH_DARK = '#4a2020';
     private static readonly FLESH_MID = '#6d3030';
     private static readonly FLESH_LIGHT = '#8d4545';

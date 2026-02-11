@@ -33,8 +33,10 @@ export class GoblinUnitRenderer implements UnitRenderer {
         const sprite = Assets.get(frameKey);
         if (sprite) {
             ctx.save();
-            ctx.rotate(rotation);
             const size = 96 * scale;
+            const facingLeft = Math.cos(rotation) < 0;
+            if (facingLeft) ctx.scale(-1, 1);
+
             ctx.drawImage(sprite, -size / 2, -size / 2, size, size);
 
             // Hit Flash (Source-Atop cheap method)

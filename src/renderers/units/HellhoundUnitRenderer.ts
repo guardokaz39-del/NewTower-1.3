@@ -17,6 +17,7 @@ import { AssetCache } from '../../utils/AssetCache';
  */
 export class HellhoundUnitRenderer extends CachedUnitRenderer {
     // 🔥 Demonic Palette — Enhanced
+    protected override orientationMode = 'FLIP' as const;
     private static readonly OBSIDIAN = '#0a0303';         // Deepest black-red
     private static readonly OBSIDIAN_LIGHT = '#1f0f0f';   // Slightly lighter
     private static readonly OBSIDIAN_MUSCLE = '#2a1515';  // Muscle tone

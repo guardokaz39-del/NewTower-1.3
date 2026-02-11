@@ -5,6 +5,7 @@ import type { Enemy } from '../../Enemy';
 import { Assets } from '../../Assets';
 
 export class SpiderUnitRenderer extends CachedUnitRenderer {
+    protected override orientationMode = 'FLIP' as const;
     // 🎨 Sinister Poison Palette
     private static readonly BODY_COLOR = '#051806'; // Nearly black green
     private static readonly ABDOMEN_COLOR = '#0f2910'; // Dark toxic green

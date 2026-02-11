@@ -14,6 +14,8 @@ export class RatUnitRenderer extends CachedUnitRenderer {
     private static readonly BARREL_WOOD = '#261b18';     // Burnt Wood
     private static readonly BARREL_RIM = '#4e342e';      // Rusted Iron
 
+    protected override orientationMode = 'FLIP' as const;
+
     constructor() {
         super();
         this.walkCycleMultiplier = 12.5; // High speed scurry

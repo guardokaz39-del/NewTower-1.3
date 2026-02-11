@@ -18,6 +18,8 @@ interface MagmaParticle {
 
 export class MagmaUnitRenderer extends CachedUnitRenderer {
     // --- PALETTE: MOLTEN CORE ---
+    protected override orientationMode = 'FLIP' as const;
+
     // Core is blindingly bright, cooling as it goes out
     private static readonly C_CORE = '#ffffff';       // White-hot core
     private static readonly C_CORE_BRIGHT = '#fff9e6'; // Slightly yellow glow
@@ -77,15 +79,20 @@ export class MagmaUnitRenderer extends CachedUnitRenderer {
         }
     }
 
-    drawBody(ctx: CanvasRenderingContext2D, enemy: Enemy, scale: number, rotation: number): void {
-        const isBoss = enemy.typeId === 'magma_king';
+    // --- HYBRID RENDERING ---
+    // Body is cached (via super.drawBody), Effects are dynamic on top.
 
-        // --- PARTICLE UPDATE (Always Procedural) ---
+    protected drawEffects(ctx: CanvasRenderingContext2D, enemy: Enemy, scale: number): void {
+        const isBoss = enemy.typeId === 'magma_king';
+        // Draw particles on top of the cached sprite
         this.updateParticles(ctx, enemy, scale, isBoss);
 
-        // --- BODY RENDERING (Cached or Fallback) ---
-        super.drawBody(ctx, enemy, scale, rotation);
+        // Draw emissive glow
+        this.drawEmissive(ctx, enemy, scale, 0);
     }
+
+    // NOTE: We do NOT override drawBody anymore. 
+    // CachedUnitRenderer.drawBody handles the sprite + hit flash + calls drawEffects.
 
 
     // =========================================================================

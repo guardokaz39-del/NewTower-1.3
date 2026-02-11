@@ -13,6 +13,7 @@ export class SkeletonUnitRenderer extends CachedUnitRenderer {
     private static readonly ARMOR_LIGHT = '#546e7a';
 
     // Config
+    protected override orientationMode = 'FLIP' as const;
     private static readonly HEAD_RADIUS = 5.5;
 
     // BAKING SUPPORT
