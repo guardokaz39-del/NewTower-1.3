@@ -49,8 +49,12 @@ export class InputSystem {
 
     private onPointerMove(e: PointerEvent) {
         const rect = this.canvas.getBoundingClientRect();
-        const scaleX = this.canvas.width / rect.width;
-        const scaleY = this.canvas.height / rect.height;
+
+        // Map screen pixels to logical game pixels
+        // game.width is the logical width (e.g. 1000), rect.width is display width (e.g. 1000)
+        // If CSS stretches the canvas, this handles it.
+        const scaleX = this.game.width / rect.width;
+        const scaleY = this.game.height / rect.height;
 
         this.mouseX = (e.clientX - rect.left) * scaleX;
         this.mouseY = (e.clientY - rect.top) * scaleY;
@@ -59,9 +63,17 @@ export class InputSystem {
         this.hoverRow = Math.floor(this.mouseY / CONFIG.TILE_SIZE);
 
         const scene = this.game.currentScene;
+        // Pass logical coordinates to drag update
         if (scene instanceof GameScene) {
             if (scene.cardSys && scene.cardSys.dragCard) {
-                scene.cardSys.updateDrag(e.clientX, e.clientY);
+                // dragCard expects global screen coords or logical?
+                // CardSystem usually uses DOM elements or Canvas drawing?
+                // Check CardSystem... for now pass ClientX/Y as it was before, 
+                // OR duplicate logic inside CardSystem if it needs logical.
+                // The original code passed e.clientX/Y. Let's keep that for Drag ops that might be DOM based.
+                // Wait, if CardSystem draws to canvas, it needs logical.
+                // Let's pass logical.
+                scene.cardSys.updateDrag(this.mouseX, this.mouseY);
             }
         }
     }

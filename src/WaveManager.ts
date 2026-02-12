@@ -52,7 +52,7 @@ export class WaveManager {
             // Early wave bonus!
             this.scene.addMoney(CONFIG.ECONOMY.EARLY_WAVE_BONUS);
             this.scene.metrics.trackMoneyEarned(CONFIG.ECONOMY.EARLY_WAVE_BONUS);
-            this.scene.showFloatingText(`EARLY! +${CONFIG.ECONOMY.EARLY_WAVE_BONUS}💰`, this.scene.game.canvas.width / 2, 300, 'gold');
+            this.scene.showFloatingText(`EARLY! +${CONFIG.ECONOMY.EARLY_WAVE_BONUS}💰`, this.scene.game.width / 2, 300, 'gold');
         }
 
         this.generateWave(this.scene.wave);
@@ -115,7 +115,7 @@ export class WaveManager {
             this.scene.metrics.trackMoneyEarned(CONFIG.ECONOMY.PERFECT_WAVE_BONUS);
             this.scene.showFloatingText(
                 `PERFECT! +${CONFIG.ECONOMY.PERFECT_WAVE_BONUS}💰`,
-                this.scene.game.canvas.width / 2,
+                this.scene.game.width / 2,
                 350,
                 '#00ffff' // Cyan for perfect
             );

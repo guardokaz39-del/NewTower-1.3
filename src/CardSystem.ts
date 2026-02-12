@@ -62,8 +62,10 @@ export class CardSystem {
                 e.clientX >= rect.left && e.clientX <= rect.right && e.clientY >= rect.top && e.clientY <= rect.bottom;
 
             if (inCanvas) {
-                const x = (e.clientX - rect.left) * (this.scene.game.canvas.width / rect.width);
-                const y = (e.clientY - rect.top) * (this.scene.game.canvas.height / rect.height);
+                // Use logical game dimensions for coordinate mapping
+                // rect.width is display width, game.width is logical width
+                const x = (e.clientX - rect.left) * (this.scene.game.width / rect.width);
+                const y = (e.clientY - rect.top) * (this.scene.game.height / rect.height);
                 this.scene.events.emit('CARD_DROPPED', { card: this.dragCard, x, y });
             }
         }

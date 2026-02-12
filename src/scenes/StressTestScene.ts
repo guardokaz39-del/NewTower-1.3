@@ -342,8 +342,8 @@ export class StressTestScene extends BaseScene implements IGameScene {
                     for (let i = 0; i < 30; i++) { // Increased to 30 to ensure load
                         this.effects.add({
                             type: 'particle',
-                            x: this.rng.rangeFloat(0, this.game.canvas.width),
-                            y: this.rng.rangeFloat(0, this.game.canvas.height),
+                            x: this.rng.rangeFloat(0, this.game.width),
+                            y: this.rng.rangeFloat(0, this.game.height),
                             life: 0.8,
                             color: this.rng.chance(0.5) ? '#fff' : '#ff0000',
                             size: 4
@@ -472,7 +472,7 @@ export class StressTestScene extends BaseScene implements IGameScene {
         PerformanceProfiler.start('Render');
 
         ctx.fillStyle = '#222';
-        ctx.fillRect(0, 0, this.game.canvas.width, this.game.canvas.height);
+        ctx.fillRect(0, 0, this.game.width, this.game.height);
 
         // Draw Map (Simplified)
         // this.map.draw(ctx); // Can use real map draw

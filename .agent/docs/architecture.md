@@ -90,6 +90,20 @@ graph TB
 - `MagmaUnitRenderer.ts`
 - `SkeletonCommanderUnitRenderer.ts`
 
+### 🖥️ Rendering Pipeline & Coordinates [NEW]
+
+The game uses a **Logical Coordinate System** decoupled from physical pixels to support High-DPI screens.
+
+- **Logical Size (Game Units):** `Game.width`, `Game.height` (matches CSS pixels).
+- **Physical Size (Buffer):** `canvas.width`, `canvas.height` (matches Device Pixels).
+- **Scaling:** `ctx` is automatically scaled by `dpr` (Device Pixel Ratio, capped at 2.0).
+
+**Key Rules:**
+
+1. **Always use** `game.width` / `game.height` for logic, UI positioning, and drawing.
+2. **Never use** `game.canvas.width` directly unless dealing with raw buffer operations (e.g. `clearRect`).
+3. **Input:** `InputSystem` automatically maps physical pointer events to logical coordinates.
+
 ---
 
 ### ⚙️ Systems

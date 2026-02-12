@@ -18,13 +18,28 @@ export class Game {
     private lastTime: number = 0;
     private cardSelection: CardSelectionUI;
 
+    // Logical dimensions (CSS pixels)
+    public get width(): number {
+        return this.canvas.width / this.dpr;
+    }
+
+    public get height(): number {
+        return this.canvas.height / this.dpr;
+    }
+
+    private dpr: number = 1;
+
     constructor(canvasId: string) {
         const canvas = document.getElementById(canvasId) as HTMLCanvasElement;
         if (!canvas) throw new Error('Canvas not found!');
         this.canvas = canvas;
         this.ctx = this.canvas.getContext('2d') as CanvasRenderingContext2D;
-        this.canvas.width = window.innerWidth;
-        this.canvas.height = window.innerHeight;
+
+        // Initial resize
+        this.resize();
+
+        // Handle window resizing
+        window.addEventListener('resize', () => this.resize());
 
         this.input = new InputSystem(this);
         this.loop = this.loop.bind(this);
@@ -33,6 +48,31 @@ export class Game {
         window.addEventListener('beforeunload', () => {
             saveSessionData('lastEnemyId', Enemy.nextId);
         });
+    }
+
+    public resize() {
+        // Cap DPR at 2.0 to balance quality and performance (saves battery/GPU)
+        this.dpr = Math.min(window.devicePixelRatio || 1, 2);
+
+        // Get physical display size
+        const rect = this.canvas.getBoundingClientRect();
+
+        // NOTE: We rely on CSS (width: 100vw; height: 100vh) to set the display size.
+        // If rect is 0 (hidden), stick to window dimensions as fallback.
+        const displayWidth = rect.width || window.innerWidth;
+        const displayHeight = rect.height || window.innerHeight;
+
+        // Set buffer size (physical pixels)
+        this.canvas.width = displayWidth * this.dpr;
+        this.canvas.height = displayHeight * this.dpr;
+
+        // Scale context so we draw in "logical" pixels (CSS pixels)
+        this.ctx.scale(this.dpr, this.dpr);
+
+        // OPTIONAL: Reset smoothing if needed (pixel art style?)
+        // this.ctx.imageSmoothingEnabled = false;
+
+        console.log(`[Game] Resized to ${displayWidth}x${displayHeight} (DPR: ${this.dpr}, Buffer: ${this.canvas.width}x${this.canvas.height})`);
     }
 
     public async start() {

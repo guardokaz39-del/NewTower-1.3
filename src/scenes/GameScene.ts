@@ -116,7 +116,7 @@ export class GameScene extends BaseScene implements IGameScene {
         // Initialize map and rendering
         this.map = new MapManager(this.mapData);
         this.fog = new FogSystem(this.mapData);
-        this.lighting = new LightingSystem(game.canvas.width, game.canvas.height);
+        this.lighting = new LightingSystem(game.width, game.height);
         this.map.lighting = this.lighting; // [NEW] Link lighting
         this.dayNightCycle = new DayNightCycle(); // Default cycle (4 min)
         this.atmosphere = new AtmosphereSystem(this.dayNightCycle); // Default config
@@ -132,7 +132,7 @@ export class GameScene extends BaseScene implements IGameScene {
         this.projectileSystem = new ProjectileSystem();
         this.weaponSystem = new WeaponSystem();
         this.metrics = new MetricsSystem();
-        this.notifications = new NotificationSystem(this.effects, game.canvas);
+        this.notifications = new NotificationSystem(this.effects, game);
 
         this.waveManager = new WaveManager(this);
         this.acidSystem = new AcidPuddleSystem(game.ctx);
@@ -422,9 +422,9 @@ export class GameScene extends BaseScene implements IGameScene {
         }
 
         // Complete canvas clearing to prevent "Hall of Mirrors" artifacts
-        ctx.clearRect(0, 0, this.game.canvas.width, this.game.canvas.height);
+        ctx.clearRect(0, 0, this.game.width, this.game.height);
         ctx.fillStyle = '#222';
-        ctx.fillRect(0, 0, this.game.canvas.width, this.game.canvas.height);
+        ctx.fillRect(0, 0, this.game.width, this.game.height);
 
         // Draw map and fog
         // Draw map and fog
@@ -434,8 +434,8 @@ export class GameScene extends BaseScene implements IGameScene {
 
         // === PHASE 6: VIGNETTE (Cinematic Polish) ===
         // Draw a subtle dark gradient at the edges
-        // const w = this.game.canvas.width;
-        // const h = this.game.canvas.height;
+        // const w = this.game.width;
+        // const h = this.game.height;
         //
         // ctx.save();
         // const gradient = ctx.createRadialGradient(w / 2, h / 2, h * 0.45, w / 2, h / 2, h * 0.9);
@@ -468,8 +468,8 @@ export class GameScene extends BaseScene implements IGameScene {
         this.acidSystem.draw();
         this.commanderSystem.draw();
 
-        const viewW = this.game.canvas.width;
-        const viewH = this.game.canvas.height;
+        const viewW = this.game.width;
+        const viewH = this.game.height;
         const cullMargin = 64; // Safe margin for large sprites/effects
 
         PerformanceMonitor.startTimer('RenderEntities');
@@ -490,8 +490,8 @@ export class GameScene extends BaseScene implements IGameScene {
 
         // Draw lighting (over everything except UI)
         // Update size if needed
-        if (this.game.canvas.width !== this.lighting['width'] || this.game.canvas.height !== this.lighting['height']) {
-            this.lighting.resize(this.game.canvas.width, this.game.canvas.height);
+        if (this.game.width !== this.lighting['width'] || this.game.height !== this.lighting['height']) {
+            this.lighting.resize(this.game.width, this.game.height);
         }
         // Reset lights
         this.lighting.clear();

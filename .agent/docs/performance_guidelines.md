@@ -273,6 +273,18 @@ ctx.drawImage(aura, x, y);
 - **Запрещено**: `ctx.strokeText` для обычного текста (Damage numbers). Это очень дорого.
 - **Разрешено**: Только для редких событий (Critical Hit, Level Up).
 
+- **Разрешено**: Только для редких событий (Critical Hit, Level Up).
+
+### 10. High-DPI & Resolution [NEW]
+
+- **DPR Capping**: `DevicePixelRatio` ограничен значением **2.0**.
+  - На экранах 3x/4x (Retina, Modern Mobile) рендеринг в полном разрешении убивает FPS.
+  - Визуальная разница между 2x и 3x мала, а нагрузка на GPU растет в 2.25 раза.
+- **Canvas Resizing**:
+  - `canvas.width` = `clientWidth * dpr`
+  - `ctx.scale(dpr, dpr)`
+  - Логика игры всегда работает в **CSS Pixels** (`game.width`).
+
 ---
 
 *Последнее обновление: 2026-02-09 (Optimization Phase 2)*

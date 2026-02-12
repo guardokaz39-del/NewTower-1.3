@@ -1,3 +1,4 @@
+import { Game } from '../Game';
 import { EffectSystem } from '../EffectSystem';
 import { EventBus, Events } from '../EventBus';
 import { SoundManager, SoundPriority } from '../SoundManager';
@@ -8,14 +9,14 @@ import { SoundManager, SoundPriority } from '../SoundManager';
  */
 export class NotificationSystem {
     private effects: EffectSystem;
-    private canvas: HTMLCanvasElement;
+    private game: Game;
 
     // Active notifications queue
     private notifications: INotification[] = [];
 
-    constructor(effects: EffectSystem, canvas: HTMLCanvasElement) {
+    constructor(effects: EffectSystem, game: Game) {
         this.effects = effects;
-        this.canvas = canvas;
+        this.game = game;
 
         this.initSubscriptions();
     }
@@ -40,8 +41,8 @@ export class NotificationSystem {
      * Wave Start notification - big zoom-in text
      */
     public showWaveStart(waveNum: number) {
-        const cx = this.canvas.width / 2;
-        const cy = this.canvas.height / 2;
+        const cx = this.game.width / 2;
+        const cy = this.game.height / 2;
 
         // Main wave text with zoom effect
         this.effects.add({
@@ -84,8 +85,8 @@ export class NotificationSystem {
      * Wave Clear notification - gold flash + confetti
      */
     public showWaveClear(waveNum: number) {
-        const cx = this.canvas.width / 2;
-        const cy = this.canvas.height / 2;
+        const cx = this.game.width / 2;
+        const cy = this.game.height / 2;
 
         // Victory text
         this.effects.add({
@@ -119,8 +120,8 @@ export class NotificationSystem {
      * Boss Spawn notification - dramatic darkening + spotlight
      */
     public showBossSpawn(bossName: string, x: number, y: number) {
-        const cx = this.canvas.width / 2;
-        const cy = this.canvas.height / 2;
+        const cx = this.game.width / 2;
+        const cy = this.game.height / 2;
 
         // Warning text
         this.effects.add({
@@ -187,8 +188,8 @@ export class NotificationSystem {
      * Custom notification (for special events)
      */
     public showCustom(text: string, color: string = '#fff', duration: number = 60) {
-        const cx = this.canvas.width / 2;
-        const cy = this.canvas.height / 2;
+        const cx = this.game.width / 2;
+        const cy = this.game.height / 2;
 
         this.effects.add({
             type: 'text',

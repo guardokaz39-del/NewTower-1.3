@@ -37,8 +37,8 @@ export class EditorScene extends BaseScene {
         this.game = game;
 
         // Создаем пустую сетку
-        const cols = Math.ceil(game.canvas.width / CONFIG.TILE_SIZE);
-        const rows = Math.ceil(game.canvas.height / CONFIG.TILE_SIZE);
+        const cols = Math.ceil(game.width / CONFIG.TILE_SIZE);
+        const rows = Math.ceil(game.height / CONFIG.TILE_SIZE);
         const emptyTiles = Array(rows)
             .fill(0)
             .map(() => Array(cols).fill(0));
@@ -242,7 +242,7 @@ export class EditorScene extends BaseScene {
 
     public draw(ctx: CanvasRenderingContext2D) {
         ctx.fillStyle = '#222';
-        ctx.fillRect(0, 0, this.game.canvas.width, this.game.canvas.height);
+        ctx.fillRect(0, 0, this.game.width, this.game.height);
 
         for (let y = 0; y < this.map.rows; y++) {
             for (let x = 0; x < this.map.cols; x++) {

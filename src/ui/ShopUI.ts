@@ -108,8 +108,8 @@ export class ShopUI {
         this.scene.effects.add({
             type: 'text',
             text: `- ${this.cost}💰`,
-            x: this.scene.game.canvas.width - 200,
-            y: this.scene.game.canvas.height - 100,
+            x: this.scene.game.width - 200,
+            y: this.scene.game.height - 100,
             life: 60,
             color: 'gold',
             vy: -1,

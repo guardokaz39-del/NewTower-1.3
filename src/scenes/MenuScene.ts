@@ -47,35 +47,36 @@ export class MenuScene extends BaseScene {
         if (bgImage) {
             // Cover-fit с центрированием (масштабирует чтобы покрыть весь canvas)
             const scale = Math.max(
-                this.game.canvas.width / bgImage.width,
-                this.game.canvas.height / bgImage.height
+                this.game.width / bgImage.width,
+                this.game.height / bgImage.height
             );
-            const x = (this.game.canvas.width - bgImage.width * scale) / 2;
-            const y = (this.game.canvas.height - bgImage.height * scale) / 2;
+            const x = (this.game.width - bgImage.width * scale) / 2;
+            const y = (this.game.height - bgImage.height * scale) / 2;
 
             ctx.drawImage(bgImage, x, y, bgImage.width * scale, bgImage.height * scale);
 
             // Затемнение для читабельности
             ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
-            ctx.fillRect(0, 0, this.game.canvas.width, this.game.canvas.height);
+            ctx.fillRect(0, 0, this.game.width, this.game.height);
         } else {
             // === Fallback - старый фон (сетка) ===
             ctx.fillStyle = '#111';
-            ctx.fillRect(0, 0, this.game.canvas.width, this.game.canvas.height);
+            ctx.fillRect(0, 0, this.game.width, this.game.height);
 
             ctx.strokeStyle = '#222';
             ctx.lineWidth = 2;
             const s = 64;
-            for (let x = 0; x < this.game.canvas.width; x += s) {
+            const gridSize = 64;
+            for (let x = 0; x < this.game.width; x += gridSize) {
                 ctx.beginPath();
                 ctx.moveTo(x, 0);
-                ctx.lineTo(x, this.game.canvas.height);
+                ctx.lineTo(x, this.game.height);
                 ctx.stroke();
             }
-            for (let y = 0; y < this.game.canvas.height; y += s) {
+            for (let y = 0; y < this.game.height; y += gridSize) {
                 ctx.beginPath();
                 ctx.moveTo(0, y);
-                ctx.lineTo(this.game.canvas.width, y);
+                ctx.lineTo(this.game.width, y);
                 ctx.stroke();
             }
         }
@@ -91,13 +92,13 @@ export class MenuScene extends BaseScene {
         ctx.shadowColor = 'rgba(0,0,0,0.9)';
         ctx.shadowBlur = 15;
         ctx.shadowOffsetY = 4;
-        ctx.fillText('NEW TOWER', this.game.canvas.width / 2, 150);
+        ctx.fillText('NEW TOWER', this.game.width / 2, 150);
 
         // Дополнительная подсветка
         ctx.shadowColor = 'rgba(255,255,255,0.3)';
         ctx.shadowBlur = 8;
         ctx.shadowOffsetY = -2;
-        ctx.fillText('NEW TOWER', this.game.canvas.width / 2, 150);
+        ctx.fillText('NEW TOWER', this.game.width / 2, 150);
 
         ctx.restore();
     }
