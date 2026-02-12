@@ -23,51 +23,106 @@ export class SkeletonCommanderUnitRenderer implements UnitRenderer {
         MAGIC_GLOW: '#ff3d00'       // Burning Ember Eyes/Runes
     };
 
+    // BAKING SUPPORT
+    public getBakeFacings(): ('SIDE' | 'UP' | 'DOWN')[] {
+        return ['SIDE', 'UP', 'DOWN'];
+    }
+
+    public drawFrameDirectional(ctx: CanvasRenderingContext2D, enemy: Enemy, t: number, facing: 'SIDE' | 'UP' | 'DOWN') {
+        const cycle = t * Math.PI * 2;
+        const scale = 1.0;
+        const s = scale * 1.35;
+        const isMoving = true;
+
+        // "Breathing" idle animation approximation for bake
+        const breath = Math.sin(t * 10 * 2) * 0.03;
+        const time = t * 10;
+
+        // 1. Dynamic Aura (Ground Layer) - Baked or Procedural? 
+        // Baking aura into the sprite might be okay if it handles transparency well.
+        this.drawAura(ctx, s, time);
+
+        if (facing === 'DOWN') {
+            this.drawCapeBack(ctx, s, time, isMoving, facing);
+            this.drawFront(ctx, s, cycle, isMoving, breath);
+        } else if (facing === 'UP') {
+            this.drawBack(ctx, s, cycle, isMoving, breath);
+            this.drawCapeBack(ctx, s, time, isMoving, facing);
+        } else {
+            this.drawCapeBack(ctx, s, time, isMoving, facing);
+            this.drawSide(ctx, s, cycle, isMoving, breath);
+        }
+    }
+
+    drawFrame(ctx: CanvasRenderingContext2D, enemy: Enemy, t: number): void {
+        this.drawFrameDirectional(ctx, enemy, t, 'SIDE');
+    }
+
     drawBody(ctx: CanvasRenderingContext2D, enemy: Enemy, scale: number, rotation: number): void {
         const time = Date.now() * 0.001;
-        // Heavy, menacing walk cycle
         const walkCycle = time * (enemy.baseSpeed * 0.15);
-        const isMoving = !enemy.finished && enemy.currentHealth > 0;
 
-        // "Breathing" idle animation
-        const breath = Math.sin(time * 2) * 0.03;
+        // 1. Try Cached Sprite
+        const t = (walkCycle % (Math.PI * 2)) / (Math.PI * 2);
+        const frameIdx = Math.floor(t * 32) % 32;
 
-        // Scale boost for "Boss" feel
-        const s = scale * 1.35;
-
-        // Orientation
         let facing: 'DOWN' | 'UP' | 'SIDE' = 'SIDE';
         const r = rotation;
         if (r > -2.35 && r < -0.78) facing = 'UP';
         else if (r > 0.78 && r < 2.35) facing = 'DOWN';
         else facing = 'SIDE';
 
+        const facingLeft = Math.cos(rotation) < 0;
+
+        const frameKey = `unit_${enemy.typeId}_${facing.toLowerCase()}_walk_${frameIdx}`;
+        const sprite = Assets.get(frameKey);
+
+        if (sprite) {
+            ctx.save();
+            const size = 96 * scale * 1.5; // Commander is big
+
+            if (facing === 'SIDE') {
+                if (facingLeft) ctx.scale(-1, 1);
+            }
+
+            // Center sprite
+            ctx.drawImage(sprite, -size / 2, -size / 2, size, size);
+
+            // Hit Flash logic
+            if (enemy.hitFlashTimer > 0) {
+                ctx.globalCompositeOperation = 'source-atop';
+                ctx.fillStyle = 'rgba(255, 255, 255, 0.6)';
+                ctx.fillRect(-size / 2, -size / 2, size, size);
+            }
+            ctx.restore();
+            return;
+        }
+
+        // 2. Fallback Procedural
+        const isMoving = !enemy.finished && enemy.currentHealth > 0;
+        const breath = Math.sin(time * 2) * 0.03;
+        const s = scale * 1.35;
+
         ctx.save();
 
-        // Hit Flash / Status Effects
-        // Hit Flash / Status Effects
         if (enemy.hitFlashTimer > 0) {
-            // optimized simple flash
             ctx.globalAlpha = 0.6;
         }
 
-        // 1. Dynamic Aura (Ground Layer)
         this.drawAura(ctx, s, time);
 
-        // 2. Render Order dependent on facing
         if (facing === 'DOWN') {
-            this.drawCapeBack(ctx, s, time, isMoving, facing); // Visible edges behind
+            this.drawCapeBack(ctx, s, time, isMoving, facing);
             this.drawFront(ctx, s, walkCycle, isMoving, breath);
         }
         else if (facing === 'SIDE') {
-            if (Math.abs(rotation) > Math.PI / 2) ctx.scale(-1, 1);
+            if (facingLeft) ctx.scale(-1, 1);
             this.drawCapeBack(ctx, s, time, isMoving, facing);
             this.drawSide(ctx, s, walkCycle, isMoving, breath);
         }
-        else { // UP (Back)
-            this.drawFront(ctx, s, walkCycle, isMoving, breath, true); // Draw body for depth? No, distinct back view.
+        else { // UP
             this.drawBack(ctx, s, walkCycle, isMoving, breath);
-            this.drawCapeBack(ctx, s, time, isMoving, facing); // Cape covers all
+            this.drawCapeBack(ctx, s, time, isMoving, facing);
         }
 
         ctx.restore();

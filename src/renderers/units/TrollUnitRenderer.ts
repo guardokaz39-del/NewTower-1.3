@@ -16,11 +16,22 @@ export class TrollUnitRenderer implements UnitRenderer {
     private static readonly CLUB_WIDTH = 8;
 
     // BAKING SUPPORT
-    drawFrame(ctx: CanvasRenderingContext2D, enemy: Enemy, t: number): void {
+    public getBakeFacings(): ('SIDE' | 'UP' | 'DOWN')[] {
+        return ['SIDE', 'UP', 'DOWN'];
+    }
+
+    public drawFrameDirectional(ctx: CanvasRenderingContext2D, enemy: Enemy, t: number, facing: 'SIDE' | 'UP' | 'DOWN') {
         const cycle = t * Math.PI * 2;
         const scale = 1.0;
         const isMoving = true;
-        this.drawSide(ctx, scale, cycle, isMoving);
+
+        if (facing === 'UP') return this.drawBack(ctx, scale, cycle, isMoving);
+        if (facing === 'DOWN') return this.drawFront(ctx, scale, cycle, isMoving);
+        return this.drawSide(ctx, scale, cycle, isMoving);
+    }
+
+    drawFrame(ctx: CanvasRenderingContext2D, enemy: Enemy, t: number): void {
+        this.drawFrameDirectional(ctx, enemy, t, 'SIDE');
     }
 
     drawBody(ctx: CanvasRenderingContext2D, enemy: Enemy, scale: number, rotation: number): void {
@@ -32,14 +43,28 @@ export class TrollUnitRenderer implements UnitRenderer {
         // 1. Try Cached Sprite
         const t = (walkCycle % (Math.PI * 2)) / (Math.PI * 2);
         const frameIdx = Math.floor(t * 32) % 32;
-        const frameKey = `unit_${enemy.typeId}_walk_${frameIdx}`;
+
+        let facing: 'DOWN' | 'UP' | 'SIDE' = 'SIDE';
+        const r = rotation;
+        // Angles: -PI..PI. 0 is Right. 
+        // UP: -PI/2 approx (-1.57). range -2.35 to -0.78
+        // DOWN: PI/2 approx (1.57). range 0.78 to 2.35
+        if (r > -2.35 && r < -0.78) facing = 'UP';
+        else if (r > 0.78 && r < 2.35) facing = 'DOWN';
+        else facing = 'SIDE';
+
+        const facingLeft = Math.cos(rotation) < 0;
+
+        const frameKey = `unit_${enemy.typeId}_${facing.toLowerCase()}_walk_${frameIdx}`;
 
         const sprite = Assets.get(frameKey);
         if (sprite) {
             ctx.save();
             const size = 96 * scale;
-            const facingLeft = Math.cos(rotation) < 0;
-            if (facingLeft) ctx.scale(-1, 1);
+
+            if (facing === 'SIDE') {
+                if (facingLeft) ctx.scale(-1, 1);
+            }
 
             ctx.drawImage(sprite, -size / 2, -size / 2, size, size);
 
@@ -57,21 +82,12 @@ export class TrollUnitRenderer implements UnitRenderer {
         // 2. Fallback
         const isMoving = !enemy.finished && enemy.currentHealth > 0;
 
-        let facing: 'DOWN' | 'UP' | 'SIDE' = 'SIDE';
-        const r = rotation;
-        // Angles: -PI..PI. 0 is Right. 
-        // UP: -PI/2 approx (-1.57). range -2.35 to -0.78
-        // DOWN: PI/2 approx (1.57). range 0.78 to 2.35
-        if (r > -2.35 && r < -0.78) facing = 'UP';
-        else if (r > 0.78 && r < 2.35) facing = 'DOWN';
-        else facing = 'SIDE';
-
         ctx.save();
 
         if (enemy.hitFlashTimer > 0) ctx.globalAlpha = 0.7;
 
         if (facing === 'SIDE') {
-            if (Math.abs(rotation) > Math.PI / 2) {
+            if (facingLeft) {
                 ctx.scale(-1, 1); // Flip for Left
             }
             this.drawSide(ctx, scale, walkCycle, isMoving);

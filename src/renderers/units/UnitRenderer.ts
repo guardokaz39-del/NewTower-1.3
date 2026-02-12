@@ -29,6 +29,18 @@ export interface UnitRenderer {
      * @param t Normalized time (0.0 to 1.0) representing the animation cycle.
      */
     drawFrame?(ctx: CanvasRenderingContext2D, enemy: Enemy, t: number): void;
+
+    /**
+     * Optional: Return supported facings for baking (SIDE, UP, DOWN).
+     * If undefined, defaults to ['SIDE'].
+     */
+    getBakeFacings?(): ('SIDE' | 'UP' | 'DOWN')[];
+
+    /**
+     * Optional: Draw a specific frame for a specific facing.
+     * Used by SpriteBaker if getBakeFacings includes UP/DOWN.
+     */
+    drawFrameDirectional?(ctx: CanvasRenderingContext2D, enemy: Enemy, t: number, facing: 'SIDE' | 'UP' | 'DOWN'): void;
 }
 
 /**

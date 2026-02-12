@@ -11,11 +11,22 @@ export class OrcUnitRenderer implements UnitRenderer {
     private static readonly ARMOR_MAIN = '#616161'; // Чуть светлее
 
     // BAKING SUPPORT
-    drawFrame(ctx: CanvasRenderingContext2D, enemy: Enemy, t: number): void {
+    public getBakeFacings(): ('SIDE' | 'UP' | 'DOWN')[] {
+        return ['SIDE', 'UP', 'DOWN'];
+    }
+
+    public drawFrameDirectional(ctx: CanvasRenderingContext2D, enemy: Enemy, t: number, facing: 'SIDE' | 'UP' | 'DOWN') {
         const cycle = t * Math.PI * 2;
-        const scale = 1.0;
-        const isMoving = true;
-        this.drawSide(ctx, scale, cycle, isMoving);
+        const s = 1.0;
+        const moving = true;
+
+        if (facing === 'UP') return this.drawBack(ctx, s, cycle, moving);
+        if (facing === 'DOWN') return this.drawFront(ctx, s, cycle, moving);
+        return this.drawSide(ctx, s, cycle, moving);
+    }
+
+    drawFrame(ctx: CanvasRenderingContext2D, enemy: Enemy, t: number): void {
+        this.drawFrameDirectional(ctx, enemy, t, 'SIDE');
     }
 
     drawBody(ctx: CanvasRenderingContext2D, enemy: Enemy, scale: number, rotation: number): void {
@@ -25,16 +36,40 @@ export class OrcUnitRenderer implements UnitRenderer {
         // 1. Try Cached Sprite
         const t = (walkCycle % (Math.PI * 2)) / (Math.PI * 2);
         const frameIdx = Math.floor(t * 32) % 32;
-        const frameKey = `unit_${enemy.typeId}_walk_${frameIdx}`;
+
+        let facing: 'DOWN' | 'UP' | 'SIDE' = 'SIDE';
+        const r = rotation;
+        // Standard angle logic
+        if (r > -2.35 && r < -0.78) facing = 'UP';
+        else if (r > 0.78 && r < 2.35) facing = 'DOWN';
+        else facing = 'SIDE';
+
+        // Helper to check if facing left for SIDE view
+        const facingLeft = Math.cos(rotation) < 0;
+
+        // Key generation: 'walk' for SIDE (legacy compatibility if needed, but we used getBakeFacings so we likely have specific keys now)
+        // However, SpriteBaker logic: 
+        // if facings == ['SIDE'] -> unit_${type}_walk_${i}
+        // else -> unit_${type}_${facing.toLowerCase()}_walk_${i}
+        // Since we explicitly return SIDE, UP, DOWN, we expect:
+        // unit_orc_side_walk_i, unit_orc_up_walk_i, unit_orc_down_walk_i
+
+        // CAUTION: The user plan says:
+        // "если facings == ['SIDE'] -> unit_${type}_walk_${i} (старый)"
+        // "иначе -> unit_${type}_${facing.toLowerCase()}_walk_${i}"
+
+        const frameKey = `unit_${enemy.typeId}_${facing.toLowerCase()}_walk_${frameIdx}`;
 
         const sprite = Assets.get(frameKey);
         if (sprite) {
             ctx.save();
             const size = 96 * scale;
 
-            // Side-view flip logic (no rotation)
-            const facingLeft = Math.cos(rotation) < 0;
-            if (facingLeft) ctx.scale(-1, 1);
+            // Orientation logic for DIR3
+            if (facing === 'SIDE') {
+                if (facingLeft) ctx.scale(-1, 1);
+            }
+            // UP/DOWN: No rotation/flip needed as they are baked specifically
 
             ctx.drawImage(sprite, -size / 2, -size / 2, size, size);
 
@@ -52,19 +87,12 @@ export class OrcUnitRenderer implements UnitRenderer {
         // 2. Fallback
         const isMoving = !enemy.finished && enemy.currentHealth > 0;
 
-        let facing: 'DOWN' | 'UP' | 'SIDE' = 'SIDE';
-        const r = rotation;
-        // Стандартная логика углов
-        if (r > -2.35 && r < -0.78) facing = 'UP';
-        else if (r > 0.78 && r < 2.35) facing = 'DOWN';
-        else facing = 'SIDE';
-
         ctx.save();
 
         if (enemy.hitFlashTimer > 0) ctx.globalAlpha = 0.7;
 
         if (facing === 'SIDE') {
-            if (Math.abs(rotation) > Math.PI / 2) ctx.scale(-1, 1);
+            if (facingLeft) ctx.scale(-1, 1);
             this.drawSide(ctx, scale, walkCycle, isMoving);
         } else if (facing === 'UP') {
             this.drawBack(ctx, scale, walkCycle, isMoving);

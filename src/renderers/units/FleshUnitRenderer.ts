@@ -14,7 +14,7 @@ export class FleshUnitRenderer extends CachedUnitRenderer {
     private static readonly FLESH_DEEPEST = '#3a1818';
 
     protected walkCycleMultiplier: number = 0.2; // Slower, heavy movement
-    protected override orientationMode = 'FLIP' as const;
+    protected override orientationMode = 'DIR3' as const;
     private static readonly FLESH_DARK = '#4a2020';
     private static readonly FLESH_MID = '#6d3030';
     private static readonly FLESH_LIGHT = '#8d4545';
@@ -48,14 +48,25 @@ export class FleshUnitRenderer extends CachedUnitRenderer {
     }
 
     // BAKING SUPPORT
-    drawFrame(ctx: CanvasRenderingContext2D, enemy: Enemy, t: number): void {
+    public getBakeFacings(): ('SIDE' | 'UP' | 'DOWN')[] {
+        return ['SIDE', 'UP', 'DOWN'];
+    }
+
+    public drawFrameDirectional(ctx: CanvasRenderingContext2D, enemy: Enemy, t: number, facing: 'SIDE' | 'UP' | 'DOWN') {
         const cycle = t * Math.PI * 2;
         const scale = 1.0;
         const colossusScale = scale * 1.1;
         const isMoving = true;
         const time = t * 10;
         const hp = 1.0; // Bake healthy
-        this.drawSide(ctx, colossusScale, cycle, isMoving, time, hp);
+
+        if (facing === 'UP') return this.drawBack(ctx, colossusScale, cycle, isMoving, time, hp);
+        if (facing === 'DOWN') return this.drawFront(ctx, colossusScale, cycle, isMoving, time, hp);
+        return this.drawSide(ctx, colossusScale, cycle, isMoving, time, hp);
+    }
+
+    drawFrame(ctx: CanvasRenderingContext2D, enemy: Enemy, t: number): void {
+        this.drawFrameDirectional(ctx, enemy, t, 'SIDE');
     }
 
     drawBody(ctx: CanvasRenderingContext2D, enemy: Enemy, scale: number, rotation: number): void {

@@ -5,7 +5,7 @@ import type { Enemy } from '../../Enemy';
 import { Assets } from '../../Assets';
 
 export class SpiderUnitRenderer extends CachedUnitRenderer {
-    protected override orientationMode = 'FLIP' as const;
+    protected override orientationMode = 'DIR3' as const;
     // 🎨 Sinister Poison Palette
     private static readonly BODY_COLOR = '#051806'; // Nearly black green
     private static readonly ABDOMEN_COLOR = '#0f2910'; // Dark toxic green
@@ -22,7 +22,11 @@ export class SpiderUnitRenderer extends CachedUnitRenderer {
     }
 
     // BAKING SUPPORT
-    drawFrame(ctx: CanvasRenderingContext2D, enemy: Enemy, t: number): void {
+    public getBakeFacings(): ('SIDE' | 'UP' | 'DOWN')[] {
+        return ['SIDE', 'UP', 'DOWN'];
+    }
+
+    public drawFrameDirectional(ctx: CanvasRenderingContext2D, enemy: Enemy, t: number, facing: 'SIDE' | 'UP' | 'DOWN') {
         const cycle = t * Math.PI * 2;
         const scale = 1.0;
         const spiderScale = scale * 1.1;
@@ -30,10 +34,20 @@ export class SpiderUnitRenderer extends CachedUnitRenderer {
         const time = t * 10;
         const breathe = Math.sin(time * 8) * 0.3 * spiderScale;
 
-        // Use Side view for bake
         // CRITICAL: Draw legs first!
-        this.drawLegs(ctx, 'SIDE', spiderScale, cycle, isMoving);
-        this.drawSide(ctx, spiderScale, breathe, time);
+        this.drawLegs(ctx, facing, spiderScale, cycle, isMoving);
+
+        if (facing === 'UP') {
+            this.drawBack(ctx, spiderScale, breathe, time);
+        } else if (facing === 'DOWN') {
+            this.drawFront(ctx, spiderScale, breathe, time);
+        } else {
+            this.drawSide(ctx, spiderScale, breathe, time);
+        }
+    }
+
+    drawFrame(ctx: CanvasRenderingContext2D, enemy: Enemy, t: number): void {
+        this.drawFrameDirectional(ctx, enemy, t, 'SIDE');
     }
 
     // drawBody is inherited

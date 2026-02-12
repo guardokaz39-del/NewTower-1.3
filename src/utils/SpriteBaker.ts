@@ -28,36 +28,53 @@ export class SpriteBaker {
             // Add other necessary properties as mocks if renderers crash
         } as any;
 
-        for (let i = 0; i < this.FRAMES; i++) {
-            const frameKey = `unit_${typeId}_walk_${i}`;
+        const facings = renderer.getBakeFacings ? renderer.getBakeFacings() : ['SIDE'] as const;
 
-            // Normalized time (0.0 -> 1.0)
-            const t = i / this.FRAMES;
+        for (const facing of facings) {
+            for (let i = 0; i < this.FRAMES; i++) {
+                // Key generation: 'walk' for legacy/SIDE-only, or 'facing_walk' for UP/DOWN/SIDE if DIR3
+                // We keep 'unit_orc_walk_i' for SIDE if it's the only facing, OR if we want strict compatibility?
+                // The plan says: if facings == ['SIDE'] -> unit_${type}_walk_${i}
+                // else -> unit_${type}_${facing.toLowerCase()}_walk_${i}
 
-            AssetCache.get(frameKey, (ctx, w, h) => {
-                ctx.translate(w / 2, h / 2);
-
-                // Invoke renderer
-                if (renderer.drawFrame) {
-                    renderer.drawFrame(ctx, mockEnemy, t);
+                let frameKey: string;
+                if (facings.length === 1 && facings[0] === 'SIDE') {
+                    frameKey = `unit_${typeId}_walk_${i}`;
+                } else {
+                    frameKey = `unit_${typeId}_${facing.toLowerCase()}_walk_${i}`;
                 }
-            }, this.SIZE, this.SIZE);
 
-            // [NEW] Generate White Silhouette for Hit Flash (Pre-baked)
-            const sprite = AssetCache.peek(frameKey);
-            if (sprite) {
-                const silhouetteKey = frameKey + '_white';
-                // Only bake if not exists (or implement a force-bake/peek check inside)
-                // AssetCache.get checks existence, so we just provide the factory.
-                AssetCache.get(silhouetteKey, (ctxS, w, h) => {
-                    // Draw the original sprite
-                    ctxS.drawImage(sprite, 0, 0);
+                // Normalized time (0.0 -> 1.0)
+                const t = i / this.FRAMES;
 
-                    // Composite white on top, keeping alpha
-                    ctxS.globalCompositeOperation = 'source-in';
-                    ctxS.fillStyle = '#ffffff';
-                    ctxS.fillRect(0, 0, w, h);
+                AssetCache.get(frameKey, (ctx, w, h) => {
+                    ctx.translate(w / 2, h / 2);
+
+                    // Invoke renderer
+                    if (renderer.drawFrameDirectional) {
+                        renderer.drawFrameDirectional(ctx, mockEnemy, t, facing);
+                    } else if (renderer.drawFrame) {
+                        // Fallback to standard drawFrame (usually SIDE)
+                        renderer.drawFrame(ctx, mockEnemy, t);
+                    }
                 }, this.SIZE, this.SIZE);
+
+                // [NEW] Generate White Silhouette for Hit Flash (Pre-baked)
+                const sprite = AssetCache.peek(frameKey);
+                if (sprite) {
+                    const silhouetteKey = frameKey + '_white';
+                    // Only bake if not exists (or implement a force-bake/peek check inside)
+                    // AssetCache.get checks existence, so we just provide the factory.
+                    AssetCache.get(silhouetteKey, (ctxS, w, h) => {
+                        // Draw the original sprite
+                        ctxS.drawImage(sprite, 0, 0);
+
+                        // Composite white on top, keeping alpha
+                        ctxS.globalCompositeOperation = 'source-in';
+                        ctxS.fillStyle = '#ffffff';
+                        ctxS.fillRect(0, 0, w, h);
+                    }, this.SIZE, this.SIZE);
+                }
             }
         }
     }

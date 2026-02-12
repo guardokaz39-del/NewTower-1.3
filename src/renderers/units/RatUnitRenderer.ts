@@ -14,7 +14,7 @@ export class RatUnitRenderer extends CachedUnitRenderer {
     private static readonly BARREL_WOOD = '#261b18';     // Burnt Wood
     private static readonly BARREL_RIM = '#4e342e';      // Rusted Iron
 
-    protected override orientationMode = 'FLIP' as const;
+    protected override orientationMode = 'DIR3' as const;
 
     constructor() {
         super();
@@ -22,16 +22,29 @@ export class RatUnitRenderer extends CachedUnitRenderer {
     }
 
     // BAKING SUPPORT
-    drawFrame(ctx: CanvasRenderingContext2D, enemy: Enemy, t: number): void {
+    public getBakeFacings(): ('SIDE' | 'UP' | 'DOWN')[] {
+        return ['SIDE', 'UP', 'DOWN'];
+    }
+
+    public drawFrameDirectional(ctx: CanvasRenderingContext2D, enemy: Enemy, t: number, facing: 'SIDE' | 'UP' | 'DOWN') {
         const cycle = t * Math.PI * 2;
         const scale = 1.0;
         const isMoving = true;
         const time = t * 10;
 
         ctx.save();
-        // Adjust for baking centering if needed, but usually 0,0 is center
-        this.drawSide(ctx, scale, cycle, isMoving, time);
+        if (facing === 'UP') {
+            this.drawBack(ctx, scale, cycle, isMoving, time);
+        } else if (facing === 'DOWN') {
+            this.drawFront(ctx, scale, cycle, isMoving, time);
+        } else {
+            this.drawSide(ctx, scale, cycle, isMoving, time);
+        }
         ctx.restore();
+    }
+
+    drawFrame(ctx: CanvasRenderingContext2D, enemy: Enemy, t: number): void {
+        this.drawFrameDirectional(ctx, enemy, t, 'SIDE');
     }
 
     // drawBody is inherited

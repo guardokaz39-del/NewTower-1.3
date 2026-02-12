@@ -145,7 +145,7 @@ export abstract class CachedUnitRenderer implements UnitRenderer {
      * Directional draw hook for baking/fallback in DIR3 mode.
      * Default: just call drawFrame (side).
      */
-    protected drawFrameDirectional(
+    public drawFrameDirectional(
         ctx: CanvasRenderingContext2D,
         enemy: Enemy,
         t: number,

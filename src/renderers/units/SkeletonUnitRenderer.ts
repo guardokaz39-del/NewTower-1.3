@@ -13,14 +13,26 @@ export class SkeletonUnitRenderer extends CachedUnitRenderer {
     private static readonly ARMOR_LIGHT = '#546e7a';
 
     // Config
-    protected override orientationMode = 'FLIP' as const;
+    protected override orientationMode = 'DIR3' as const;
     private static readonly HEAD_RADIUS = 5.5;
 
     // BAKING SUPPORT
-    drawFrame(ctx: CanvasRenderingContext2D, enemy: Enemy, t: number): void {
+    public getBakeFacings(): ('SIDE' | 'UP' | 'DOWN')[] {
+        return ['SIDE', 'UP', 'DOWN'];
+    }
+
+    public drawFrameDirectional(ctx: CanvasRenderingContext2D, enemy: Enemy, t: number, facing: 'SIDE' | 'UP' | 'DOWN') {
         const cycle = t * Math.PI * 2;
         const scale = 1.0;
-        this.drawSide(ctx, scale, cycle, true);
+        const isMoving = true;
+
+        if (facing === 'UP') return this.drawBack(ctx, scale, cycle, isMoving);
+        if (facing === 'DOWN') return this.drawFront(ctx, scale, cycle, isMoving);
+        return this.drawSide(ctx, scale, cycle, isMoving);
+    }
+
+    drawFrame(ctx: CanvasRenderingContext2D, enemy: Enemy, t: number): void {
+        this.drawFrameDirectional(ctx, enemy, t, 'SIDE');
     }
 
     // drawBody and drawProcedural removed (using CachedUnitRenderer)

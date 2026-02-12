@@ -14,12 +14,44 @@ export class WraithUnitRenderer implements UnitRenderer {
     private static readonly C_HORN = '#263238';      // Dark Horn
     private static readonly C_EMERALD_FIRE = '#00e676'; // Emerald Fire
 
+    // BAKING SUPPORT
+    public getBakeFacings(): ('SIDE' | 'UP' | 'DOWN')[] {
+        return ['SIDE', 'UP', 'DOWN'];
+    }
+
+    public drawFrameDirectional(ctx: CanvasRenderingContext2D, enemy: Enemy, t: number, facing: 'SIDE' | 'UP' | 'DOWN') {
+        const scale = 1.0;
+        const bossScale = scale * 1.7;
+        const time = t * 10;
+
+        // No hover in bake, or baked in?
+        // Let's bake in some hover movement
+        const hover = Math.sin(time * 1.2) * (10 * scale);
+
+        ctx.save();
+        ctx.translate(0, hover - 18 * scale);
+
+        if (facing === 'UP') {
+            this.drawBack(ctx, bossScale, time, enemy);
+        } else if (facing === 'DOWN') {
+            this.drawFront(ctx, bossScale, time, enemy);
+        } else {
+            this.drawSide(ctx, bossScale, time, enemy);
+        }
+        ctx.restore();
+    }
+
+    drawFrame(ctx: CanvasRenderingContext2D, enemy: Enemy, t: number): void {
+        this.drawFrameDirectional(ctx, enemy, t, 'SIDE');
+    }
+
     drawBody(ctx: CanvasRenderingContext2D, enemy: Enemy, scale: number, rotation: number): void {
         const time = Date.now() * 0.002;
-        const bossScale = scale * 1.7; // Large Boss Scale
-
-        // Heavy Levitation
-        const hover = Math.sin(time * 1.2) * (10 * scale);
+        const cycle = time; // Use time as cycle for consistent lookup if needed, but Wraith doesn't have frame-based walk cycle
+        // Wraith is floating, so maybe we just use a loop for frames?
+        // Since it's floating, let's use a 32-frame loop based on time
+        const t = (cycle % (Math.PI * 2)) / (Math.PI * 2);
+        const frameIdx = Math.floor(t * 32) % 32;
 
         let facing: 'DOWN' | 'UP' | 'SIDE' = 'SIDE';
         const r = rotation;
@@ -27,11 +59,30 @@ export class WraithUnitRenderer implements UnitRenderer {
         else if (r > 0.78 && r < 2.35) facing = 'DOWN';
         else facing = 'SIDE';
 
+        const facingLeft = Math.cos(rotation) < 0;
+        const frameKey = `unit_${enemy.typeId}_${facing.toLowerCase()}_walk_${frameIdx}`;
+        const sprite = Assets.get(frameKey);
+
+        if (sprite) {
+            ctx.save();
+            const size = 128 * scale; // Big sprite
+            if (facing === 'SIDE') {
+                if (facingLeft) ctx.scale(-1, 1);
+            }
+            ctx.drawImage(sprite, -size / 2, -size / 2, size, size);
+            ctx.restore();
+            return;
+        }
+
+        // Fallback
+        const bossScale = scale * 1.7;
+        const hover = Math.sin(time * 1.2) * (10 * scale);
+
         ctx.save();
         ctx.translate(0, hover - 18 * scale);
 
         if (facing === 'SIDE') {
-            if (Math.abs(rotation) > Math.PI / 2) ctx.scale(-1, 1);
+            if (facingLeft) ctx.scale(-1, 1);
             this.drawSide(ctx, bossScale, time, enemy);
         } else if (facing === 'UP') {
             this.drawBack(ctx, bossScale, time, enemy);
