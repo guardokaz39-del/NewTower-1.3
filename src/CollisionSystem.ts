@@ -22,7 +22,8 @@ export class CollisionSystem {
         this.enemyGrid.clear();
         for (let i = 0; i < enemies.length; i++) {
             const enemy = enemies[i];
-            if (enemy.isAlive()) {
+            // Safety check for holes in array
+            if (enemy && enemy.isAlive()) {
                 this.enemyGrid.register(enemy);
             }
         }
@@ -36,7 +37,7 @@ export class CollisionSystem {
         // Check projectile collisions using spatial grid
         for (let p = 0; p < projectiles.length; p++) {
             const proj = projectiles[p];
-            if (!proj.alive) continue;
+            if (!proj || !proj.alive) continue;
 
             // Out of bounds check
             if (proj.x < -50 || proj.x > window.innerWidth + 50 || proj.y < -50 || proj.y > window.innerHeight + 50) {
@@ -55,7 +56,8 @@ export class CollisionSystem {
 
             for (let e = 0; e < count; e++) {
                 const enemy = CollisionSystem.aoeBuffer[e];
-                if (!enemy.isAlive()) continue;
+                // CRITICAL FIX: Safety check for undefined logic
+                if (!enemy || !enemy.isAlive()) continue;
                 if (proj.hitList.includes(enemy.id)) continue;
 
                 // Squared distance check (faster than Math.hypot)
