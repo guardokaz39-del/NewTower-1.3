@@ -12,7 +12,7 @@ export type SpriteFacing = 'SIDE' | 'UP' | 'DOWN';
  */
 export abstract class CachedUnitRenderer implements UnitRenderer {
 
-    // Multiplier for walk cycle speed. 
+    // Multiplier for walk cycle speed.
     // Orc: 0.1, Goblin: 0.25, etc.
     // Default: 0.15
     protected walkCycleMultiplier: number = 0.15;
@@ -21,7 +21,8 @@ export abstract class CachedUnitRenderer implements UnitRenderer {
     protected spriteSize: number = 96;
 
     // Orientation of baked sprites
-    protected orientationMode: SpriteOrientationMode = 'FLIP';
+    // Default: 'ROTATE' for backward compatibility (Top-Down units, Projectiles)
+    protected orientationMode: SpriteOrientationMode = 'ROTATE';
 
     /**
      * If your sprite is authored “facing up” instead of “facing right” etc.
@@ -46,9 +47,6 @@ export abstract class CachedUnitRenderer implements UnitRenderer {
     /**
      * Standard draw method called by EnemyRenderer.
      */
-    /**
-     * Standard draw method called by EnemyRenderer.
-     */
     public drawBody(ctx: CanvasRenderingContext2D, enemy: Enemy, scale: number, rotation: number): void {
         const time = Date.now() * 0.001;
         const walkCycle = time * (enemy.baseSpeed * this.walkCycleMultiplier);
@@ -59,13 +57,35 @@ export abstract class CachedUnitRenderer implements UnitRenderer {
         // Try to get Cached Sprite
         // We assume 32 frames for the walk cycle (standard in SpriteBaker)
         const frameIdx = Math.floor(t * 32) % 32;
-        const frameKey = `unit_${enemy.typeId}_walk_${frameIdx}`;
+
+        // Determine facing for key generation (needed for DIR3)
+        const facing = this.getFacing(rotation);
+        const frameKey = this.getSpriteKey(enemy.typeId, frameIdx, facing);
         const sprite = Assets.get(frameKey);
 
         if (sprite) {
             ctx.save();
-            ctx.rotate(rotation);
             const size = this.spriteSize * scale;
+
+            // --- ORIENTATION LOGIC ---
+            if (this.orientationMode === 'ROTATE') {
+                // Classic Top-Down: Rotate the context match direction
+                ctx.rotate(rotation + this.baseRotationOffset);
+            } else if (this.orientationMode === 'FLIP') {
+                // Side-View: Flip horizontally if moving left. NEVER rotate.
+                if (this.isFacingLeft(enemy, rotation)) {
+                    ctx.scale(-1, 1);
+                }
+            } else {
+                // DIR3: 3-Directional (SIDE / UP / DOWN)
+                // SIDE: Flip if left
+                // UP/DOWN: No flip, no rotate
+                if (facing === 'SIDE' && this.isFacingLeft(enemy, rotation)) {
+                    ctx.scale(-1, 1);
+                }
+            }
+
+            // Draw Centered
             ctx.drawImage(sprite, -size / 2, -size / 2, size, size);
 
             // Optimized Hit Flash (Source-Atop - extremely fast)
@@ -80,10 +100,20 @@ export abstract class CachedUnitRenderer implements UnitRenderer {
             this.drawEffects(ctx, enemy, scale);
         } else {
             // Fallback: Procedural Draw
-            // We rotate the context so the procedural draw (usually Side view) matches direction
             ctx.save();
-            ctx.rotate(rotation);
-            this.drawFrame(ctx, enemy, t);
+
+            if (this.orientationMode === 'ROTATE') {
+                ctx.rotate(rotation + this.baseRotationOffset);
+                this.drawFrame(ctx, enemy, t);
+            } else if (this.orientationMode === 'FLIP') {
+                if (this.isFacingLeft(enemy, rotation)) ctx.scale(-1, 1);
+                this.drawFrame(ctx, enemy, t);
+            } else {
+                // DIR3 Fallback
+                if (facing === 'SIDE' && this.isFacingLeft(enemy, rotation)) ctx.scale(-1, 1);
+                this.drawFrameDirectional(ctx, enemy, t, facing);
+            }
+
             ctx.restore();
 
             // Draw effects for fallback too
@@ -92,19 +122,22 @@ export abstract class CachedUnitRenderer implements UnitRenderer {
     }
 
     protected getFacing(rotation: number): SpriteFacing {
-        if (rotation > this.facingUpMin && rotation < this.facingUpMax) return 'UP';
-        if (rotation > this.facingDownMin && rotation < this.facingDownMax) return 'DOWN';
+        // Normalize rotation to -PI..PI if needed, but usually it is.
+        // Canvas angles: 0=Right, PI/2=Down, -PI/2=Up
+        if (rotation > -Math.PI / 4 * 3 && rotation < -Math.PI / 4) return 'UP'; // Approx -135 to -45 deg
+        if (rotation > Math.PI / 4 && rotation < Math.PI / 4 * 3) return 'DOWN'; // Approx 45 to 135 deg
         return 'SIDE';
     }
 
-    protected isFacingLeft(rotation: number): boolean {
-        // cos < 0 => движение “влево”
-        return Math.cos(rotation) < 0;
+    protected isFacingLeft(enemy: Enemy, rotation: number): boolean {
+        // PREFERRED: Use persistent state to avoid jitter (walking backwards)
+        return enemy.lastFacingLeft;
     }
 
     protected getSpriteKey(enemyTypeId: string, frameIdx: number, facing: SpriteFacing): string {
-        // Backward compatible: old baked keys without facing
+        // Compatibility: ROTATE and FLIP modes use the legacy "walk_N" keys (side view baked)
         if (this.orientationMode !== 'DIR3') return `unit_${enemyTypeId}_walk_${frameIdx}`;
+        // DIR3 uses directional keys
         return `unit_${enemyTypeId}_${facing.toLowerCase()}_walk_${frameIdx}`;
     }
 

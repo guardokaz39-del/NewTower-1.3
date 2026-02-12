@@ -31,6 +31,8 @@ export class OrcUnitRenderer implements UnitRenderer {
         if (sprite) {
             ctx.save();
             const size = 96 * scale;
+
+            // Side-view flip logic (no rotation)
             const facingLeft = Math.cos(rotation) < 0;
             if (facingLeft) ctx.scale(-1, 1);
 

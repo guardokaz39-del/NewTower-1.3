@@ -46,6 +46,8 @@ export class Enemy {
     public killedByProjectile: Projectile | null = null;   // Track what projectile killed this enemy
     public hitFlashTimer: number = 0;        // Timer for white flash on hit
 
+    public lastFacingLeft: boolean = false; // Persistent facing state
+
     // Targeting Support
     public threatPriority: number = 0;       // 0 = Normal, >0 = High Priority (Taunt)
 
@@ -93,6 +95,7 @@ export class Enemy {
 
         this.damageModifier = 1.0;
         this.killedByProjectile = null;
+        this.lastFacingLeft = false; // Reset facing
 
         // Reset specific fields
         this.threatPriority = 0;
@@ -111,6 +114,7 @@ export class Enemy {
         this.killedByProjectile = null;
         this.x = -1000; // Move offscreen
         this.y = -1000;
+        this.lastFacingLeft = false;
 
         this.threatPriority = 0;
         this.spawnThresholds.length = 0;
@@ -267,6 +271,12 @@ export class Enemy {
         // Only update if moving significant amount to avoid jitter
         if (Math.abs(vector.x) > 0.01 || Math.abs(vector.y) > 0.01) {
             this.moveAngle = Math.atan2(vector.y, vector.x);
+
+            // Update Facing State (Stabilized)
+            // Use a threshold to prevent flipping when moving vertically (jitter)
+            if (Math.abs(vector.x) > 0.1) {
+                this.lastFacingLeft = vector.x < 0;
+            }
         }
     }
 
