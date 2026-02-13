@@ -101,7 +101,7 @@ export class CardSystem {
         };
         this.hand.push(card);
         this.render();
-        this.scene.ui.update();
+        if (this.scene.ui) this.scene.ui.update();
     }
 
     public addRandomCardToHand() {
@@ -115,7 +115,7 @@ export class CardSystem {
         if (index !== -1) {
             this.hand.splice(index, 1);
             this.render();
-            this.scene.ui.update();
+            if (this.scene.ui) this.scene.ui.update();
         }
     }
 

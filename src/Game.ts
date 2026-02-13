@@ -1,4 +1,5 @@
 import { Assets } from './Assets';
+import { UIRoot } from './UIRoot';
 import { IMapData } from './MapData';
 import { Scene } from './Scene';
 import { MenuScene } from './scenes/MenuScene';
@@ -12,6 +13,7 @@ import { PerformanceMonitor } from './utils/PerformanceMonitor';
 export class Game {
     public canvas: HTMLCanvasElement;
     public ctx: CanvasRenderingContext2D;
+    public uiRoot: UIRoot;
 
     public input: InputSystem;
     public currentScene: Scene | null = null;
@@ -34,6 +36,7 @@ export class Game {
         if (!canvas) throw new Error('Canvas not found!');
         this.canvas = canvas;
         this.ctx = this.canvas.getContext('2d') as CanvasRenderingContext2D;
+        this.uiRoot = new UIRoot();
 
         // Initial resize
         this.resize();
@@ -139,8 +142,15 @@ export class Game {
         this.currentScene.onEnter();
     }
 
+    private menuScene: MenuScene;
+
+    // ...
+
     public toMenu() {
-        this.changeScene(new MenuScene(this));
+        if (!this.menuScene) {
+            this.menuScene = new MenuScene(this);
+        }
+        this.changeScene(this.menuScene);
     }
 
     private pendingMapData?: IMapData;
@@ -151,12 +161,14 @@ export class Game {
         this.cardSelection.show();
     }
 
+    // ...
+
     private startGameWithCards(selectedCards: string[]) {
         import('./scenes/GameScene')
             .then(({ GameScene }) => {
-                // Pass selected cards to GameScene via global or constructor
-                (window as any)._STARTING_CARDS = selectedCards;
-                this.changeScene(new GameScene(this, this.pendingMapData));
+                // Pass selected cards directly to constructor
+                // Verify GameScene constructor signature update in next step
+                this.changeScene(new GameScene(this, this.pendingMapData, selectedCards));
             })
             .catch((err) => {
                 console.error('Failed to load GameScene:', err);

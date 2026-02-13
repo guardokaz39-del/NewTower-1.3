@@ -16,23 +16,41 @@ export class ShopUI {
     public readonly cost: number = 100;
     public readonly refreshCost: number = CONFIG.ECONOMY.SHOP_REROLL_COST; // [NEW]
 
+    private boundBuy: () => void;
+    private boundRefresh: () => void;
+    private boundMoneyChanged: (money: number) => void;
+    private moneySubId: number = -1;
+
     constructor(scene: IGameScene) {
         this.scene = scene;
         this.elShopBtn = document.getElementById('shop-btn') as HTMLButtonElement;
         this.elRefreshBtn = document.getElementById('shop-refresh-btn') as HTMLButtonElement; // [NEW]
         this.elSlotsContainer = document.getElementById('shop-slots')!;
 
+        // Bind callbacks
+        this.boundBuy = () => this.buySelectedCard();
+        this.boundRefresh = () => this.rerollWithCost();
+        this.boundMoneyChanged = () => this.update();
+
         this.initListeners();
         this.rerollShop();
     }
 
     private initListeners() {
-        this.elShopBtn.addEventListener('click', () => this.buySelectedCard());
-        this.elRefreshBtn.addEventListener('click', () => this.rerollWithCost()); // [NEW]
+        if (this.elShopBtn) this.elShopBtn.addEventListener('click', this.boundBuy);
+        if (this.elRefreshBtn) this.elRefreshBtn.addEventListener('click', this.boundRefresh);
 
-        EventBus.getInstance().on(Events.MONEY_CHANGED, () => {
-            this.update();
-        });
+        this.moneySubId = EventBus.getInstance().on(Events.MONEY_CHANGED, this.boundMoneyChanged);
+    }
+
+    public destroy() {
+        if (this.elShopBtn) this.elShopBtn.removeEventListener('click', this.boundBuy);
+        if (this.elRefreshBtn) this.elRefreshBtn.removeEventListener('click', this.boundRefresh);
+
+        if (this.moneySubId !== -1) {
+            EventBus.getInstance().off(this.moneySubId);
+            this.moneySubId = -1;
+        }
     }
 
     public rerollWithCost() {

@@ -1,4 +1,4 @@
-import { GameScene } from '../scenes/GameScene';
+import { IGameScene } from '../scenes/IGameScene';
 import { Logger, LogLevel, LogChannel, LogEntry } from '../utils/Logger';
 import { SafeJson } from '../utils/SafeJson';
 import { PerformanceMonitor } from '../utils/PerformanceMonitor';
@@ -8,7 +8,7 @@ import { PerformanceMonitor } from '../utils/PerformanceMonitor';
  * Вкладки: ЛОГ | ГРАФИК | ЧИТЫ | ТЕСТЫ
  */
 export class DevConsole {
-    private scene: GameScene;
+    private scene: IGameScene;
     private container!: HTMLElement;
     private toggleBtn!: HTMLElement;
 
@@ -49,7 +49,7 @@ export class DevConsole {
     // Cleanup
     private keyDownHandler: ((e: KeyboardEvent) => void) | null = null;
 
-    constructor(scene: GameScene) {
+    constructor(scene: IGameScene) {
         this.scene = scene;
         this.createUI();
         this.setupLogger();
@@ -258,7 +258,7 @@ export class DevConsole {
         addHeader('💰 РЕСУРСЫ');
         addBtn('+1000 Золота', '💰', () => { this.scene.addMoney(1000); Logger.info(LogChannel.GAME, '+1000 золота'); }, '#1a4a1a');
         addBtn('+10000 Золота', '💰', () => { this.scene.addMoney(10000); Logger.info(LogChannel.GAME, '+10000 золота'); }, '#1a4a1a');
-        addBtn('Полные жизни (100)', '❤️', () => { (this.scene as any).gameState.lives = 100; Logger.info(LogChannel.GAME, 'Жизни восстановлены'); }, '#1a4a1a');
+        addBtn('Полные жизни (100)', '❤️', () => { this.scene.gameState.lives = 100; Logger.info(LogChannel.GAME, 'Жизни восстановлены'); }, '#1a4a1a');
 
         addHeader('⚔️ ВОЛНЫ');
         addBtn('Следующая волна', '⏩', () => { this.scene.wave++; Logger.info(LogChannel.GAME, `Волна ${this.scene.wave}`); }, '#4a3a1a');
@@ -339,12 +339,12 @@ export class DevConsole {
             Logger.info(LogChannel.SYSTEM, `Пути: ${(window as any).__DEBUG_PATHS ? 'ВКЛ' : 'ВЫКЛ'}`);
         });
         addBtn('Статистика сетки (SpatialGrid)', '📐', () => {
-            const collision = this.scene.collision as any;
+            const collision = this.scene.collision;
             if (collision?.enemyGrid?.getStats) {
                 const stats = collision.enemyGrid.getStats();
                 Logger.info(LogChannel.SYSTEM, `SpatialGrid: ${stats.occupiedCells}/${stats.totalCells} ячеек, ${stats.totalEntities} сущностей`);
             } else {
-                Logger.warn(LogChannel.SYSTEM, 'SpatialGrid недоступен (возможно, приватное поле)');
+                Logger.warn(LogChannel.SYSTEM, 'SpatialGrid недоступен');
             }
         });
 
@@ -526,7 +526,7 @@ export class DevConsole {
 🎮 СОСТОЯНИЕ ИГРЫ:
   Волна: ${this.scene.wave}
   Деньги: ${this.scene.money}
-  Жизни: ${(this.scene as any).gameState?.lives}
+  Жизни: ${this.scene.gameState?.lives}
   Врагов: ${this.scene.enemies?.length || 0}
   Башен: ${this.scene.towers?.length || 0}
   Снарядов: ${this.scene.projectiles?.length || 0}

@@ -39,6 +39,7 @@ import { RendererFactory } from '../RendererFactory';
 import { EnemyRenderer } from '../renderers/EnemyRenderer';
 import { AcidPuddleSystem } from '../systems/AcidPuddleSystem';
 import { SkeletonCommanderSystem } from '../systems/SkeletonCommanderSystem';
+import { GameSession } from '../GameSession';
 
 /**
  * Main game scene - REFACTORED VERSION
@@ -50,77 +51,91 @@ export class GameScene extends BaseScene implements IGameScene {
     public game: Game;
     public mapData: IMapData;
     public readonly startingLives: number;
+    private startingCards: string[];
 
-    // Modular components
-    public gameState: GameState;
-    public entityManager: EntityManager;
-    public gameController: GameController;
+    // The Game Session (Logic / Simulation)
+    private session: GameSession;
 
-    // Ambient cycle
-    private dayTime: number = 0;
+    // Ambient cycle (Visual + Logic?)
+    // DayNightCycle is used by Atmosphere (Visual) and maybe logic?
+    // Session has it? No, I didn't put DayNight in Session in previous step!
+    // I put Atmosphere in Session? No.
+    // Let's check GameSession.ts content I wrote.
+    // I did NOT put DayNightCycle or Atmosphere in GameSession constructor.
+    // I put: gameState, entityManager, waveManager, projectileSystem, collision, metrics, weapon, card, forge, inspector, bestiary, notifications, acid, commander.
+    // So DayNight, Atmosphere, Fog, Lighting REMAIN in GameScene (Visuals).
 
     // Map & rendering
     public map: MapManager;
     public fog: FogSystem;
     public lighting: LightingSystem;
 
-    // Systems
+    // Systems provided by Session (IGameScene interface)
+    public get gameState() { return this.session.gameState; }
+    public get entityManager() { return this.session.entityManager; }
+    public get waveManager() { return this.session.waveManager; }
+    public get projectileSystem() { return this.session.projectileSystem; }
+    public get collision() { return this.session.collision; }
+    public get metrics() { return this.session.metrics; }
+    public get weaponSystem() { return this.session.weaponSystem; }
+    public get cardSys() { return this.session.cardSys; }
+    public get forge() { return this.session.forge; }
+    public get inspector() { return this.session.inspector; }
+    public get bestiary() { return this.session.bestiary; }
+    public get notifications() { return this.session.notifications; }
+    public get acidSystem() { return this.session.acidSystem; }
+    public get commanderSystem() { return this.session.commanderSystem; }
+
+    // UI (Scene specific)
     public ui: UIManager;
-    public cardSys: CardSystem;
-    public waveManager: WaveManager;
-    public events: EventEmitter;
-    public input: InputSystem;
-    public projectileSystem: ProjectileSystem;
-    public effects: EffectSystem;
     public devConsole: DevConsole;
-    public forge: ForgeSystem;
-    public collision: CollisionSystem;
-    public inspector: InspectorSystem;
-    public bestiary: BestiarySystem;
-    public metrics: MetricsSystem;
-    public weaponSystem: WeaponSystem;
-    public notifications: NotificationSystem;
+
+    // Visual Systems
+    public effects: EffectSystem;
     private dayNightCycle!: DayNightCycle;
     private atmosphere!: AtmosphereSystem;
-    public acidSystem: AcidPuddleSystem;
-    public commanderSystem: SkeletonCommanderSystem;
 
-    // IGameScene compatibility properties (delegate to gameState)
-    public get wave(): number { return this.gameState.wave; }
-    public set wave(value: number) { this.gameState.wave = value; }
+    // Input / Events
+    public events: EventEmitter;
+    public input: InputSystem;
+    public gameController: GameController;
 
-    public get money(): number { return this.gameState.money; }
+    // IGameScene compatibility properties
+    public get wave(): number { return this.session.gameState.wave; }
+    public set wave(value: number) { this.session.gameState.wave = value; }
 
-    public get lives(): number { return this.gameState.lives; }
+    public get money(): number { return this.session.gameState.money; }
 
-    public get paused(): boolean { return this.gameState.paused; }
+    public get lives(): number { return this.session.gameState.lives; }
 
-    public get selectedTower(): Tower | null { return this.gameState.selectedTower; }
-    public set selectedTower(value: Tower | null) { this.gameState.selectTower(value); }
+    public get paused(): boolean { return this.session.gameState.paused; }
 
-    public get enemies() { return this.gameState.enemies; }
-    public get towers() { return this.gameState.towers; }
-    public get projectiles() { return this.projectileSystem.projectiles; }
+    public get selectedTower(): Tower | null { return this.session.gameState.selectedTower; }
+    public set selectedTower(value: Tower | null) { this.session.gameState.selectTower(value); }
 
-    public get enemyPool() { return this.gameState.enemyPool; }
+    public get enemies() { return this.session.gameState.enemies; }
+    public get towers() { return this.session.gameState.towers; }
+    public get projectiles() { return this.session.projectileSystem.projectiles; }
 
-    constructor(game: Game, mapData: IMapData) {
+    public get enemyPool() { return this.session.gameState.enemyPool; }
+
+
+    // Ambient cycle
+    private dayTime: number = 0;
+
+    constructor(game: Game, mapData: IMapData, startingCards: string[]) {
         super();
         this.game = game;
         this.mapData = mapData || DEMO_MAP;
+        this.startingCards = startingCards;
 
-        // Initialize core state
-        this.gameState = new GameState();
-        this.startingLives = CONFIG.PLAYER.START_LIVES;
-
-        // Initialize map and rendering
+        // Initialize map and rendering FIRST
         this.map = new MapManager(this.mapData);
         this.fog = new FogSystem(this.mapData);
         this.lighting = new LightingSystem(game.width, game.height);
-        this.map.lighting = this.lighting; // [NEW] Link lighting
-        this.dayNightCycle = new DayNightCycle(); // Default cycle (4 min)
-        this.atmosphere = new AtmosphereSystem(this.dayNightCycle); // Default config
-        // Set world size for cloud positioning (map dimensions in pixels)
+        this.map.lighting = this.lighting; // Link lighting
+        this.dayNightCycle = new DayNightCycle();
+        this.atmosphere = new AtmosphereSystem(this.dayNightCycle);
         const worldWidth = this.mapData.width * CONFIG.TILE_SIZE;
         const worldHeight = this.mapData.height * CONFIG.TILE_SIZE;
         this.atmosphere.setWorldSize(worldWidth, worldHeight);
@@ -128,51 +143,34 @@ export class GameScene extends BaseScene implements IGameScene {
         this.effects = new EffectSystem(game.ctx);
         this.input = game.input;
 
-        // Initialize systems
-        this.projectileSystem = new ProjectileSystem();
-        this.weaponSystem = new WeaponSystem();
-        this.metrics = new MetricsSystem();
-        this.notifications = new NotificationSystem(this.effects, game);
-
-        this.waveManager = new WaveManager(this);
-        this.acidSystem = new AcidPuddleSystem(game.ctx);
-        this.commanderSystem = new SkeletonCommanderSystem(game.ctx);
-
-        // Initialize entity manager
-        this.entityManager = new EntityManager(
-            this.gameState,
+        // Initialize Game Session (Logic / Simulation)
+        this.session = new GameSession(
+            game,
+            this,
+            this.map,
+            this.mapData,
             this.effects,
-            this.metrics,
+            this.startingCards
         );
 
-        // Initialize UI and card systems
-        // Get starting cards from selection or use default
-        // CHANGED: Start with ALL 5 card types
-        const startingCards = (window as any)._STARTING_CARDS || ['FIRE', 'ICE', 'SNIPER', 'MULTISHOT', 'MINIGUN'];
-        delete (window as any)._STARTING_CARDS; // Cleanup after use
-
+        // Initialize UI (depends on Scene/Session)
         this.ui = new UIManager(this);
-        this.cardSys = new CardSystem(this, startingCards);
-        this.forge = new ForgeSystem(this);
         this.devConsole = new DevConsole(this);
-        this.collision = new CollisionSystem(this.effects); // Debug removed
 
         Logger.info(LogChannel.GAME, 'GameScene Initialized');
-        this.inspector = new InspectorSystem(this);
-        this.bestiary = new BestiarySystem(this);
 
-        // Initialize game controller
+        // Initialize game controller (depends on Session logic via getters)
         this.gameController = new GameController(
-            this.gameState,
-            this.entityManager,
+            this.session.gameState,
+            this.session.entityManager,
             this.effects,
-            this.inspector,
+            this.session.inspector,
             this.ui,
-            this.metrics,
+            this.session.metrics,
             this.mapData,
             this.map,
             (col, row) => this.map.isBuildable(col, row),
-            this.cardSys,
+            this.session.cardSys,
             this.events,
         );
 
@@ -180,7 +178,7 @@ export class GameScene extends BaseScene implements IGameScene {
         EventBus.getInstance().on(Events.ENEMY_DIED, (data: any) => {
             const enemy = data.enemy as Enemy;
             if (enemy && enemy.typeId === 'sapper_rat') {
-                this.triggerExplosion(enemy.x, enemy.y, 45, 200, true); // Уменьшенный радиус
+                this.triggerExplosion(enemy.x, enemy.y, 45, 200, true); // Visual + Logic (Damage)
             }
         });
 
@@ -188,26 +186,19 @@ export class GameScene extends BaseScene implements IGameScene {
         EventBus.getInstance().on('ENEMY_SPLIT', (data: any) => {
             const enemy = data.enemy as Enemy;
             if (enemy && enemy.typeId === 'magma_king') {
-                // Spawn Decoy
-                // Iterate through neighbor points to find a valid spot or just spawn at same location
-                // Spawning at exact same location is fine, visually they overlap during "shedding"
                 const decoy = this.entityManager.spawnEnemy('MAGMA_STATUE', this.map.waypoints);
                 if (decoy) {
-                    // Set Decoy Position to Boss Position
                     decoy.x = enemy.x;
                     decoy.y = enemy.y;
-
-                    // Match path progress so it doesn't walk from start
                     decoy.pathIndex = enemy.pathIndex;
 
-                    // Add "Pop" effect
                     this.effects.add({
-                        type: 'explosion', // Reusing explosion for visual splash
+                        type: 'explosion',
                         x: enemy.x,
                         y: enemy.y,
                         radius: 40,
                         life: 0.3,
-                        color: '#b0bec5' // Silver splash
+                        color: '#b0bec5'
                     });
 
                     this.showFloatingText('DECOY!', enemy.x, enemy.y - 30, '#b0bec5');
@@ -215,24 +206,22 @@ export class GameScene extends BaseScene implements IGameScene {
             }
         });
 
-        // Flesh Colossus Death-Spawn Logic (Meat Piñata)
+        // Flesh Colossus Death-Spawn Logic
         EventBus.getInstance().on('ENEMY_DEATH_SPAWN', (data: any) => {
             const parent = data.enemy as Enemy;
             const spawns: string[] = data.spawns;
 
             if (!parent || !spawns || spawns.length === 0) return;
 
-            // 1. Gore explosion effect
             this.effects.add({
                 type: 'explosion',
                 x: parent.x,
                 y: parent.y,
                 radius: 55,
                 life: 0.5,
-                color: '#8b0000' // Dark blood red
+                color: '#8b0000'
             });
 
-            // 2. Meat chunks flying out
             for (let i = 0; i < 10; i++) {
                 const angle = (i / 10) * Math.PI * 2 + Math.random() * 0.3;
                 const speed = 120 + Math.random() * 80;
@@ -251,15 +240,11 @@ export class GameScene extends BaseScene implements IGameScene {
                 });
             }
 
-            // 3. Spawn children with circular offset to prevent overlap
             for (let i = 0; i < spawns.length; i++) {
                 const typeKey = spawns[i];
                 const child = this.entityManager.spawnEnemy(typeKey.toUpperCase(), this.map.waypoints);
                 if (child) {
-                    // Copy path progress from parent
                     child.pathIndex = parent.pathIndex;
-
-                    // Circular offset to prevent overlap
                     const angle = (i / spawns.length) * Math.PI * 2 + Math.random() * 0.3;
                     const offset = 25 + Math.random() * 15;
                     child.x = parent.x + Math.cos(angle) * offset;
@@ -267,28 +252,34 @@ export class GameScene extends BaseScene implements IGameScene {
                 }
             }
 
-            // 4. Floating text and feedback
             this.showFloatingText('BURST!', parent.x, parent.y - 40, '#ff5252');
             SoundManager.play('explosion');
             this.triggerShake(0.35, 7);
         });
     }
 
-    public onEnter() {
+    protected onEnterImpl() {
         const ui = document.getElementById('ui-layer');
         if (ui) ui.style.display = 'block';
         const hand = document.getElementById('hand-container');
         if (hand) hand.style.display = 'flex';
 
         this.ui.update();
-        window.addEventListener('keydown', this.onKeyDown);
+        // Use this.on for automatic cleanup
+        this.on(window, 'keydown', this.onKeyDown);
     }
 
-    public onExit() {
+    protected onExitImpl() {
+        // UI Cleanup
+        if (this.ui) this.ui.destroy();
+
+        // Session Cleanup (Systems, Listeners)
+        if (this.session) this.session.destroy();
+
         const ui = document.getElementById('ui-layer');
         if (ui) ui.style.display = 'none';
-        window.removeEventListener('keydown', this.onKeyDown);
-        if (this.bestiary) this.bestiary.destroy();
+
+        // Note: this.bestiary is part of session, so session.destroy() handles it.
     }
 
     private onKeyDown = (e: KeyboardEvent) => {
@@ -666,7 +657,7 @@ export class GameScene extends BaseScene implements IGameScene {
     }
 
     public restart(): void {
-        this.game.changeScene(new GameScene(this.game, this.mapData));
+        this.game.changeScene(new GameScene(this.game, this.mapData, this.startingCards));
     }
 
     public togglePause(): void {

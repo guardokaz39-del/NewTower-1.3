@@ -10,13 +10,20 @@ import { Enemy } from '../Enemy';
 import { Tower } from '../Tower';
 import { Projectile } from '../Projectile';
 import { EffectSystem } from '../EffectSystem';
+import { ProjectileSystem } from '../systems/ProjectileSystem';
+import { CollisionSystem } from '../CollisionSystem';
 import { EventEmitter } from '../Events';
+import { GameController } from './GameController';
+import { GameState } from './GameState';
 
 // Define the interface for the GameScene
 export interface IGameScene {
     // Core references
     game: Game;
     mapData: IMapData;
+
+    // Controller
+    gameController: GameController;
 
     // Systems
     waveManager: WaveManager;
@@ -26,9 +33,12 @@ export interface IGameScene {
     inspector: InspectorSystem;
     metrics: MetricsSystem;
     effects: EffectSystem;
+    projectileSystem: ProjectileSystem;
+    collision: CollisionSystem;
     events: EventEmitter;
 
     // State
+    gameState: GameState;
     wave: number;
     readonly money: number;
     readonly lives: number;

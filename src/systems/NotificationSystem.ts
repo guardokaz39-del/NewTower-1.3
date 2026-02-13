@@ -14,6 +14,8 @@ export class NotificationSystem {
     // Active notifications queue
     private notifications: INotification[] = [];
 
+    private subscriptionIds: number[] = [];
+
     constructor(effects: EffectSystem, game: Game) {
         this.effects = effects;
         this.game = game;
@@ -24,17 +26,23 @@ export class NotificationSystem {
     private initSubscriptions() {
         const bus = EventBus.getInstance();
 
-        bus.on(Events.WAVE_STARTED, (wave: number) => {
+        this.subscriptionIds.push(bus.on(Events.WAVE_STARTED, (wave: number) => {
             this.showWaveStart(wave);
-        });
+        }));
 
-        bus.on(Events.WAVE_COMPLETED, (wave: number) => {
+        this.subscriptionIds.push(bus.on(Events.WAVE_COMPLETED, (wave: number) => {
             this.showWaveClear(wave);
-        });
+        }));
 
-        bus.on(Events.ENEMY_IMMUNE, (data: { x: number, y: number }) => {
+        this.subscriptionIds.push(bus.on(Events.ENEMY_IMMUNE, (data: { x: number, y: number }) => {
             this.showImmune(data.x, data.y);
-        });
+        }));
+    }
+
+    public destroy() {
+        const bus = EventBus.getInstance();
+        this.subscriptionIds.forEach(id => bus.off(id));
+        this.subscriptionIds = [];
     }
 
     /**

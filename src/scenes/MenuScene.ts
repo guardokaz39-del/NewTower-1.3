@@ -17,23 +17,27 @@ export class MenuScene extends BaseScene {
     constructor(game: Game) {
         super();
         this.game = game;
-        this.createUI();
-        this.createMapSelectionUI();
+        // UI creation moved to onEnterImpl
     }
 
-    public onEnter() {
+    protected onEnterImpl() {
+        if (!this.container) {
+            this.createUI();
+        }
+        if (!this.mapSelectionContainer) {
+            this.createMapSelectionUI();
+        }
+
         this.container.style.display = 'flex';
         this.mapSelectionContainer.style.display = 'none';
 
-        const uiLayer = document.getElementById('ui-layer');
-        if (uiLayer) uiLayer.style.display = 'none';
-        const hand = document.getElementById('hand-container');
-        if (hand) hand.style.display = 'none';
+        // Hide game UI layers via UIRoot
+        this.game.uiRoot.hideGameUI();
     }
 
-    public onExit() {
-        this.container.style.display = 'none';
-        this.mapSelectionContainer.style.display = 'none';
+    protected onExitImpl() {
+        if (this.container) this.container.style.display = 'none';
+        if (this.mapSelectionContainer) this.mapSelectionContainer.style.display = 'none';
 
         // Cleanup canvas elements to prevent memory leaks
         this.clearMapPreviews();

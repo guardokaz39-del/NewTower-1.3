@@ -13,6 +13,7 @@ export class GameState {
     // Core state
     public wave: number = 0;
     public lives: number = CONFIG.PLAYER.START_LIVES;
+    public readonly startingLives: number = CONFIG.PLAYER.START_LIVES;
     public money: number = CONFIG.PLAYER.START_MONEY;
     public paused: boolean = false;
     public isRunning: boolean = true;

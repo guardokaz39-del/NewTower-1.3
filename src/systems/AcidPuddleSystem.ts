@@ -50,11 +50,18 @@ export class AcidPuddle {
 export class AcidPuddleSystem {
     private puddles: AcidPuddle[] = [];
     private ctx: CanvasRenderingContext2D;
+    private listenerId: number;
 
     constructor(ctx: CanvasRenderingContext2D) {
         this.ctx = ctx;
         // Listen for enemy deaths
-        EventBus.getInstance().on(Events.ENEMY_DIED, this.onEnemyDied.bind(this));
+        this.listenerId = EventBus.getInstance().on(Events.ENEMY_DIED, this.onEnemyDied.bind(this));
+    }
+
+    public destroy() {
+        if (this.listenerId !== undefined) {
+            EventBus.getInstance().off(this.listenerId);
+        }
     }
 
     private onEnemyDied(data: { enemy: Enemy }) {

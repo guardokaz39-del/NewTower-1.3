@@ -24,6 +24,8 @@ import { EventEmitter } from '../Events';
 import { CONFIG } from '../Config';
 import { WeaponSystem } from '../WeaponSystem';
 import { Projectile } from '../Projectile';
+import { GameSession } from '../GameSession';
+import { GameController } from './GameController';
 
 enum TestPhase {
     IDLE,
@@ -38,75 +40,64 @@ enum TestPhase {
 export class StressTestScene extends BaseScene implements IGameScene {
     public game: Game;
     public mapData: IMapData;
-    public gameState: GameState;
-    public entityManager: EntityManager;
-    public effects: EffectSystem;
-    public map: MapManager;
-    public projectileSystem: ProjectileSystem;
-    public collision: CollisionSystem;
-    public metrics: MetricsSystem;
-    public ui: UIManager; // Stub
-    public cardSys: CardSystem; // Stub
-    public waveManager: WaveManager; // Stub
-    public forge: ForgeSystem; // Stub
-    public inspector: InspectorSystem; // Stub
+    public session: GameSession;
+    private _map: MapManager;
+
+    // IGameScene proxies to Session
+    public get gameState() { return this.session.gameState; }
+    public get entityManager() { return this.session.entityManager; }
+    public get waveManager() { return this.session.waveManager; }
+    public get projectileSystem() { return this.session.projectileSystem; }
+    public get collision() { return this.session.collision; }
+    public get metrics() { return this.session.metrics; }
+    public get weaponSystem() { return this.session.weaponSystem; }
+    public get cardSys() { return this.session.cardSys; }
+    public get forge() { return this.session.forge; }
+    public get inspector() { return this.session.inspector; }
+    public get bestiary() { return this.session.bestiary; }
+    public get notifications() { return this.session.notifications; }
+    public get acidSystem() { return this.session.acidSystem; }
+    public get commanderSystem() { return this.session.commanderSystem; }
+    public get effects() { return this._effects; } // Local ref or session ref? Session takes effects in constructor.
+
+    public ui: UIManager;
     public events: EventEmitter;
-    public weaponSystem: WeaponSystem;
+
+    // Visual Systems (Stubs or minimal impl)
+    public gameController: GameController;
+    public dayTime: number = 0;
+    public fog: any = { update: () => { }, draw: () => { } };
+    public lighting: any = { update: () => { }, render: () => { }, clear: () => { }, resize: () => { }, addLight: () => { } };
+    public dayNightCycle: any = {};
+    public atmosphere: any = {};
+    public input: any = { hoverCol: -1, hoverRow: -1 };
+    public devConsole: any = {};
+
+    private _effects: EffectSystem;
 
     // Test State
     private phase: TestPhase = TestPhase.IDLE;
     private timer: number = 0;
     private rng: SeededRandom;
     private uiOverlay: HTMLElement | null = null;
-
-    // Phase Specifics
     private lastWallToggle: number = 0;
     private lastRampUp: number = 0;
     public stableMaxEntities: number = 0;
     private lastDt: number = 0.016;
     private lastFps: number = 60;
 
-    // Stubs for IGameScene
-    public wave: number = 0;
-    public money: number = 999999;
-    public lives: number = 100;
-    public startingLives: number = 100;
-    public get enemies() { return this.gameState.enemies; }
-    public set enemies(v: Enemy[]) { this.gameState.enemies = v; }
-    public get towers() { return this.gameState.towers; }
-    public set towers(v: Tower[]) { this.gameState.towers = v; }
+    // IGameScene Props
+    public get wave() { return this.session.waveManager.isWaveActive ? this.session.gameState.wave : 0; }
+    public set wave(v: number) { this.session.gameState.wave = v; } // Setter needed?
+    public get money() { return this.session.gameState.money; }
+    public get lives() { return this.session.gameState.lives; }
+    public get startingLives() { return this.session.gameState.startingLives; }
+    public get enemies() { return this.session.gameState.enemies; }
+    public get towers() { return this.session.gameState.towers; }
+    public get projectiles() { return this.session.projectileSystem.projectiles; }
 
-    public get projectiles(): Projectile[] { return this.projectileSystem.projectiles; }
-    public set projectiles(v: Projectile[]) {
-        // No-op or warn, as ProjectileSystem manages this
-        console.warn("Attempt to set projectiles directly in StressTestScene");
-    }
-
-    // Stubs to satisfy potential rigid type checks if systems expect GameScene
-    public gameController: any = {
-        handleCardDrop: () => false,
-        startBuildingTower: () => { },
-        handleGridClick: () => { },
-        showFloatingText: () => { },
-        sellTower: () => { },
-        sellCardFromTower: () => { },
-        giveRandomCard: () => { },
-        handleKeyDown: () => { }
-    };
-    public dayTime: number = 0;
-    public fog: any = { update: () => { }, draw: () => { } };
-    public lighting: any = { update: () => { }, render: () => { }, clear: () => { }, resize: () => { }, addLight: () => { } };
-    public bestiary: any = { destroy: () => { } };
-    public notifications: any = { add: () => { } };
-    public acidSystem: any = { update: () => { }, draw: () => { } };
-    public commanderSystem: any = { update: () => { }, draw: () => { } };
-    public input: any = { hoverCol: -1, hoverRow: -1 };
-    public devConsole: any = {};
-    public dayNightCycle: any = {};
-    public atmosphere: any = {};
-
-    // Stub methods
-    public spawnEnemy(type: string) { }
+    // Methods
+    public spawnEnemy(type: string) { this.session.gameState.enemies.push(new Enemy()); } // Stub-ish
     public showFloatingText(text: string, x: number, y: number, color?: string) { }
     public handleCardDrop(card: ICard, x: number, y: number): boolean { return false; }
     public giveRandomCard() { }
@@ -114,7 +105,7 @@ export class StressTestScene extends BaseScene implements IGameScene {
     public sellCardFromTower(tower: Tower, cardIndex: number) { }
     public restart() { }
     public togglePause() { }
-    public addMoney(amount: number) { }
+    public addMoney(amount: number) { this.session.gameState.money += amount; }
     public spendMoney(amount: number): boolean { return true; }
     public loseLife(amount?: number) { }
     public startBuildingTower(col: number, row: number) { }
@@ -133,48 +124,48 @@ export class StressTestScene extends BaseScene implements IGameScene {
             waypoints: [],
             objects: []
         };
-        this.rng = new SeededRandom(12345); // Fixed seed
+        this.rng = new SeededRandom(12345);
 
-        // Init Systems
-        this.gameState = new GameState();
+        // Init Effects
+        this._effects = new EffectSystem(game.ctx);
+
+        // Init Map
+        this._map = new MapManager(this.mapData);
+        const mapManager = this._map;
+        // We need to expose mapManager as 'map' property if we want consistency, 
+        // but for now let's just use it to init session.
+        // Wait, StressTestScene uses 'this.map' later.
+
         this.events = new EventEmitter();
-        this.effects = new EffectSystem(game.ctx);
-        this.map = new MapManager(this.mapData);
 
-        // Setup Map for Stress Test: Clear a central area
-        // Ensure grid reflects Grass
+        // GameSession
+        this.session = new GameSession(game, this, mapManager, this.mapData, this._effects, []);
+
+        // Assign local aliases if needed by existing code
+        // this.gameState = ... (referencing getter)
+
+        // Setup Map for Stress Test
         for (let y = 0; y < 20; y++) {
             for (let x = 0; x < 20; x++) {
-                if (this.map.grid && this.map.grid[y] && this.map.grid[y][x]) {
-                    this.map.grid[y][x].type = 0;
+                if (mapManager.grid && mapManager.grid[y] && mapManager.grid[y][x]) {
+                    mapManager.grid[y][x].type = 0;
                 }
             }
         }
+        this.mapData.waypoints = [{ x: 0, y: 10 }, { x: 19, y: 10 }];
+        mapManager.waypoints = this.mapData.waypoints;
 
-        // Define simple linear path for enemies to crowd
-        this.mapData.waypoints = [
-            { x: 0, y: 10 },
-            { x: 19, y: 10 }
-        ];
-        this.map.waypoints = this.mapData.waypoints; // Sync
+        // UI
+        this.ui = new UIManager(this);
 
-        this.metrics = new MetricsSystem();
-        this.entityManager = new EntityManager(this.gameState, this.effects, this.metrics);
-        this.projectileSystem = new ProjectileSystem();
-        this.collision = new CollisionSystem(this.effects);
-        this.weaponSystem = new WeaponSystem();
-
-        // Stubs
-        // UIManager and others might depend on 'this' satisfying IGameScene
-        // Since we implement IGameScene, this should be safe
-        this.ui = new UIManager(this as any);
-        this.cardSys = new CardSystem(this as any, []);
-        this.waveManager = new WaveManager(this as any);
-        this.forge = new ForgeSystem(this as any);
-        this.inspector = new InspectorSystem(this as any);
+        // Stub Controller
+        this.gameController = {} as GameController;
     }
 
-    public onEnter() {
+    // Helper to expose map for existing code
+    public get map() { return this._map; }
+
+    protected onEnterImpl() {
         // Create Overlay
         this.createOverlay();
         // Start Test
@@ -190,7 +181,7 @@ export class StressTestScene extends BaseScene implements IGameScene {
         console.log("Stress Test Started");
     }
 
-    public onExit() {
+    protected onExitImpl() {
         if (this.uiOverlay) {
             this.uiOverlay.remove();
             this.uiOverlay = null;

@@ -1,17 +1,17 @@
-import { GameScene } from './scenes/GameScene';
+import { IGameScene } from './scenes/IGameScene';
 import { BestiaryUI } from './ui/bestiary/BestiaryUI';
 import { UIUtils } from './UIUtils';
 import { EventBus, Events } from './EventBus';
 
 export class BestiarySystem {
-    private scene: GameScene;
+    private scene: IGameScene;
     private unlockedEnemies: Set<string> = new Set();
     private ui: BestiaryUI | null = null;
     private btn!: HTMLElement;
 
     private eventSubId: number = -1;
 
-    constructor(scene: GameScene) {
+    constructor(scene: IGameScene) {
         this.scene = scene;
         this.loadProgress(); // Load saved unlocks
         this.createButton();

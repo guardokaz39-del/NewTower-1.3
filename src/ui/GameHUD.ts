@@ -15,6 +15,15 @@ export class GameHUD {
     private elStartBtn: HTMLButtonElement;
     // private elPauseBtn: HTMLButtonElement; // REMOVED
 
+    private boundStartWave: () => void;
+    private boundForge: () => void;
+
+    // Subscription IDs
+    private subMoney: number = -1;
+    private subLives: number = -1;
+    private subWaveStart: number = -1;
+    private subWaveEnd: number = -1;
+
     constructor(scene: IGameScene) {
         this.scene = scene;
 
@@ -26,6 +35,10 @@ export class GameHUD {
         this.elStartBtn = document.getElementById('start-wave-btn') as HTMLButtonElement;
         // Pause button removed
 
+        // Bind callbacks
+        this.boundStartWave = () => this.scene.waveManager.startWave();
+        this.boundForge = () => this.handleForgeClick();
+
         this.initListeners();
         this.initSubscriptions();
 
@@ -36,37 +49,46 @@ export class GameHUD {
     }
 
     private initListeners() {
-        this.elStartBtn.addEventListener('click', () => this.scene.waveManager.startWave());
+        if (this.elStartBtn) this.elStartBtn.addEventListener('click', this.boundStartWave);
+        if (this.elForgeBtn) this.elForgeBtn.addEventListener('click', this.boundForge);
+    }
 
-        // Pause button listener removed
+    private handleForgeClick() {
+        // FIX: Use forge system
+        if (!this.scene.forge || !this.scene.forge.canForge()) return;
 
-        this.elForgeBtn.addEventListener('click', () => {
-            // FIX: Use forge system
-            if (!this.scene.forge || !this.scene.forge.canForge()) return;
+        // Determine cost based on card level
+        const card = this.scene.forge.forgeSlots[0];
+        const forgeCost = card && card.level >= 2
+            ? CONFIG.ECONOMY.FORGE_COST_LVL2
+            : CONFIG.ECONOMY.FORGE_COST_LVL1;
 
-            // Determine cost based on card level
-            const card = this.scene.forge.forgeSlots[0];
-            const forgeCost = card && card.level >= 2
-                ? CONFIG.ECONOMY.FORGE_COST_LVL2
-                : CONFIG.ECONOMY.FORGE_COST_LVL1;
-
-            if (this.scene.money >= forgeCost) {
-                this.scene.forge.tryForge();
-                // Button state will update on next tick or via event if we add more events
-            }
-        });
+        if (this.scene.money >= forgeCost) {
+            this.scene.forge.tryForge();
+            // Button state will update on next tick or via event if we add more events
+        }
     }
 
     private initSubscriptions() {
         const bus = EventBus.getInstance();
-        bus.on(Events.MONEY_CHANGED, (money: number) => this.updateMoney(money));
-        bus.on(Events.LIVES_CHANGED, (lives: number) => this.updateLives(lives));
-        bus.on(Events.WAVE_STARTED, (wave: number) => {
+        this.subMoney = bus.on(Events.MONEY_CHANGED, (money: number) => this.updateMoney(money));
+        this.subLives = bus.on(Events.LIVES_CHANGED, (lives: number) => this.updateLives(lives));
+        this.subWaveStart = bus.on(Events.WAVE_STARTED, (wave: number) => {
             this.updateWaveText(wave);
             this.updateStartBtn(true);
         });
-        bus.on(Events.WAVE_COMPLETED, () => this.updateStartBtn(false));
-        // Pause toggle event listener removed for button update (button doesn't exist)
+        this.subWaveEnd = bus.on(Events.WAVE_COMPLETED, () => this.updateStartBtn(false));
+    }
+
+    public destroy() {
+        if (this.elStartBtn) this.elStartBtn.removeEventListener('click', this.boundStartWave);
+        if (this.elForgeBtn) this.elForgeBtn.removeEventListener('click', this.boundForge);
+
+        const bus = EventBus.getInstance();
+        if (this.subMoney !== -1) bus.off(this.subMoney);
+        if (this.subLives !== -1) bus.off(this.subLives);
+        if (this.subWaveStart !== -1) bus.off(this.subWaveStart);
+        if (this.subWaveEnd !== -1) bus.off(this.subWaveEnd);
     }
 
     private updateMoney(newMoney: number) {

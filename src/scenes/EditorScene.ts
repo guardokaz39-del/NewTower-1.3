@@ -57,27 +57,29 @@ export class EditorScene extends BaseScene {
         this.history = new EditorHistory();
         this.createUI();
         this.createMapsPanel();
-        this.setupHotkeys();
+        // Hotkeys are now set up in onEnterImpl
     }
 
-    public onEnter() {
+    protected onEnterImpl() {
         this.toolbar.show();
         this.controlsContainer.style.display = 'flex';
         this.mapsPanel.style.display = 'block';
-        const uiLayer = document.getElementById('ui-layer');
-        if (uiLayer) uiLayer.style.display = 'none';
+
+        // Hide standard game UI
+        (this.game as any).uiRoot.hideGameUI(); // Cast as any if TS doesn't know yet
 
         // Initial fog render
         this.fog.update(0);
+
+        // Setup hotkeys with automatic cleanup
+        this.on(document, 'keydown', (e: Event) => this.handleGlobalKey(e as KeyboardEvent));
     }
 
-    public onExit() {
+    protected onExitImpl() {
         this.toolbar.hide();
         this.controlsContainer.style.display = 'none';
         this.mapsPanel.style.display = 'none';
-        if (this.toolbar) this.toolbar.destroy();
-        if (this.controlsContainer.parentNode) this.controlsContainer.parentNode.removeChild(this.controlsContainer);
-        if (this.mapsPanel.parentNode) this.mapsPanel.parentNode.removeChild(this.mapsPanel);
+        // Cleanup handled by BaseScene.dispose()
     }
 
     public update(dt: number) {
@@ -428,9 +430,8 @@ export class EditorScene extends BaseScene {
     }
 
     private refreshMapsPanel() {
-        console.log('Refreshing Maps Panel. Raw Storage:', localStorage.getItem('NEWTOWER_MAPS'));
         const maps = getSavedMaps();
-        console.log('Parsed Maps:', maps);
+
         // Clear current content except header
         while (this.mapsPanel.children.length > 1) {
             this.mapsPanel.removeChild(this.mapsPanel.lastChild!);
@@ -549,51 +550,52 @@ export class EditorScene extends BaseScene {
         this.refreshMapsPanel();
     }
 
-    private setupHotkeys() {
-        document.addEventListener('keydown', (e) => {
-            // Ignore if typing in input fields
-            if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
-                return;
-            }
+    private handleGlobalKey(e: KeyboardEvent) {
+        // Ignore if typing in input fields
+        if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
+            return;
+        }
 
-            // Ctrl+Z - Undo
-            if (e.ctrlKey && e.key === 'z' && !e.shiftKey) {
-                e.preventDefault();
-                if (this.history.undo()) {
-                    this.fog.update(0); // Re-render fog after undo
-                }
-                return;
+        // Ctrl+Z - Undo
+        if (e.ctrlKey && e.key === 'z' && !e.shiftKey) {
+            e.preventDefault();
+            if (this.history.undo()) {
+                this.fog.update(0); // Re-render fog after undo
             }
+            return; // Fixed: was return; in original? Yes
+        }
 
-            // Ctrl+Shift+Z - Redo
-            if (e.ctrlKey && e.shiftKey && e.key === 'Z') {
-                e.preventDefault();
-                if (this.history.redo()) {
-                    this.fog.update(0); // Re-render fog after redo
-                }
-                return;
+        // Ctrl+Shift+Z - Redo
+        if (e.ctrlKey && e.shiftKey && e.key === 'Z') {
+            e.preventDefault();
+            if (this.history.redo()) {
+                this.fog.update(0); // Re-render fog after redo
             }
+            return;
+        }
 
-            // Ctrl+S - Save
-            if (e.ctrlKey && e.key === 's') {
-                e.preventDefault();
-                this.openWaveConfig();
-                return;
-            }
+        // Ctrl+S - Save
+        if (e.ctrlKey && e.key === 's') {
+            e.preventDefault();
+            this.openWaveConfig();
+            return;
+        }
 
-            // E - Eraser mode
-            if (e.key === 'e' || e.key === 'E') {
-                this.mode = 'eraser';
-                return;
-            }
+        // E - Eraser mode
+        if (e.key === 'e' || e.key === 'E') {
+            this.mode = 'eraser';
+            // Also update toolbar UI if possible?
+            // current toolbar implementation relies on callback to update scene, not vice versa.
+            // Ideally we should sync toolbar state.
+            return;
+        }
 
-            // 1-3 - Category selection
-            if (e.key >= '1' && e.key <= '3') {
-                const categoryIndex = parseInt(e.key) - 1;
-                this.toolbar.selectCategory(categoryIndex);
-                return;
-            }
-        });
+        // 1-3 - Category selection
+        if (e.key >= '1' && e.key <= '3') {
+            const categoryIndex = parseInt(e.key) - 1;
+            this.toolbar.selectCategory(categoryIndex);
+            return;
+        }
     }
 
 }

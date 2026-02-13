@@ -27,9 +27,9 @@ export class UIManager {
         this.pauseMenu = new PauseMenu(scene);
         this.gameOver = new GameOverUI(scene);
 
-        // Контейнеры
-        this.elHandContainer = document.getElementById('hand-container')!;
-        this.elUiLayer = document.getElementById('ui-layer')!;
+        // Containes via UIRoot
+        this.elHandContainer = this.scene.game.uiRoot.getLayer('hand');
+        this.elUiLayer = this.scene.game.uiRoot.getLayer('ui');
     }
 
     public updatePauseMenu(paused: boolean) {
@@ -67,5 +67,18 @@ export class UIManager {
 
         this.hud.update();
         this.shop.update();
+    }
+
+    public destroy() {
+        // Destroy components to clean up listeners
+        if (this.shop) this.shop.destroy();
+        if (this.hud) this.hud.destroy();
+
+        // Clear dynamic UI layers (hand), but KEEP static UI layer (HUD/Shop structure)
+        if (this.scene && this.scene.game && this.scene.game.uiRoot) {
+            // this.scene.game.uiRoot.clearLayer('ui'); // DO NOT CLEAR STATIC UI
+            this.scene.game.uiRoot.clearLayer('hand');
+            this.scene.game.uiRoot.clearLayer('tooltip');
+        }
     }
 }

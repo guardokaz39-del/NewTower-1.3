@@ -1,9 +1,9 @@
-import { GameScene } from './scenes/GameScene';
+import { IGameScene } from './scenes/IGameScene';
 import { Tower } from './Tower';
 import { CONFIG } from './Config';
 
 export class InspectorSystem {
-    private scene: GameScene;
+    private scene: IGameScene;
     private elInspector: HTMLElement;
     private elName: HTMLElement;
     private elStats: HTMLElement;
@@ -12,7 +12,7 @@ export class InspectorSystem {
 
     private currentTower: Tower | null = null;
 
-    constructor(scene: GameScene) {
+    constructor(scene: IGameScene) {
         this.scene = scene;
         this.elInspector = document.createElement('div');
 
@@ -208,7 +208,8 @@ export class InspectorSystem {
             if (slot.isLocked) {
                 // === LOCKED SLOT ===
                 const unlockCost = CONFIG.ECONOMY.SLOT_UNLOCK_COST[index];
-                const canAfford = this.scene.gameState.money >= unlockCost;
+                const canAfford = this.scene.money >= unlockCost;
+
 
                 Object.assign(slotEl.style, {
                     width: '50px',
