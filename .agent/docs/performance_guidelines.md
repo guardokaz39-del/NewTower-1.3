@@ -97,10 +97,9 @@ for (let i = 0; i < enemies.length; i++) {
 
 ### Object Pool для частых объектов
 
-```typescript
 class EffectPool {
     private pool: IEffect[] = [];
-    
+
     acquire(): IEffect {
         return this.pool.pop() || this.createNew();
     }
@@ -108,6 +107,36 @@ class EffectPool {
     release(effect: IEffect): void {
         effect.reset();
         this.pool.push(effect);
+    }
+}
+
+```
+
+**Важно для Pool.reset():**
+
+- **Deep Reset**: Очищайте ВСЕ поля (включая флаги, таймеры, ссылки).
+- **No-Alloc**: `this.array.length = 0`, но `this.effects = STATIC_EMPTY_ARRAY`.
+- **Remove Order**: `reset()` -> `pool.push()` -> `swapRemove()`. Это предотвращает использование "грязных" объектов при ошибках индексов.
+
+### Dirty Flag Caching (Stat Calculation)
+
+Для сложных вычислений, зависящих от редких событий (например, статы башни зависят от карт):
+
+```typescript
+class Tower {
+    private statsDirty = true;
+    private cachedStats = null;
+
+    invalidateCache() { 
+        this.statsDirty = true; 
+    }
+
+    getStats() {
+        if (this.statsDirty) {
+            this.cachedStats = this.calculateExpensiveStats();
+            this.statsDirty = false;
+        }
+        return this.cachedStats;
     }
 }
 ```

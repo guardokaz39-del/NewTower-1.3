@@ -19,6 +19,11 @@ import { SoundManager } from '../SoundManager';
  * - Keyboard hotkeys
  */
 export class GameController {
+    // Bound handler for safe unsubscription
+    private onCardDropped = (data: any) => {
+        this.handleCardDrop(data.card, data.x, data.y);
+    };
+
     constructor(
         private state: GameState,
         private entityManager: EntityManager,
@@ -32,9 +37,15 @@ export class GameController {
         private cardSys: any, // CardSystem reference
         private events: EventEmitter,
     ) {
-        this.events.on('CARD_DROPPED', (data: any) => {
-            this.handleCardDrop(data.card, data.x, data.y);
-        });
+        this.events.on('CARD_DROPPED', this.onCardDropped);
+    }
+
+    public dispose(): void {
+        this.events.off('CARD_DROPPED', this.onCardDropped);
+        if (this.flowFieldUpdateTimer) {
+            clearTimeout(this.flowFieldUpdateTimer);
+            this.flowFieldUpdateTimer = null;
+        }
     }
 
     public handleMenuAction(action: { type: 'UNLOCK' | 'CLICK_SLOT' | 'REMOVE_CARD', slotId: number }, tower: Tower) {
@@ -75,6 +86,7 @@ export class GameController {
             if (tower.selectedSlotId !== action.slotId) {
                 tower.selectedSlotId = action.slotId;
                 // Optional: Sound for selection
+                // TODO: Add slot selection sound if needed
             } else {
                 // Second click on SAME slot -> Action (Remove Card)
                 // Only if there is a card
@@ -244,10 +256,14 @@ export class GameController {
             case 'Space':
                 this.handleSpaceKey();
                 break;
+
+            case 'Delete':
+            case 'Backspace':
                 if (this.state.selectedTower) {
                     this.sellTower(this.state.selectedTower);
                 }
                 break;
+
             case 'KeyM':
                 console.log('CHEAT: Give Minigun');
                 this.cardSys.addCard('MINIGUN', 1);

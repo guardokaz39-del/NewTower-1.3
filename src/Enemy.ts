@@ -127,6 +127,8 @@ export class Enemy {
         // Reset Performance caches
         this.typeConfig = null;
         this.moveAngle = 0;
+        this._moveVector.x = 0;
+        this._moveVector.y = 0;
 
         // Reset Damage Text
         this.lastDamageText = null;

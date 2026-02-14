@@ -270,10 +270,13 @@ export class GameScene extends BaseScene implements IGameScene {
     }
 
     protected onExitImpl() {
-        // UI Cleanup
+        // 1. Stop Logic (Controller first to prevent input handling during shutdown)
+        if (this.gameController) this.gameController.dispose();
+
+        // 2. UI Cleanup
         if (this.ui) this.ui.destroy();
 
-        // Session Cleanup (Systems, Listeners)
+        // 3. Session Cleanup (Systems, Listeners)
         if (this.session) this.session.destroy();
 
         const ui = document.getElementById('ui-layer');

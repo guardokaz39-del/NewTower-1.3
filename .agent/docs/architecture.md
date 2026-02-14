@@ -188,3 +188,30 @@ src/
 3. **Assets → Renderers**: `Assets.get('name')` provides procedural textures
 4. **Scene → Systems**: `GameScene` orchestrates via `IGameScene` interface
 5. **Cards → Tower Stats**: `Tower.getStats()` merges effects via `CardStackingSystem`
+
+---
+
+## Simulation Stability Contract
+
+To ensure long-running simulation stability (no memory leaks, no "ghost" behaviors), the following contracts are strictly enforced:
+
+### 1. Strict Lifecycle Management
+
+When exiting `GameScene`, cleanup MUST occur in this specific order to prevent race conditions:
+
+1. **Stop Logic**: `GameController.dispose()` (Stop input, timers, events).
+2. **Stop UI**: `UI.destroy()` (Detach DOM elements).
+3. **Destroy Session**: `GameSession.destroy()` (Clear systems, Entity Pools).
+
+### 2. Pooling Integrity
+
+Object Pools (Enemy, Projectile) must guarantee "Factory-Fresh" state upon reuse.
+
+- **Deep Reset**: `reset()` methods must clear ALL runtime state (physics, visual flags, timers, path indices).
+- **No-Alloc Reset**: `reset()` must NOT allocate new arrays/objects. Use `.length = 0` or static empty constants (e.g., `Projectile.EMPTY_EFFECTS`).
+- **Safe Removal**: When removing from active lists, the order is: `Reset` -> `Pool` -> `Swap/Remove`.
+
+### 3. Separation of Concerns (Physics vs Visuals)
+
+- **Projectiles**: Pure physics/logic containers. `update()` does NOT spawn visual effects directly.
+- **ProjectileSystem**: Orchestrates visual side-effects (trails) based on projectile state. This ensures deterministic simulation logic is decoupled from rendering density.

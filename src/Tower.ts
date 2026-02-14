@@ -61,6 +61,11 @@ export class Tower {
 
     public costSpent: number = 0;
 
+    // Cache State
+    private statsDirty: boolean = true;
+    private cachedStats: (IProjectileStats & { range: number; cd: number; projCount: number; spread: number; projectileType: string; attackSpeedMultiplier: number }) | null = null;
+    // public rangeSquared: number = 0; // Removed duplicate declaration
+
     // Spinup state (for Minigun cards)
     public spinupTime: number = 0;        // Seconds spent firing continuously
     public maxHeat: number = 5;             // Max seconds before overheat (default 5s)
@@ -103,7 +108,17 @@ export class Tower {
         return dummy.getStats();
     }
 
+    // Force cache update
+    public invalidateCache() {
+        this.statsDirty = true;
+        this.rangeSquared = 0; // Force range recalc
+    }
+
     getStats(): IProjectileStats & { range: number; cd: number; projCount: number; spread: number; projectileType: string; attackSpeedMultiplier: number } {
+        if (!this.statsDirty && this.cachedStats) {
+            return this.cachedStats;
+        }
+
         // Start with base stats
         let range = CONFIG.TOWER.BASE_RANGE;
         let damage = CONFIG.TOWER.BASE_DMG;
@@ -218,7 +233,7 @@ export class Tower {
             // (actual capping happens in WeaponSystem)
         }
 
-        return {
+        const stats = {
             range: Math.round(range),
             dmg: damage,
             cd: attackSpeed,
@@ -232,6 +247,10 @@ export class Tower {
             projectileType,
             attackSpeedMultiplier: mergedMods.attackSpeedMultiplier || 1.0
         };
+
+        this.cachedStats = stats;
+        this.statsDirty = false;
+        return stats;
     }
 
     addCard(c: ICard): boolean {
@@ -239,6 +258,7 @@ export class Tower {
         const emptySlot = this.slots.find(s => !s.isLocked && s.card === null);
         if (emptySlot) {
             emptySlot.card = c;
+            this.invalidateCache();
             this.updateTowerStats(); // Recalculate turn speed etc
             return true;
         }
@@ -293,6 +313,7 @@ export class Tower {
         if (index >= 0 && index < activeSlots.length) {
             const card = activeSlots[index].card;
             activeSlots[index].card = null;
+            this.invalidateCache();
             this.updateTowerStats();
             return card;
         }
@@ -304,6 +325,7 @@ export class Tower {
         if (slot && slot.card) {
             const c = slot.card;
             slot.card = null;
+            this.invalidateCache();
             this.updateTowerStats();
             return c;
         }
@@ -314,6 +336,7 @@ export class Tower {
         const slot = this.slots.find(s => s.id === slotId);
         if (slot && slot.isLocked) {
             slot.isLocked = false;
+            this.invalidateCache();
             return true;
         }
         return false;

@@ -39,6 +39,8 @@ export class Projectile {
     public projectileType: string = 'standard'; // Visual type
     public towerLevel: number = 1;            // Tower's max card level (for trails)
 
+    private static readonly EMPTY_EFFECTS: ICardEffect[] = [];
+
     // Конструктор пустой!
     constructor() { }
 
@@ -49,11 +51,12 @@ export class Projectile {
         this.alive = true;
         this.damage = stats.dmg;
         this.color = stats.color;
-        this.effects = stats.effects;
+        this.effects = stats.effects || Projectile.EMPTY_EFFECTS;
         this.pierce = stats.pierce || 0;
         this.hitList.length = 0; // PERF: Reuse array instead of allocating new
         this.projectileType = stats.projectileType || 'standard';
         this.towerLevel = stats.towerLevel || 1;
+        this.radius = 4; // Default radius
 
         // Handle critical hits
         const critChance = stats.critChance || 0;
@@ -63,7 +66,7 @@ export class Projectile {
         }
 
         // Handle explosion on death effect (Fire level 3)
-        const explodeEffect = stats.effects.find((e: any) => e.type === 'explodeOnDeath');
+        const explodeEffect = this.effects.find((e: any) => e.type === 'explodeOnDeath');
         if (explodeEffect) {
             this.explodeOnDeath = true;
             this.explosionDamage = stats.dmg * (explodeEffect.explosionDamagePercent || 0.5);
@@ -83,63 +86,13 @@ export class Projectile {
         if (this.projectileType === 'sniper') this.life = 1.0;
     }
 
-    public update(effects?: any, dt: number = 1) { // Type 'any' to avoid strict circular import issues if EffectSystem isn't imported, but normally it should be fine. Using any for safety here or import it.
+    // Decoupled update: No effects dependency
+    public update(dt: number = 1) {
         if (!this.alive) return;
 
         this.x += this.vx * dt;
         this.y += this.vy * dt;
         this.life -= dt;
-
-        // --- TRAIL EFFECTS ---
-        // Spawn trail particles approx every ~0.03s (30 fps)
-        // Spawn trail particles approx every ~0.06s (15 fps)
-        if (effects && Math.random() < dt * 15) {
-            const type = this.projectileType || 'standard';
-
-            // Fire Trail (Smoke/Embers)
-            if (type === 'fire') {
-                effects.add({
-                    type: 'particle',
-                    x: this.x + (Math.random() - 0.5) * 4,
-                    y: this.y + (Math.random() - 0.5) * 4,
-                    vx: -this.vx * 0.2 + (Math.random() - 0.5) * 60,
-                    vy: -this.vy * 0.2 + (Math.random() - 0.5) * 60,
-                    life: 0.25 + Math.random() * 0.15, // ~15-25 frames
-                    radius: 2 + Math.random() * 2,
-                    color: Math.random() > 0.5 ? 'rgba(255, 100, 0, 0.5)' : 'rgba(100, 100, 100, 0.3)'
-                });
-            }
-            // Ice Trail (Snow/Sparkle)
-            else if (type === 'ice') {
-                effects.add({
-                    type: 'particle',
-                    x: this.x,
-                    y: this.y,
-                    vx: (Math.random() - 0.5) * 30, // 0.5 * 60
-                    vy: (Math.random() - 0.5) * 30,
-                    life: 0.35, // 20 frames
-                    radius: 1.5,
-                    color: '#e1f5fe'
-                });
-            }
-            // Sniper Trail (handled by draw mostly, but particles are nice)
-            else if (type === 'sniper') {
-                // Sniper is fast, maybe no particles needed, leaving trail line in draw()
-            }
-            // Level 3 Trail (Glow)
-            if (this.towerLevel >= 3) {
-                effects.add({
-                    type: 'particle',
-                    x: this.x,
-                    y: this.y,
-                    vx: 0,
-                    vy: 0,
-                    life: 0.16, // 10 frames
-                    radius: 2,
-                    color: this.color
-                });
-            }
-        }
 
         if (this.life <= 0 || this.x < -100 || this.x > 2000 || this.y < -100 || this.y > 2000) {
             this.alive = false;
@@ -152,6 +105,23 @@ export class Projectile {
 
     public reset() {
         this.alive = false;
+        this.x = 0;
+        this.y = 0;
+        this.vx = 0;
+        this.vy = 0;
+        this.damage = 0;
+        this.life = 0;
+        this.effects = Projectile.EMPTY_EFFECTS; // Zero alloc reset
         this.hitList.length = 0;
+
+        this.isCrit = false;
+        this.explodeOnDeath = false;
+        this.explosionDamage = 0;
+        this.explosionRadius = 0;
+        this.projectileType = 'standard';
+        this.towerLevel = 1;
+        this.pierce = 0;
+        this.radius = 4;
+        this.color = '#fff';
     }
 }

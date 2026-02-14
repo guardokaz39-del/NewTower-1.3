@@ -50,15 +50,19 @@ export class ProjectileSystem {
     }
 
     public update(dt: number, effects: EffectSystem) {
-        // Iterate BACKWARDS to allow swap-remove safely?
-        // Actually, with swap-remove, we can iterate forward if we handle the index correctly.
-        // Standard pattern:
+        // Iterate active projectiles
         for (let i = 0; i < this.active.length; i++) {
             const p = this.active[i];
 
-            p.update(effects, dt); // Update logic
+            p.update(dt); // Update logic (physics only)
 
-            if (!p.alive) {
+            if (p.alive) {
+                // --- TRAIL EFFECTS (Decoupled from Projectile) ---
+                // Spawn trail particles approx every ~0.06s (15 fps density)
+                if (Math.random() < dt * 15) {
+                    this.spawnTrail(p, effects);
+                }
+            } else {
                 // Remove from active (Swap & Pop)
                 this.remove(i);
 
@@ -68,16 +72,64 @@ export class ProjectileSystem {
         }
     }
 
+    private spawnTrail(p: Projectile, effects: EffectSystem) {
+        const type = p.projectileType || 'standard';
+
+        // Fire Trail (Smoke/Embers)
+        if (type === 'fire') {
+            effects.add({
+                type: 'particle',
+                x: p.x + (Math.random() - 0.5) * 4,
+                y: p.y + (Math.random() - 0.5) * 4,
+                vx: -p.vx * 0.2 + (Math.random() - 0.5) * 60,
+                vy: -p.vy * 0.2 + (Math.random() - 0.5) * 60,
+                life: 0.25 + Math.random() * 0.15, // ~15-25 frames
+                radius: 2 + Math.random() * 2,
+                color: Math.random() > 0.5 ? 'rgba(255, 100, 0, 0.5)' : 'rgba(100, 100, 100, 0.3)'
+            });
+        }
+        // Ice Trail (Snow/Sparkle)
+        else if (type === 'ice') {
+            effects.add({
+                type: 'particle',
+                x: p.x,
+                y: p.y,
+                vx: (Math.random() - 0.5) * 30,
+                vy: (Math.random() - 0.5) * 30,
+                life: 0.35, // 20 frames
+                radius: 1.5,
+                color: '#e1f5fe'
+            });
+        }
+        // Level 3 Trail (Glow) - Generic for all high levels
+        if (p.towerLevel >= 3) {
+            effects.add({
+                type: 'particle',
+                x: p.x,
+                y: p.y,
+                vx: 0,
+                vy: 0,
+                life: 0.16, // 10 frames
+                radius: 2,
+                color: p.color
+            });
+        }
+    }
+
     private remove(index: number) {
         const p = this.active[index];
-        const last = this.active.pop();
 
+        // 1. Reset state completely
+        p.reset();
+
+        // 2. Return to pool
+        this.pool.push(p);
+
+        // 3. Swap Remove from active
+        const last = this.active.pop();
         if (last && last !== p) {
             this.active[index] = last;
         }
-
-        // Return to pool
-        this.pool.push(p);
     }
 
     public draw(ctx: CanvasRenderingContext2D) {
@@ -92,6 +144,7 @@ export class ProjectileSystem {
         while (this.active.length > 0) {
             const p = this.active.pop();
             if (p) {
+                p.reset(); // Crucial: Reset before pooling
                 p.alive = false;
                 this.pool.push(p);
             }

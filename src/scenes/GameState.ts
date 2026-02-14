@@ -58,9 +58,9 @@ export class GameState {
         this.shakeIntensity = 0;
         this.selectedTower = null;
 
-        // Clear entities
-        this.enemies = [];
-        this.towers = [];
+        // Clear entities in-place to preserve references
+        this.enemies.length = 0;
+        this.towers.length = 0;
         // this.projectiles = []; // MOVED
     }
 
