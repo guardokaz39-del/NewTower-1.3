@@ -120,42 +120,51 @@ export class TargetingSystem {
      */
     private static getPreciseFlowDistance(e: Enemy, flowField: FlowField): number {
         const cellSize = this.CELL_SIZE;
-        const col = (e.x / cellSize) | 0; // Bitwise floor is faster
+        const col = (e.x / cellSize) | 0;
         const row = (e.y / cellSize) | 0;
 
         // 1. Grid Distance (Integer)
         let gridDist = 99999;
 
         // Safety Check & Grid Lookup
-        if (row >= 0 && row < flowField.distances.length && col >= 0 && col < flowField.distances[0].length) {
-            gridDist = flowField.distances[row][col];
+        if (row >= 0 && row < flowField.rows && col >= 0 && col < flowField.cols) {
+            // Flattened 1D Access
+            gridDist = flowField.distances[row * flowField.cols + col];
         }
 
         // 2. Sub-tile Precision (Float)
-        // We use the dot product of the enemy's position within the cell 
-        // against the flow vector to determine how "far" along the flow they are.
+        if (gridDist !== -1 && gridDist !== 99999) { // -1 is unreachable in new FlowField
+            // Use helper to get vector (handles array access transparently)
+            // We reuse a static small buffer for vector retrieval to avoid allocation?
+            // Actually getVector writes to an 'out' object. Let's create a temp static one.
+            if (!this.tempVec) this.tempVec = { x: 0, y: 0 };
 
-        if (gridDist !== 99999 && gridDist !== Infinity) {
-            const vect = flowField.vectors[row][col];
-            if (vect && (vect.x !== 0 || vect.y !== 0)) {
+            // We need RAW vector from grid, not steering vector?
+            // getPreciseFlowDistance logic relies on flow direction.
+            // FlowField.getVector returns STEERING vector (centered).
+            // We probably want the raw grid vector for distance calculation.
+
+            const idx = row * flowField.cols + col;
+            const vx = flowField.vectors[idx * 2];
+            const vy = flowField.vectors[idx * 2 + 1];
+
+            if (vx !== 0 || vy !== 0) {
                 const cellCenterX = col * cellSize + cellSize / 2;
                 const cellCenterY = row * cellSize + cellSize / 2;
 
-                // Vector from center of cell to enemy
                 const dx = e.x - cellCenterX;
                 const dy = e.y - cellCenterY;
 
-                // Project position onto flow vector.
-                // Positive value means enemy is "ahead" of center (closer to target).
-                // Negative value means enemy is "behind" center (further from target).
-                const progress = (dx * vect.x + dy * vect.y);
+                // Project position onto flow vector
+                const progress = (dx * vx + dy * vy);
 
-                // Refined Distance:
-                // Base Distance (pixels) - Progress (pixels)
+                // Refined Distance
                 return (gridDist * cellSize) - progress;
             }
         }
 
         return (gridDist * cellSize);
     }
+
+    private static tempVec: { x: number, y: number } | null = null;
 }

@@ -1,16 +1,18 @@
 import { IGameScene } from './scenes/IGameScene';
 import { CONFIG } from './Config';
-import { IWaveConfig, SpawnPattern } from './MapData';
+import { IWaveConfig, SpawnPattern, IWaveGroup, IWaveGroupRaw } from './MapData';
+import { Rng } from './utils/Rng';
 import { SoundManager, SoundPriority } from './SoundManager';
 import { EventBus, Events } from './EventBus';
 
 /**
- * Структура для хранения метаданных о враге в очереди спавна
+ * Metadata for a queued enemy spawn.
+ * Internal Use Only: Derives from normalized IWaveGroup.
  */
 interface SpawnQueueEntry {
     type: string;
     pattern: SpawnPattern;
-    baseInterval: number;
+    interval: number; // Delay BEFORE this unit spawns (seconds)
 }
 
 /**
@@ -20,61 +22,76 @@ export class WaveManager {
     private scene: IGameScene;
     public isWaveActive: boolean = false;
 
-    // Новая система с метаданными вместо простого массива строк
+    // Queue with pre-calculated determinism
     private spawnQueue: SpawnQueueEntry[] = [];
     private spawnTimer: number = 0;
-    private currentPattern: SpawnPattern = 'normal';
-    private currentBaseInterval: number = 40;
-    private currentIndex: number = 0; // Индекс текущего врага в очереди
 
-    // Card reward tracking - track last wave number that received a card
+    // Determinism & State
+    private readonly runSeed: number;
+    private pendingWaveStarts: number = 0; // Tracks queued early starts
+    private lastEarlyBonusTime: number = -1; // Cooldown for early wave bonus (ms)
+    private waveStartLives: number = 0; // Snapshot for perfect wave check
+
+    // Card reward tracking
     private lastCardGivenForWave: number = 0;
 
-    constructor(scene: IGameScene) {
+    constructor(scene: IGameScene, runSeed: number) {
         this.scene = scene;
+        this.runSeed = runSeed;
     }
 
     /**
-     * Starts the next wave. If already active, adds bonus.
+     * Starts the next wave. If already active, appends to queue and adds bonus.
      */
     public startWave() {
-        // ALLOW EARLY WAVE START
-        // If wave is active, we just increment and add more enemies to the queue
+        const nowMs = Date.now();
 
-        this.scene.wave++;
-        EventBus.getInstance().emit(Events.WAVE_STARTED, this.scene.wave);
-
-        // If not active, activate. If active, we just continue.
+        // Logic split:
         if (!this.isWaveActive) {
+            // Case A: Fresh Start
+            this.scene.wave++;
             this.isWaveActive = true;
+            this.pendingWaveStarts = 0;
+
+            // Snapshot lives for "Perfect Wave" check (only on fresh start of a sequence)
+            this.waveStartLives = this.scene.lives;
+
+            this.generateWave(this.scene.wave);
+            EventBus.getInstance().emit(Events.WAVE_STARTED, this.scene.wave);
         } else {
-            // Early wave bonus!
-            // Early wave bonus!
-            this.scene.addMoney(CONFIG.ECONOMY.EARLY_WAVE_BONUS);
-            this.scene.metrics.trackMoneyEarned(CONFIG.ECONOMY.EARLY_WAVE_BONUS);
-            this.scene.showFloatingText(`EARLY! +${CONFIG.ECONOMY.EARLY_WAVE_BONUS}💰`, this.scene.game.width / 2, 300, 'gold');
+            // Case B: Early Start (Stacking)
+            // Give bonus only if cooldown passed to prevent accidental double-clicks
+            if (nowMs - this.lastEarlyBonusTime > 500) {
+                this.scene.addMoney(CONFIG.ECONOMY.EARLY_WAVE_BONUS);
+                this.scene.metrics.trackMoneyEarned(CONFIG.ECONOMY.EARLY_WAVE_BONUS);
+                this.scene.showFloatingText(`EARLY! +${CONFIG.ECONOMY.EARLY_WAVE_BONUS}💰`, this.scene.game.width / 2, 300, 'gold');
+                this.lastEarlyBonusTime = nowMs;
+            }
+
+            this.pendingWaveStarts++;
+            this.scene.wave++;
+            this.generateWave(this.scene.wave); // Appends to queue WITHOUT clearing
+
+            // Notify UI of new wave number
+            EventBus.getInstance().emit(Events.WAVE_STARTED, this.scene.wave);
         }
 
-        this.generateWave(this.scene.wave);
         this.scene.metrics.trackWaveReached(this.scene.wave);
-
-
-
-        // Wave visuals now handled by NotificationSystem via EventBus
-        // this.scene.ui.update(); // EventBus handles UI
     }
 
     public update(dt: number) {
         if (!this.isWaveActive) return;
 
-        // Спавн врагов из очереди
+        // Process Spawn Queue
         if (this.spawnQueue.length > 0) {
             this.spawnTimer += dt;
 
-            // Динамический интервал в зависимости от паттерна
-            const requiredDelay = this.getNextSpawnDelay();
+            // Peek at next enemy
+            const nextEntry = this.spawnQueue[0];
 
-            if (this.spawnTimer >= requiredDelay) {
+            if (this.spawnTimer >= nextEntry.interval) {
+                // Time to spawn!
+                // FIFO: Remove from head
                 const entry = this.spawnQueue.shift()!;
                 this.scene.spawnEnemy(entry.type);
 
@@ -84,12 +101,9 @@ export class WaveManager {
                 }
 
                 this.spawnTimer = 0;
-
-                // Обновить паттерн для следующего врага
-                this.updateCurrentPattern();
             }
         } else {
-            // Если очередь пуста И врагов на карте нет -> победа в волне
+            // If queue is empty AND no enemies alive -> Wave Complete
             if (this.scene.enemies.length === 0) {
                 this.endWave();
             }
@@ -99,51 +113,43 @@ export class WaveManager {
     private endWave() {
         this.isWaveActive = false;
         EventBus.getInstance().emit(Events.WAVE_COMPLETED, this.scene.wave);
-        // Wave clear visuals now handled by NotificationSystem via EventBus
 
-        // Progressive economy: Base reward + scaling per wave
+        // Progressive economy
         const reward = CONFIG.ECONOMY.WAVE_BASE_REWARD + (this.scene.wave * CONFIG.ECONOMY.WAVE_SCALING_FACTOR);
         this.scene.addMoney(reward);
 
-        // Perfect wave bonus (no lives lost this game/wave - strictly checking if at max lives)
-        // Note: This checks if current lives equals starting lives. 
-        // If we want per-wave perfection, we'd need to snapshot lives at wave start.
-        // Assuming "Perfect Wave" means "No leaks currently" or "Full Health".
-        // Let's go with: If player has full health (startingLives), give bonus.
-        if (this.scene.lives >= this.scene.startingLives) {
+        // Perfect wave bonus
+        if (this.scene.lives >= this.waveStartLives) {
             this.scene.addMoney(CONFIG.ECONOMY.PERFECT_WAVE_BONUS);
             this.scene.metrics.trackMoneyEarned(CONFIG.ECONOMY.PERFECT_WAVE_BONUS);
             this.scene.showFloatingText(
                 `PERFECT! +${CONFIG.ECONOMY.PERFECT_WAVE_BONUS}💰`,
                 this.scene.game.width / 2,
                 350,
-                '#00ffff' // Cyan for perfect
+                '#00ffff'
             );
         }
 
-        // Give card for this completed wave (only once per wave number)
-        // This ensures card is given even if wave was started early
-        if (this.scene.wave > this.lastCardGivenForWave) {
-            this.scene.giveRandomCard();
+        // Give card reward (for all completed waves since last grant)
+        const wavesToReward = this.scene.wave - this.lastCardGivenForWave;
+        if (wavesToReward > 0) {
+            for (let i = 0; i < wavesToReward; i++) {
+                this.scene.giveRandomCard();
+            }
             this.lastCardGivenForWave = this.scene.wave;
         }
-
-        // this.scene.ui.update(); // EventBus handles UI
     }
 
     public getWaveConfig(waveNum: number): IWaveConfig | null {
         let waveConfig: IWaveConfig | null = null;
 
-        // 1. Пытаемся взять волну из Карты (из редактора)
+        // 1. Try Map Data
         if (this.scene.mapData && this.scene.mapData.waves && this.scene.mapData.waves.length > 0) {
-            // Note: Map data often repeats the last wave or loops, but for now we just clamp
-            // Actually, if we want "infinite" waves logic, we need to replicate how generateWave picks it.
-            // Current generateWave logic: Math.min(waveNum - 1, length - 1)
             const idx = Math.min(waveNum - 1, this.scene.mapData.waves.length - 1);
             waveConfig = this.scene.mapData.waves[idx];
         }
 
-        // 2. Если в карте пусто, берем из Config (фолбек)
+        // 2. Fallback to Global Config
         if (!waveConfig) {
             const idx = Math.min(waveNum - 1, CONFIG.WAVES.length - 1);
             const rawData = CONFIG.WAVES[idx];
@@ -159,118 +165,111 @@ export class WaveManager {
         return waveConfig;
     }
 
+    /**
+     * Generates a wave DETERMINISTICALLY.
+     * Normalizes config before processing.
+     */
     private generateWave(waveNum: number) {
-        this.spawnQueue = [];
-        this.currentIndex = 0;
-
         const waveConfig = this.getWaveConfig(waveNum);
+        if (!waveConfig || !waveConfig.enemies) return;
 
-        // Разбор конфига и заполнение очереди с метаданными
-        if (waveConfig && waveConfig.enemies) {
-            waveConfig.enemies.forEach((group) => {
-                // Миграция и получение паттерна
-                const migrated = this.migrateGroupConfig(group);
-                const baseInterval = this.getBaseIntervalFromRate(group.spawnRate);
+        // 1. Create ISOLATED RNG
+        const waveSeed = (this.runSeed ^ (waveNum * 1664525)) >>> 0;
+        const waveRng = new Rng(waveSeed);
 
-                for (let i = 0; i < migrated.count; i++) {
-                    this.spawnQueue.push({
-                        type: migrated.type,
-                        pattern: migrated.pattern,
-                        baseInterval: baseInterval
-                    });
-                }
-            });
-        }
+        // 2. Normalize and Process Config
+        const waveEnemies: SpawnQueueEntry[] = [];
 
-        // Перемешиваем врагов в волне, чтобы было веселее
-        this.spawnQueue.sort(() => Math.random() - 0.5);
+        waveConfig.enemies.forEach((rawGroup: IWaveGroupRaw) => {
+            // STRICT MIGRATION: Convert Raw Config to Normalized Group
+            const group: IWaveGroup = WaveManager.normalizeWaveGroup(rawGroup);
 
-        // Инициализируем паттерн первого врага
-        if (this.spawnQueue.length > 0) {
-            this.currentPattern = this.spawnQueue[0].pattern;
-            this.currentBaseInterval = this.spawnQueue[0].baseInterval;
-        }
+            for (let i = 0; i < group.count; i++) {
+                // Use NORMALIZED baseInterval
+                const delay = this.calculateDelay(group.pattern, group.baseInterval, waveRng);
+
+                waveEnemies.push({
+                    type: group.type,
+                    pattern: group.pattern,
+                    interval: delay
+                });
+            }
+        });
+
+        // 3. Shuffle
+        waveRng.shuffle(waveEnemies);
+
+        // 4. Append
+        this.spawnQueue.push(...waveEnemies);
     }
 
     /**
-     * Мигрирует старые конфигурации к новому формату
-     * Безопасно обрабатывает отсутствующие поля
+     * Pure function to normalize legacy or partial config into strict IWaveGroup
+     * Made PUBLIC STATIC to allow ThreatService to use the EXACT same logic
      */
-    private migrateGroupConfig(group: any): { type: string; count: number; pattern: SpawnPattern } {
-        // Если уже есть новое поле - используем его
-        if (group.spawnPattern) {
-            return {
-                type: group.type,
-                count: group.count,
-                pattern: group.spawnPattern as SpawnPattern
-            };
+    public static normalizeWaveGroup(raw: IWaveGroupRaw): IWaveGroup {
+        // Validation
+        if (!raw.type) throw new Error('[WaveManager] Invalid group: missing type');
+        if (raw.count <= 0) throw new Error('[WaveManager] Invalid group: count must be > 0');
+
+        // Resolve Pattern
+        // Priority: pattern > spawnPattern > default
+        const pattern: SpawnPattern = raw.pattern || raw.spawnPattern || 'normal';
+
+        // Resolve Base Interval
+        // Priority: baseInterval > spawnRate mapping > default
+        let baseInterval = 0.66; // default medium
+
+        if (raw.baseInterval !== undefined) {
+            baseInterval = raw.baseInterval;
+        } else if (raw.spawnRate) {
+            baseInterval = WaveManager.getBaseIntervalFromRate(raw.spawnRate);
         }
 
-        // Миграция из старого формата
-        // Эвристика: если было много врагов с fast - делаем swarm
-        let defaultPattern: SpawnPattern = 'normal';
-        if (group.spawnRate === 'fast' && group.count > 15) {
-            defaultPattern = 'swarm';
-        }
+        // Clamping (Safety)
+        // Prevent near-zero intervals crashing the game or 50s intervals breaking flow
+        baseInterval = Math.max(0.05, Math.min(baseInterval, 10.0));
 
         return {
-            type: group.type,
-            count: group.count,
-            pattern: defaultPattern
+            type: raw.type,
+            count: raw.count,
+            baseInterval: baseInterval,
+            pattern: pattern
         };
     }
 
-    /**
-     * Конвертирует старый spawnRate в базовый интервал
-     */
-    private getBaseIntervalFromRate(rate?: 'fast' | 'medium' | 'slow'): number {
-        switch (rate) {
-            case 'fast': return 0.4; // 25 / 60
-            case 'slow': return 1.0; // 60 / 60
-            case 'medium':
-            default: return 0.66; // 40 / 60
-        }
-    }
+    private calculateDelay(pattern: SpawnPattern, baseInterval: number, rng: Rng): number {
+        // Use normalized interval
+        const safeBase = baseInterval;
 
-    /**
-     * Вычисляет следующий интервал спавна в зависимости от паттерна
-     */
-    private getNextSpawnDelay(): number {
-        // Minimum delay 0.05s (instead of 5 frames) to avoiding instant stacking but allow fast fire
-        const baseInterval = Math.max(0.05, this.currentBaseInterval);
-
-        switch (this.currentPattern) {
+        switch (pattern) {
             case 'normal':
-                // Фиксированный интервал
-                return baseInterval;
+                return safeBase;
 
             case 'random':
-                // Рандомизация ±30% от базового
-                const variance = baseInterval * 0.3;
-                const randomDelay = baseInterval + (Math.random() - 0.5) * 2 * variance;
-                return Math.max(0.05, randomDelay);
+                // ±30% variance
+                const variance = safeBase * 0.3;
+                const randomOffset = (rng.next() - 0.5) * 2 * variance;
+                return Math.max(0.05, safeBase + randomOffset);
 
             case 'swarm':
-                // Очень короткие интервалы (10-25% от базового)
-                const swarmBase = baseInterval * 0.15;
+                // Fast: 10-25% of base
+                const swarmBase = safeBase * 0.15;
                 const swarmVariance = swarmBase * 0.5;
-                const swarmDelay = swarmBase + Math.random() * swarmVariance;
+                const swarmDelay = swarmBase + rng.next() * swarmVariance;
                 return Math.max(0.02, swarmDelay);
 
             default:
-                console.warn('[WaveManager] Unknown spawn pattern:', this.currentPattern);
-                return baseInterval;
+                return safeBase;
         }
     }
 
-    /**
-     * Обновляет текущий паттерн для следующего врага в очереди
-     */
-    private updateCurrentPattern(): void {
-        if (this.spawnQueue.length > 0) {
-            const next = this.spawnQueue[0];
-            this.currentPattern = next.pattern;
-            this.currentBaseInterval = next.baseInterval;
+    public static getBaseIntervalFromRate(rate: 'fast' | 'medium' | 'slow'): number {
+        switch (rate) {
+            case 'fast': return 0.4;
+            case 'slow': return 1.0;
+            case 'medium':
+            default: return 0.66;
         }
     }
 }

@@ -1,17 +1,33 @@
 // Режимы появления врагов из портала
 export type SpawnPattern = 'normal' | 'random' | 'swarm';
 
+// Input format (from JSON/Editor/Config)
+// This is lenient to allow legacy data and editor drafts
+export interface IWaveGroupRaw {
+    type: string;
+    count: number;
+
+    // Optional / Legacy fields
+    baseInterval?: number;
+    pattern?: SpawnPattern;
+    spawnRate?: 'fast' | 'medium' | 'slow';
+    spawnPattern?: SpawnPattern; // Alias for pattern, seen in some legacy data
+    speed?: number; // Legacy multiplier, rarely used but present in old saves
+}
+
+// Runtime format (Strictly normalized)
+// Logic should ONLY use this interface
+export interface IWaveGroup {
+    type: string;
+    count: number;
+    baseInterval: number; // Always in seconds (e.g. 0.5)
+    pattern: SpawnPattern;
+}
+
 // Структура одной волны
 export interface IWaveConfig {
-    enemies: {
-        type: string;
-        count: number;
-        // @deprecated Старые поля - не используются, сохранены для совместимости
-        speed?: number; // 0.5, 1.0, 1.5, 2.0 etc (multiplier)
-        spawnRate?: 'fast' | 'medium' | 'slow'; // spawn delay
-        // Новое поле - режим появления группы врагов
-        spawnPattern?: SpawnPattern;
-    }[]; // Кто и сколько
+    // Configs can be raw, we normalize them at runtime
+    enemies: IWaveGroupRaw[];
 }
 
 // Полная структура файла сохранения
@@ -42,16 +58,12 @@ export interface IMapData {
     waves?: IWaveConfig[];
     startingMoney?: number;
     startingLives?: number;
-    manualPath?: boolean; // true if waypoints were manually placed
+    manualPath?: boolean; // @deprecated use waypointsMode
+    waypointsMode?: WaypointsMode; // Defines the source of truth for navigation
     fogData?: number[]; // ARRAY: fog density per tile (0=Visible, 1-5=Fog density 20%-100%)
 }
 
-export interface Cell {
-    type: number; // 0=Grass, 1=Path, 2=Decor
-    x: number;
-    y: number;
-    decor?: string | null;
-}
+export type WaypointsMode = 'ENDPOINTS' | 'FULLPATH';
 
 // Заглушка (чтобы старый код не ломался, если где-то используется)
 export const DEMO_MAP: IMapData = {

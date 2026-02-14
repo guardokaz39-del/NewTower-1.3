@@ -42,10 +42,6 @@ export class GameController {
 
     public dispose(): void {
         this.events.off('CARD_DROPPED', this.onCardDropped);
-        if (this.flowFieldUpdateTimer) {
-            clearTimeout(this.flowFieldUpdateTimer);
-            this.flowFieldUpdateTimer = null;
-        }
     }
 
     public handleMenuAction(action: { type: 'UNLOCK' | 'CLICK_SLOT' | 'REMOVE_CARD', slotId: number }, tower: Tower) {
@@ -150,17 +146,10 @@ export class GameController {
         this.requestFlowFieldUpdate();
     }
 
-    private flowFieldUpdateTimer: any = null;
     private requestFlowFieldUpdate() {
-        if (this.flowFieldUpdateTimer) {
-            clearTimeout(this.flowFieldUpdateTimer);
+        if (this.map && this.map.requestFlowFieldUpdate) {
+            this.map.requestFlowFieldUpdate();
         }
-        this.flowFieldUpdateTimer = setTimeout(() => {
-            if (this.map && this.map.updateFlowField) {
-                this.map.updateFlowField(this.state.towers);
-            }
-            this.flowFieldUpdateTimer = null;
-        }, 200); // 200ms debounce
     }
 
     // === Grid Click Handling ===

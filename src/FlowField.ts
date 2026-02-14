@@ -6,96 +6,182 @@ export class FlowField {
     public rows: number;
     public target: { x: number; y: number } | null = null;
 
-    // Dijkstra Map: Distance to target for each cell
-    public distances: number[][] = [];
+    // Engine-Grade Buffers (Flat Arrays)
+    // Distances: -1 = Unreachable, >=0 = Distance
+    public distances: Int32Array;
+    // Vectors: interleaved x,y. index*2 = x, index*2+1 = y. Values: -1, 0, 1
+    public vectors: Int8Array;
 
-    // Vector Field: Direction to move for each cell
-    public vectors: { x: number; y: number }[][] = [];
+    // Search State (Shared)
+    private queue: Int32Array;
+    private visited: Uint16Array;
+    private searchId: number = 0;
+
+    // Version tracking
+    public version: number = 0;
 
     constructor(cols: number, rows: number) {
         this.cols = cols;
         this.rows = rows;
+
+        // Allocate buffers
+        const size = cols * rows;
+        this.distances = new Int32Array(size);
+        this.vectors = new Int8Array(size * 2);
+        this.queue = new Int32Array(size); // Max queue size is whole map
+        this.visited = new Uint16Array(size);
+
+        this.reset();
+    }
+
+    /**
+     * Resizes buffers if map dimensions change (Editor support)
+     */
+    public resize(cols: number, rows: number) {
+        this.cols = cols;
+        this.rows = rows;
+        const size = cols * rows;
+        this.distances = new Int32Array(size);
+        this.vectors = new Int8Array(size * 2);
+        this.queue = new Int32Array(size);
+        this.visited = new Uint16Array(size);
+        this.searchId = 0;
         this.reset();
     }
 
     public reset() {
-        this.distances = Array(this.rows).fill(0).map(() => Array(this.cols).fill(Infinity));
-        this.vectors = Array(this.rows).fill(0).map(() => Array(this.cols).fill({ x: 0, y: 0 }));
+        this.distances.fill(-1);
+        this.vectors.fill(0);
+        // We don't need to reset visited/queue as they use searchId/pointers
     }
 
     /**
      * Generates the Flow Field (Dijkstra Map + Vector Field)
-     * @param grid The game grid (0 = grass/buildable, 1 = path, others = obstacles)
-     * @param target The target cell (Base)
+     * Zero-Allocation implementation.
      */
     public generate(grid: Cell[][], target: { x: number; y: number }) {
         this.target = target;
-        this.reset();
+        this.version++;
+        this.searchId++;
 
-        // 1. Calculate Distances (BFS / Dijkstra)
-        const queue: { x: number; y: number; dist: number }[] = [];
+        // Overflow protection for searchId
+        if (this.searchId >= 65000) {
+            this.searchId = 1;
+            this.visited.fill(0);
+        }
 
-        // Initialize target
-        this.distances[target.y][target.x] = 0;
-        queue.push({ x: target.x, y: target.y, dist: 0 });
+        // Initialize Search
+        const targetIdx = target.y * this.cols + target.x;
 
-        const directions = [
-            { dx: 0, dy: -1 }, // Up
-            { dx: 1, dy: 0 },  // Right
-            { dx: 0, dy: 1 },  // Down
-            { dx: -1, dy: 0 }  // Left
-        ];
+        // Reset buffers logic
+        // We can't use fill(-1) on distances efficiently every time?
+        // Actually, for FlowField we overwrite reachable values. 
+        // But unreachable ones must remain -1.
+        // Option: Track 'touched' indices or just fill(-1) since generate is not per-frame.
+        // Since generate happens only on build/dirty, fill(-1) is acceptable safety.
+        this.distances.fill(-1);
+        this.vectors.fill(0);
 
-        while (queue.length > 0) {
-            const current = queue.shift()!;
+        // BFS params
+        let head = 0;
+        let tail = 0;
 
-            for (const dir of directions) {
-                const nx = current.x + dir.dx;
-                const ny = current.y + dir.dy;
+        // Push Target
+        this.queue[tail++] = targetIdx;
+        this.visited[targetIdx] = this.searchId;
+        this.distances[targetIdx] = 0;
 
-                if (nx >= 0 && nx < this.cols && ny >= 0 && ny < this.rows) {
-                    const cell = grid[ny][nx];
-                    // Strict path following: Only type 1 is walkable for ground units
-                    if (cell.type === 1) {
-                        if (this.distances[ny][nx] === Infinity) {
-                            this.distances[ny][nx] = current.dist + 1;
-                            queue.push({ x: nx, y: ny, dist: current.dist + 1 });
-                        }
+        const cols = this.cols;
+        const rows = this.rows;
+
+        // Directions: Up, Right, Down, Left
+        // Optimization: Pre-calc neighbor offsets? 
+        // For strict grid: -cols, +1, +cols, -1
+        const offsets = [-cols, 1, cols, -1];
+        const dxs = [0, 1, 0, -1];
+        const dys = [-1, 0, 1, 0];
+
+        while (head < tail) {
+            const currentIdx = this.queue[head++];
+            const dist = this.distances[currentIdx];
+
+            // Reconstruct x,y only if needed for boundary checks
+            // Optimization: checking boundaries using 1D index is tricky without x,y
+            const cx = currentIdx % cols;
+            // const cy = (currentIdx / cols) | 0;
+
+            for (let i = 0; i < 4; i++) {
+                const offset = offsets[i];
+                const neighborIdx = currentIdx + offset;
+
+                // Simple 1D boundary checks
+                // 1. Array bounds
+                if (neighborIdx < 0 || neighborIdx >= this.distances.length) continue;
+
+                // 2. Wrap-around checks (e.g. Right edge to Left edge)
+                // If moving Right (+1), make sure we didn't jump to x=0
+                if (i === 1 && (neighborIdx % cols) === 0) continue;
+                // If moving Left (-1), make sure we didn't jump to x=cols-1
+                if (i === 3 && ((neighborIdx + 1) % cols) === 0) continue;
+
+                // Valid neighbor
+                const nx = cx + dxs[i];
+                const ny = (neighborIdx / cols) | 0;
+
+                // Game Logic Rule: Only walk on PATH (type === 1)
+                const cell = grid[ny][nx];
+
+                if (cell.type === 1) {
+                    if (this.visited[neighborIdx] !== this.searchId) {
+                        this.visited[neighborIdx] = this.searchId;
+                        this.distances[neighborIdx] = dist + 1;
+                        this.queue[tail++] = neighborIdx;
                     }
                 }
             }
         }
 
-        // 2. Generate Vectors based on Distances
-        for (let y = 0; y < this.rows; y++) {
-            for (let x = 0; x < this.cols; x++) {
-                if (this.distances[y][x] === Infinity) continue; // Unreachable
+        // 2. Generate Vectors
+        // Iterate only reachable cells? Or all?
+        // Can utilize the queue 'touched' cells? No, queue is empty now.
+        // We iterate all cells.
+        for (let y = 0; y < rows; y++) {
+            for (let x = 0; x < cols; x++) {
+                const idx = y * cols + x;
+                const dist = this.distances[idx];
 
-                let minDist = this.distances[y][x];
-                let bestDir = { dx: 0, dy: 0 };
+                if (dist === -1) continue; // Unreachable
 
-                for (const dir of directions) {
-                    const nx = x + dir.dx;
-                    const ny = y + dir.dy;
+                let minDist = dist;
+                let bestDirIndex = -1;
 
-                    if (nx >= 0 && nx < this.cols && ny >= 0 && ny < this.rows) {
-                        const dist = this.distances[ny][nx];
-                        if (dist < minDist) {
-                            minDist = dist;
-                            bestDir = dir;
-                        }
+                // Check neighbors
+                for (let i = 0; i < 4; i++) {
+                    const offset = offsets[i];
+                    const neighborIdx = idx + offset;
+
+                    if (neighborIdx < 0 || neighborIdx >= this.distances.length) continue;
+                    // Wrap/Boundary checks
+                    if (i === 1 && (neighborIdx % cols) === 0) continue;
+                    if (i === 3 && ((neighborIdx + 1) % cols) === 0) continue;
+
+                    const nDist = this.distances[neighborIdx];
+                    if (nDist !== -1 && nDist < minDist) {
+                        minDist = nDist;
+                        bestDirIndex = i;
                     }
                 }
 
-                this.vectors[y][x] = { x: bestDir.dx, y: bestDir.dy };
+                if (bestDirIndex !== -1) {
+                    this.vectors[idx * 2] = dxs[bestDirIndex]; // x
+                    this.vectors[idx * 2 + 1] = dys[bestDirIndex]; // y
+                }
             }
         }
     }
 
     /**
-     * Gets the movement vector for a world position
-     * Handles steering behavior to keep entities centered on tiles
-     * @param out The vector to write results into (avoid allocation)
+     * Gets movement vector. Optimized for flat array.
      */
     public getVector(worldX: number, worldY: number, out: { x: number; y: number }): void {
         const col = Math.floor(worldX / CONFIG.TILE_SIZE);
@@ -107,40 +193,38 @@ export class FlowField {
             return;
         }
 
-        // Basic vector from field
-        const vector = this.vectors[row][col];
+        const idx = row * this.cols + col;
+        const vecIndex = idx * 2;
+        const vx = this.vectors[vecIndex];
+        const vy = this.vectors[vecIndex + 1];
 
-        // If we represent the "Target" (Base), vector is 0,0. 
-        if (vector.x === 0 && vector.y === 0) {
+        if (vx === 0 && vy === 0) {
             out.x = 0;
             out.y = 0;
             return;
         }
 
-        // Steering / Centering logic
-        // If moving Horizontal, align Y to center of tile
-        // If moving Vertical, align X to center of tile
+        // Steering Logic (Centering)
+        const TS = CONFIG.TILE_SIZE;
+        const centerX = col * TS + TS / 2;
+        const centerY = row * TS + TS / 2;
 
-        const centerX = col * CONFIG.TILE_SIZE + CONFIG.TILE_SIZE / 2;
-        const centerY = row * CONFIG.TILE_SIZE + CONFIG.TILE_SIZE / 2;
+        let steerX = vx;
+        let steerY = vy;
 
-        let steerX = vector.x;
-        let steerY = vector.y;
+        const centerThreshold = 4.0;
+        const steerStrength = 1.5;
 
-        const centerThreshold = 4.0; // Increased threshold
-        const steerStrength = 1.5; // Strong steering to force center alignment
-
-        if (vector.x !== 0) {
-            // Moving horizontally, correct Y
+        // If moving Horizontal, correct Y
+        if (vx !== 0) {
             const dy = centerY - worldY;
             if (Math.abs(dy) > centerThreshold) {
-                // Additive steering
                 steerY += Math.sign(dy) * steerStrength;
             }
         }
 
-        if (vector.y !== 0) {
-            // Moving vertically, correct X
+        // If moving Vertical, correct X
+        if (vy !== 0) {
             const dx = centerX - worldX;
             if (Math.abs(dx) > centerThreshold) {
                 steerX += Math.sign(dx) * steerStrength;
@@ -160,58 +244,78 @@ export class FlowField {
     }
 
     /**
-     * Checks if placing an obstacle at (ox, oy) blocks the path to target for ANY spawn point.
-     * @param grid The grid state *before* placement
-     * @param spawns List of spawn points
-     * @returns True if buildable (path exists), False if blocked
+     * Optimized CheckBuildability.
+     * Uses SearchId to reuse buffers without allocation.
      */
     public checkBuildability(grid: Cell[][], ox: number, oy: number, spawns: { x: number; y: number }[]): boolean {
         if (!this.target) return true;
 
-        // Simple BFS for validation
-        const q: { x: number, y: number }[] = [];
-        const visited = new Set<string>();
+        // MAZE RULE OPTIMIZATION:
+        // If the tile is a Path (type=1), we can NEVER build there.
+        // This is enforced by isBuildable, but we check here for robustness.
+        const tile = grid[oy][ox];
+        if (tile && tile.type === 1) return false;
 
-        // Add target to Q (reverse search) or Spawns to Q (forward).
-        // Let's do Spawns -> Target.
-        for (const spawn of spawns) {
-            q.push(spawn);
-            visited.add(`${spawn.x},${spawn.y}`);
+        // If we are strictly "Forbidden Maze", we theoretically don't need BFS if we assume
+        // the map is valid and we only build on Grass.
+        // However, if we built on Grass that somehow blocked a specialized path (e.g. cutting corner?), 
+        // we keep BFS for safety but it is super fast now.
+
+        this.searchId++;
+        if (this.searchId >= 65000) {
+            this.searchId = 1;
+            this.visited.fill(0);
         }
 
-        // Standard BFS
-        let found = false;
+        const targetIdx = this.target.y * this.cols + this.target.x;
 
-        while (q.length > 0) {
-            const cur = q.shift()!;
-            if (cur.x === this.target.x && cur.y === this.target.y) {
-                found = true;
-                break;
-            }
+        let head = 0;
+        let tail = 0;
 
-            const dirs = [{ x: 0, y: -1 }, { x: 1, y: 0 }, { x: 0, y: 1 }, { x: -1, y: 0 }];
-            for (const d of dirs) {
-                const nx = cur.x + d.x;
-                const ny = cur.y + d.y;
+        // Push spawns (Reverse BFS: Spawns -> Target? Or Forward?)
+        // Previous logic was Spawns -> Target.
 
-                // Check bounds
-                if (nx < 0 || nx >= this.cols || ny < 0 || ny >= this.rows) continue;
+        for (const spawn of spawns) {
+            const idx = spawn.y * this.cols + spawn.x;
+            this.queue[tail++] = idx;
+            this.visited[idx] = this.searchId;
+        }
+
+        const cols = this.cols;
+        const offsets = [-cols, 1, cols, -1];
+
+        // We only need to find Target.
+        while (head < tail) {
+            const currentIdx = this.queue[head++];
+
+            if (currentIdx === targetIdx) return true; // Reached target!
+
+            const cx = currentIdx % cols;
+
+            for (let i = 0; i < 4; i++) {
+                const neighborIdx = currentIdx + offsets[i];
+
+                if (neighborIdx < 0 || neighborIdx >= this.distances.length) continue;
+                if (i === 1 && (neighborIdx % cols) === 0) continue;
+                if (i === 3 && ((neighborIdx + 1) % cols) === 0) continue;
 
                 // Check blockage
-                if (nx === ox && ny === oy) continue;
+                const ny = (neighborIdx / cols) | 0;
+                const nx = neighborIdx % cols;
 
-                // Check grid walkability (using same logic as generator)
+                if (nx === ox && ny === oy) continue; // The phantom block
+
                 const cell = grid[ny][nx];
-                if (cell.type === 1 || cell.type === 0) { // Allow grass if mazing?
-                    const key = `${nx},${ny}`;
-                    if (!visited.has(key)) {
-                        visited.add(key);
-                        q.push({ x: nx, y: ny });
+                // Walkability check - STRICT: Only Path (type === 1)
+                if (cell.type === 1) {
+                    if (this.visited[neighborIdx] !== this.searchId) {
+                        this.visited[neighborIdx] = this.searchId;
+                        this.queue[tail++] = neighborIdx;
                     }
                 }
             }
         }
 
-        return found;
+        return false;
     }
 }

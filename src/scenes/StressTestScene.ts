@@ -176,7 +176,8 @@ export class StressTestScene extends BaseScene implements IGameScene {
         PerformanceProfiler.enable();
 
         // Initial FlowField
-        this.map.updateFlowField([]);
+        this.map.requestFlowFieldUpdate();
+        this.map.update(0);
 
         console.log("Stress Test Started");
     }
@@ -286,7 +287,9 @@ export class StressTestScene extends BaseScene implements IGameScene {
 
                     // CLEANUP: Reset map walls from Pathing phase
                     this.resetMapWalls();
-                    this.map.updateFlowField([]); // Clear flowfield
+                    this.resetMapWalls();
+                    this.map.requestFlowFieldUpdate(); // Clear flowfield logic check
+                    this.map.update(0);
 
                     this.setupPhysicsPhase();
                 } else {
@@ -300,7 +303,8 @@ export class StressTestScene extends BaseScene implements IGameScene {
                         this.lastWallToggle = this.timer;
                         PerformanceProfiler.start('Pathfinding');
                         this.randomizeWalls();
-                        this.map.updateFlowField([]);
+                        this.map.requestFlowFieldUpdate();
+                        this.map.update(0);
                         PerformanceProfiler.end('Pathfinding');
                     }
                 }

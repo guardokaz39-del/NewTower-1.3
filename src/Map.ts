@@ -1,10 +1,16 @@
 import { CONFIG } from './Config';
-import { IMapData, Cell, IMapObject } from './MapData';
+import { IMapData, Cell, IMapObject, WaypointsMode } from './MapData';
 import { Assets } from './Assets';
 import { Pathfinder } from './Pathfinder';
 import { FlowField } from './FlowField';
 import { LightingSystem } from './systems/LightingSystem';
 import { ObjectRenderer, ObjectType } from './ObjectRenderer';
+
+export interface PathError {
+    x: number;
+    y: number;
+    reason: 'blocked' | 'disconnected' | 'unreachable' | 'loop';
+}
 
 export class MapManager {
     public cols!: number;
@@ -14,12 +20,17 @@ export class MapManager {
 
     public tiles: number[][] = [];
     public waypoints: { x: number; y: number }[] = [];
+    public waypointsMode: WaypointsMode = 'ENDPOINTS'; // Default
+
     public waves: any[] = [];
     public lighting?: LightingSystem;
     public objects: IMapObject[] = []; // Objects for decoration and blocking
     public flowField: FlowField;
 
     private cacheCanvas: HTMLCanvasElement;
+
+    // Dirty flag pattern for FlowField optimization
+    private isFlowFieldDirty: boolean = false;
 
     constructor(data: IMapData) {
         this.loadMap(data);
@@ -29,48 +40,113 @@ export class MapManager {
         this.cols = data.width;
         this.rows = data.height;
         this.tiles = data.tiles;
-        this.waypoints = data.waypoints;
         this.waves = data.waves || [];
         this.objects = data.objects || []; // Load objects
 
-        // Генерация объекта grid для совместимости с редактором
+        // Default or Derived Waypoints Mode
+        if (data.waypointsMode) {
+            this.waypointsMode = data.waypointsMode;
+        } else {
+            // Migration Logic: Implicit Mode
+            if (!data.waypoints || data.waypoints.length <= 2) {
+                this.waypointsMode = 'ENDPOINTS';
+            } else {
+                this.waypointsMode = 'FULLPATH';
+            }
+        }
+
+        // Copy waypoints initially
+        this.waypoints = data.waypoints || [];
+
+        // Build grid object for runtime usage
         this.grid = [];
         for (let y = 0; y < this.rows; y++) {
             const row: Cell[] = [];
             for (let x = 0; x < this.cols; x++) {
                 const type = this.tiles[y][x];
                 let decor = null;
-                // Восстанавливаем декор визуально
+                // Basic visual decor restoration
                 if (type === 2) decor = Math.random() > 0.5 ? 'tree' : 'rock';
                 row.push({ type, x, y, decor });
             }
             this.grid.push(row);
         }
 
-        // If waypoints only contain start and end, expand to full path
-        if (this.waypoints.length === 2) {
-            const fullPath = Pathfinder.findPath(this.grid, this.waypoints[0], this.waypoints[1]);
-            if (fullPath.length > 0) {
-                this.waypoints = fullPath;
+        // STRICT LOADER CONTRACT
+        if (this.waypointsMode === 'ENDPOINTS') {
+            // RASTER IS CANONICAL
+            // We expect strictly 2 waypoints (Start/End) or at least 2.
+            // If < 2, we can't do anything (Editor should prevent saving this state).
+            if (this.waypoints.length >= 2) {
+                const start = this.waypoints[0];
+                const end = this.waypoints[this.waypoints.length - 1];
+
+                // Clear cache because mapping just loaded/changed
+                Pathfinder.invalidateCache();
+
+                const fullPath = Pathfinder.findPath(this.grid, start, end);
+                if (fullPath.length > 0) {
+                    this.waypoints = fullPath;
+                } else {
+                    console.error('[MapManager] Failed to derive path from endpoints!', start, end);
+                    // Critical Error in Dev, might want to fallback or show UI error
+                }
             }
+        } else {
+            // FULLPATH: VECTOR IS CANONICAL
+            // We leave this.waypoints AS IS.
+            // Validation happens separately.
         }
 
-        // Initialize FlowField
-        this.flowField = new FlowField(this.cols, this.rows);
-
-        // Find target (Base/Castle) - usually the last waypoint
-        let target = { x: 0, y: 0 };
-        if (this.waypoints.length > 0) {
-            target = this.waypoints[this.waypoints.length - 1];
+        // Initialize or Resize FlowField (Reuse buffers)
+        if (!this.flowField) {
+            this.flowField = new FlowField(this.cols, this.rows);
+        } else {
+            this.flowField.resize(this.cols, this.rows);
         }
 
-        // Generate Flow Field
-        this.flowField.generate(this.grid, target);
+        // Initial generation
+        this.requestFlowFieldUpdate();
+        this.updateFlowField(); // Force immediate update for init
 
         // Prerender the static map logic
         this.prerender();
         // Cache torches logic
         this.cacheTorches();
+    }
+
+    /**
+     * Request a flow field rebuild on next update
+     */
+    public requestFlowFieldUpdate() {
+        this.isFlowFieldDirty = true;
+    }
+
+    /**
+     * Called every frame/tick by GameScene
+     */
+    public update(_dt: number) {
+        if (this.isFlowFieldDirty) {
+            this.updateFlowField();
+            this.isFlowFieldDirty = false;
+        }
+    }
+
+    /**
+     * Regenerates the Flow Field based on current grid and target.
+     */
+    private updateFlowField() {
+        let target = { x: 0, y: 0 };
+        if (this.waypoints.length > 0) {
+            target = this.waypoints[this.waypoints.length - 1];
+        }
+
+        // Mark pathfinder cache invalid if we are updating flow (likely means tiles changed)
+        // Although loadMap handles init, if this is called from Editor, we likely changed tiles.
+        Pathfinder.invalidateCache();
+
+        this.flowField.generate(this.grid, target);
+        console.log('[MapManager] FlowField Regenerated. Version:', this.flowField.version);
     }
 
     public prerender() {
@@ -79,7 +155,6 @@ export class MapManager {
         this.cacheCanvas.width = this.cols * CONFIG.TILE_SIZE;
         this.cacheCanvas.height = this.rows * CONFIG.TILE_SIZE;
         const ctx = this.cacheCanvas.getContext('2d');
-
         if (!ctx) return;
 
         const TS = CONFIG.TILE_SIZE;
@@ -92,10 +167,8 @@ export class MapManager {
 
                 // Рисуем тайл на кэш-канвас
                 if (type === 1) {
-                    // PATH
                     this.drawTile(ctx, 'path', px, py);
                 } else {
-                    // GRASS (0)
                     this.drawTile(ctx, 'grass', px, py);
                 }
             }
@@ -104,6 +177,10 @@ export class MapManager {
 
     public isBuildable(col: number, row: number): boolean {
         if (col < 0 || col >= this.cols || row < 0 || row >= this.rows) return false;
+
+        // MAZE FORBIDDEN CONTRACT: Cannot build on path
+        if (this.tiles[row][col] === 1) return false;
+
         if (this.tiles[row][col] !== 0) return false; // Only grass is buildable
 
         // Check if any object occupies this tile
@@ -114,6 +191,32 @@ export class MapManager {
         });
 
         return !hasObject;
+    }
+
+    /**
+     * Checks if building at (col, row) would block the path.
+     * Delegates to FlowField but includes pre-checks.
+     */
+    public checkBuildability(col: number, row: number): boolean {
+        // 1. Basic check
+        if (!this.isBuildable(col, row)) return false;
+
+        // 2. FlowField check
+        // We need spawn points to check connectivity
+        // In this game, usually we check if ANY spawn is blocked?
+        // Or if the Target is reachable from all spawns?
+
+        // Strict Mode: If we are on Grass, and Enemies are strictly on Path,
+        // then building on Grass NEVER blocks path.
+        // So we can return true immediately if we trust isBuildable!
+        if (this.tiles[row][col] === 0) {
+            return true;
+        }
+
+        // If we assumed "Mazing" was allowed (building on 0 blocks movement),
+        // we would call this.flowField.checkBuildability(this.grid, col, row, this.waypoints[0] or spawns);
+        // But since we enforced strict rules:
+        return true;
     }
 
     public draw(ctx: CanvasRenderingContext2D) {
@@ -141,8 +244,6 @@ export class MapManager {
 
     // [NEW] Cache torch positions to avoid grid scanning every frame
     private torchPositions: { x: number, y: number, colorHash: number }[] = [];
-
-    // ... (prerender is fine)
 
     private cacheTorches() {
         this.torchPositions = [];
@@ -181,88 +282,69 @@ export class MapManager {
         }
     }
 
-    // [NEW] Draw Torches overlay (called from GameScene after main draw)
     public drawTorches(ctx: CanvasRenderingContext2D, time: number = 0) {
         if (!this.lighting) return;
         if (this.torchPositions.length === 0) return;
 
         const TS = CONFIG.TILE_SIZE;
-        // Light radius: 1.5 tiles
         const radiusVal = TS * 1.5;
 
-        // Optimized: Iterate cached positions
         for (const torch of this.torchPositions) {
-            // Smooth flicker using Sine waves
             const flickerBase = Math.sin(time * 0.1 + torch.colorHash) * 0.05 + Math.sin(time * 0.03 + torch.colorHash * 2) * 0.05;
             const pop = (Math.random() > 0.98) ? (Math.random() * 0.1) : 0;
             const flickerLocal = 1.0 + flickerBase + pop;
 
-            // Torch Stick
             ctx.fillStyle = '#5d4037';
             ctx.fillRect(torch.x - 2, torch.y, 4, 6);
 
-            // Flame
             const size = (8 + flickerBase * 4);
             ctx.fillStyle = `rgba(255, 87, 34, ${0.8 + flickerBase})`;
             ctx.beginPath();
             ctx.arc(torch.x, torch.y + 2, size / 2, 0, Math.PI * 2);
             ctx.fill();
 
-            // Inner Flame
             ctx.fillStyle = `rgba(255, 235, 59, ${0.8 + flickerBase})`;
             ctx.beginPath();
             ctx.arc(torch.x, torch.y + 2, size / 4, 0, Math.PI * 2);
             ctx.fill();
 
-            // Light
             const lightRadius = radiusVal + flickerBase * 5;
             this.lighting!.addLight(torch.x, torch.y, lightRadius, '#ff9100', 0.8 * flickerLocal);
         }
     }
 
     private drawTile(ctx: CanvasRenderingContext2D, key: string, x: number, y: number) {
-        // Phase 2: Bitmasking для path
         if (key === 'path') {
-            // Вычислить координаты тайла
             const col = Math.floor(x / CONFIG.TILE_SIZE);
             const row = Math.floor(y / CONFIG.TILE_SIZE);
 
-            // Проверить соседей (для битмаска)
             const NORTH = (row > 0 && this.tiles[row - 1][col] === 1) ? 1 : 0;
             const WEST = (col > 0 && this.tiles[row][col - 1] === 1) ? 1 : 0;
             const EAST = (col < this.cols - 1 && this.tiles[row][col + 1] === 1) ? 1 : 0;
             const SOUTH = (row < this.rows - 1 && this.tiles[row + 1][col] === 1) ? 1 : 0;
 
-            // Вычислить индекс битмаска (0-15)
             const bitmask = NORTH | (WEST << 1) | (EAST << 2) | (SOUTH << 3);
-
-            // Получить соответствующий path tile
             const pathTile = Assets.get(`path_${bitmask}`);
 
             if (pathTile) {
                 ctx.drawImage(pathTile, x, y);
             } else {
-                // Fallback - простой path
                 const fallback = Assets.get('path');
                 if (fallback) {
                     ctx.drawImage(fallback, x, y);
                 } else {
-                    ctx.fillStyle = '#c5b8a1'; // ФАЗА 1: Каменный fallback
-
+                    ctx.fillStyle = '#c5b8a1';
                     ctx.fillRect(x, y, CONFIG.TILE_SIZE, CONFIG.TILE_SIZE);
                 }
             }
             return;
         }
 
-        // Grass (с вариативностью)
-        // FIX: Use deterministic variant to prevent flickering (Assets.get is random)
         let img: HTMLCanvasElement | HTMLImageElement | undefined;
 
         if (key === 'grass') {
             const variantCount = Assets.getVariantCount('grass');
             if (variantCount > 0) {
-                // Deterministic index based on position
                 const index = Math.abs((x * 73 + y * 37)) % variantCount;
                 img = Assets.getVariant('grass', index);
             } else {
@@ -273,9 +355,7 @@ export class MapManager {
         }
 
         if (img) {
-            // Для разнообразия травы - случайное отражение
             if (key === 'grass') {
-                // Используем координаты для детерминированной "случайности"
                 const seed = x * 73 + y * 37;
                 const flipH = (seed % 2) === 0;
                 const flipV = (Math.floor(seed / 2) % 2) === 0;
@@ -304,37 +384,70 @@ export class MapManager {
         ctx.fillText(icon, x, y);
     }
 
-    public validatePath(_start: { x: number; y: number }, _end: { x: number; y: number }): { x: number; y: number }[] {
-        return [];
-    }
-
     /**
-     * Updates the flow field, considering dynamic obstacles (towers).
-     * @param towers Current list of towers
+     * Engine-Grade Validation
+     * Checks for: Connectivity, Alignment, Continuity, and Loops
      */
-    public updateFlowField(towers: any[]) { // Expecting Tower[]
-        // In current game logic (NewTower 1.4), towers are on Grass (0) and Enemies on Path (1).
-        // So towers technically don't block.
-        // However, to support "Mazing" if rules change or if mixed tiles exist:
+    public validatePath(_start?: { x: number; y: number }, _end?: { x: number; y: number }): PathError[] {
+        const errors: PathError[] = [];
 
-        // 1. Create a temp grid copy or modify weights
-        // For optimization, we pass the raw grid and let FlowField handle logic, 
-        // but if we want to treat towers as blocks, we need to tell FlowField.
-
-        // Since FlowField.generate takes 'grid' which is Cell[][], we can't easily inject towers without modifying grid.
-        // Let's rely on FlowField checking a separate 'obstacles' set if we want strict blocking,
-        // OR, we assume for now this is just a re-fresh in case the GRID itself changed.
-
-        // If we want to simulate blocking for future-proofing:
-        // const tempGrid = ... clone grid ...
-        // apply towers to tempGrid
-        // flowField.generate(tempGrid, target);
-
-        // For now, simple re-generation:
-        let target = { x: 0, y: 0 };
-        if (this.waypoints.length > 0) {
-            target = this.waypoints[this.waypoints.length - 1];
+        // 1. Endpoint Existence
+        if (this.waypoints.length < 2) {
+            // If we have no waypoints at all, can't validate much, unless map expects them.
+            return errors;
         }
-        this.flowField.generate(this.grid, target);
+
+        // 2. Alignment Check (All Modes: Path must be on Path Tiles)
+        // If WaypointsMode is FULLPATH, this is critical.
+        // If ENDPOINTS, it's derived so likely correct, but good to check.
+        this.waypoints.forEach(wp => {
+            if (wp.x < 0 || wp.x >= this.cols || wp.y < 0 || wp.y >= this.rows) {
+                errors.push({ x: wp.x, y: wp.y, reason: 'unreachable' }); // Out of bounds
+            } else if (this.tiles[wp.y][wp.x] !== 1) {
+                errors.push({ x: wp.x, y: wp.y, reason: 'blocked' }); // Waypoint on Grass/Obstacle
+            }
+        });
+
+        // 3. Continuity & Loop Check (Only for FULLPATH usually, but good for all)
+        if (this.waypointsMode === 'FULLPATH' || this.waypoints.length > 2) {
+            const visited = new Set<string>();
+
+            for (let i = 0; i < this.waypoints.length; i++) {
+                const wp = this.waypoints[i];
+                const key = `${wp.x},${wp.y}`;
+
+                // Self-Intersection / Loop Check
+                if (visited.has(key)) {
+                    errors.push({ x: wp.x, y: wp.y, reason: 'loop' });
+                }
+                visited.add(key);
+
+                // Continuity Check (Distance to next)
+                if (i < this.waypoints.length - 1) {
+                    const next = this.waypoints[i + 1];
+                    const dist = Math.abs(next.x - wp.x) + Math.abs(next.y - wp.y); // Manhattan
+                    if (dist > 1) {
+                        errors.push({ x: wp.x, y: wp.y, reason: 'disconnected' });
+                    }
+                }
+            }
+        }
+
+        // 4. Connectivity Check (Raster Reachability)
+        // Can we actually get from start to end on grid?
+        // This validates if the tiles themselves form a valid corridor
+        const start = this.waypoints[0];
+        const end = this.waypoints[this.waypoints.length - 1];
+
+        // Only run BFS if endpoints are valid
+        if (this.tiles[start.y]?.[start.x] === 1 && this.tiles[end.y]?.[end.x] === 1) {
+            const path = Pathfinder.findPath(this.grid, start, end);
+            if (path.length === 0) {
+                // Disconnected components
+                errors.push({ x: end.x, y: end.y, reason: 'unreachable' });
+            }
+        }
+
+        return errors;
     }
 }

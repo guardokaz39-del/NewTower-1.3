@@ -1,4 +1,4 @@
-import { IWaveConfig, SpawnPattern } from '../MapData';
+import { IWaveConfig, SpawnPattern, IWaveGroupRaw } from '../MapData';
 import { ThreatService } from './ThreatService';
 
 type ChangeListener = () => void;
@@ -43,7 +43,12 @@ export class WaveModel {
 
     public addWave() {
         this.waves.push({
-            enemies: [{ type: 'GRUNT', count: 5, spawnPattern: 'normal' }]
+            enemies: [{
+                type: 'GRUNT',
+                count: 5,
+                pattern: 'normal',
+                spawnRate: 'medium' // Default for new waves
+            }]
         });
         this.notify();
     }
@@ -58,7 +63,12 @@ export class WaveModel {
     public addEnemyGroup(waveIndex: number) {
         const wave = this.waves[waveIndex];
         if (wave) {
-            wave.enemies.push({ type: 'GRUNT', count: 1, spawnPattern: 'normal' });
+            wave.enemies.push({
+                type: 'GRUNT',
+                count: 1,
+                pattern: 'normal',
+                spawnRate: 'medium'
+            });
             this.notify();
         }
     }
@@ -71,11 +81,8 @@ export class WaveModel {
         }
     }
 
-    public updateEnemyGroup(waveIndex: number, groupIndex: number, updates: {
-        type?: string;
-        count?: number;
-        spawnPattern?: SpawnPattern
-    }) {
+    // Explicitly typed for IWaveGroupRaw partial updates
+    public updateEnemyGroup(waveIndex: number, groupIndex: number, updates: Partial<IWaveGroupRaw>) {
         const wave = this.waves[waveIndex];
         if (wave && wave.enemies[groupIndex]) {
             Object.assign(wave.enemies[groupIndex], updates);
@@ -102,6 +109,7 @@ export class WaveModel {
             if (!wave.enemies || wave.enemies.length === 0) return false;
             for (const group of wave.enemies) {
                 if (group.count < 1) return false;
+                if (!group.type) return false;
             }
         }
         return true;

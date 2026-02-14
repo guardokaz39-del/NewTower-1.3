@@ -340,6 +340,7 @@ export class GameScene extends BaseScene implements IGameScene {
         for (let l = 0; l < loops; l++) {
             this.dayNightCycle.update(dt);
             this.atmosphere.update(dt);
+            this.map.update(dt);
             this.waveManager.update(dt);
             this.fog.update(dt);
             // Lighting doesn't need explicit update logic for now, just render

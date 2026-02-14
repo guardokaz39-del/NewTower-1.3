@@ -9,6 +9,7 @@ import { EffectSystem } from './EffectSystem';
 import { MapManager } from './Map';
 import { IMapData } from './MapData';
 import { CardSystem } from './CardSystem';
+import { Rng } from './utils/Rng';
 import { ForgeSystem } from './ForgeSystem';
 import { InspectorSystem } from './InspectorSystem';
 import { BestiarySystem } from './BestiarySystem';
@@ -38,17 +39,28 @@ export class GameSession {
     public acidSystem: AcidPuddleSystem;
     public commanderSystem: SkeletonCommanderSystem;
 
+    // Randomness State
+    public readonly runSeed: number;
+    public readonly rng: Rng;
+
     // References needed for logic
     private game: Game;
     private map: MapManager;
     private effects: EffectSystem;
     private scene: IGameScene; // Back-reference for compatibility (temporary/permanent?)
 
-    constructor(game: Game, scene: IGameScene, map: MapManager, mapData: IMapData, effects: EffectSystem, startingCards: string[]) {
+    constructor(game: Game, scene: IGameScene, map: MapManager, mapData: IMapData, effects: EffectSystem, startingCards: string[], forceSeed?: number) {
         this.game = game;
         this.scene = scene;
         this.map = map;
         this.effects = effects;
+
+        // Initialize RNG
+        // @ts-ignore - Allow temporary window override for testing
+        const globalForce = (window as any).FORCE_SEED;
+        this.runSeed = forceSeed ?? globalForce ?? Date.now();
+        this.rng = new Rng(this.runSeed);
+        console.log(`[GameSession] Initialized with Run Seed: ${this.runSeed}`);
 
         // Initialize State
         this.gameState = new GameState();
@@ -60,7 +72,7 @@ export class GameSession {
         this.weaponSystem = new WeaponSystem();
         this.collision = new CollisionSystem(effects);
 
-        this.waveManager = new WaveManager(scene); // WaveManager needs IGameScene interface
+        this.waveManager = new WaveManager(scene, this.runSeed); // WaveManager needs IGameScene interface
         this.cardSys = new CardSystem(scene, startingCards);
         this.forge = new ForgeSystem(scene);
         this.inspector = new InspectorSystem(scene);

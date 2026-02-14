@@ -24,14 +24,16 @@ const mockScene = {
         trackWaveReached: jest.fn(),
         trackMoneyEarned: jest.fn()
     },
-    effects: { add: jest.fn() }
+    effects: { add: jest.fn() },
+    lives: 20,
+    startingLives: 20
 } as unknown as GameScene;
 
 describe('WaveManager', () => {
     let waveManager: WaveManager;
 
     beforeEach(() => {
-        waveManager = new WaveManager(mockScene);
+        waveManager = new WaveManager(mockScene, 12345);
         mockGameState.wave = 0;
         mockGameState.enemies = [];
         // Reset mocks
