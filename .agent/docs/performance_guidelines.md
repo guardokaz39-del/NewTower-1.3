@@ -132,14 +132,25 @@ class Tower {
     }
 
     getStats() {
-        if (this.statsDirty) {
-            this.cachedStats = this.calculateExpensiveStats();
+        // Tier 1: Полный пересчёт только при изменении карт
+        if (this.statsDirty || !this.cachedStats) {
+            this.cachedStats = this.calculateExpensiveStats(); // mergeCardsWithStacking, etc.
+            // Кэшируем _baseDamage, _baseCrit, _baseCd для Tier 2
             this.statsDirty = false;
+        }
+
+        // Tier 2: Лёгкий оверлей spinup (каждый кадр для Minigun, ~3 арифм. операции)
+        if (spinupEffect && this.spinupTime > 0) {
+            cached.dmg = _baseDamage + bonusDamage;
+            cached.critChance = _baseCrit + bonusCrit;
+            cached.cd = _baseCd / (_baseSpeedMult + spinupSpeedBonus);
         }
         return this.cachedStats;
     }
 }
 ```
+
+> ⚠️ **Двухуровневый кэш**: Если значение зависит от данных, меняющихся каждый кадр (spinupTime), **НЕ** пересчитывайте весь кэш. Разделите на дорогую часть (Tier 1: dirty flag) и дешёвый оверлей (Tier 2: арифметика поверх базовых кэшированных значений).
 
 **Важно для Pool.reset():**
 

@@ -127,12 +127,22 @@ export class EnemyRenderer {
         }
     }
 
+    // PERF: Pre-computed burn colors per-particle (avoids rgba() string creation — Rule 3)
+    private static readonly BURN_COLORS = ['#ff6400', '#ffa000', '#ff8c00'];
+
     private static drawStatusEffects(ctx: CanvasRenderingContext2D, enemy: Enemy) {
-        // PERF: use performance.now() once
-        const time = performance.now() * 0.003;
+        // PERF: Manual status check — no .some() closure allocation (Rule 5)
+        let hasSlow = false;
+        let hasBurn = false;
+        for (let s = 0; s < enemy.statuses.length; s++) {
+            const t = enemy.statuses[s].type;
+            if (t === 'slow') hasSlow = true;
+            else if (t === 'burn') hasBurn = true;
+        }
 
         // SLOW (Blue Orbs)
-        if (enemy.statuses.some(s => s.type === 'slow')) {
+        if (hasSlow) {
+            const time = performance.now() * 0.003;
             for (let i = 0; i < 3; i++) {
                 const angle = time + (i * Math.PI * 2 / 3);
                 const orbX = Math.cos(angle) * 20;
@@ -149,12 +159,13 @@ export class EnemyRenderer {
             }
         }
 
-        // BURN (Rising Fire Particles)
-        if (enemy.statuses.some(s => s.type === 'burn')) {
+        // BURN (Rising Fire Particles) — Rule 8: fillRect for size < 3
+        if (hasBurn) {
+            const now = Date.now(); // PERF: call once, not per particle
             for (let i = 0; i < 3; i++) {
                 // Deterministic offset based on ID to desync particles
                 const offset = (enemy.id * 10) + i * 100;
-                const progress = ((Date.now() + offset) % 600) / 600; // 0..1 loop every 600ms
+                const progress = ((now + offset) % 600) / 600; // 0..1 loop every 600ms
 
                 // Rising motion with slight wiggle
                 const pY = 10 - (progress * 30); // Start low, rise up
@@ -163,13 +174,14 @@ export class EnemyRenderer {
                 const alpha = 1 - progress; // Fade out
                 const size = 3 + (1 - progress) * 2; // Shrink as they rise
 
-                // Deterministic color variation (no Math.random() in render loop!)
-                const greenChannel = 100 + ((enemy.id * 37 + i * 73) % 100);
-                ctx.fillStyle = `rgba(255, ${greenChannel}, 0, ${alpha})`;
-                ctx.beginPath();
-                ctx.arc(pX, pY, size, 0, Math.PI * 2);
-                ctx.fill();
+                // PERF: Use pre-computed colors + globalAlpha (no rgba() string — Rule 3)
+                ctx.globalAlpha = alpha;
+                ctx.fillStyle = EnemyRenderer.BURN_COLORS[i];
+                // PERF: fillRect for particles (Rule 8: ctx.arc forbidden for r < 3,
+                // but here size can be up to 5, so we use fillRect as per guidelines)
+                ctx.fillRect(pX - size * 0.5, pY - size * 0.5, size, size);
             }
+            ctx.globalAlpha = 1.0; // PERF: Restore immediately
         }
     }
 

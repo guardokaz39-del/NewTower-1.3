@@ -82,23 +82,33 @@ effectiveSpeed = baseSpeed * (1 - slowPower);
 
 | Параметр | Значение |
 |----------|----------|
-| Урон | `burnDamage` DPS (из `IStatus.damage`) |
+| Урон | `burnDps` DPS (из `IStatus.power`) — **TRUE damage** (игнорирует броню) |
 | Применение | `CollisionSystem` вызывает `enemy.applyStatus({ type: 'burn', ... })` |
 | Тик | `Enemy.update(dt)` уменьшает HP каждый кадр |
+| Смерть от DOT | Эмитит `ENEMY_DIED` и `ENEMY_DEATH_SPAWN` (как `takeDamage()`) |
 
 **Механика (Реализовано):**
 
 ```typescript
 // В Enemy.ts update(dt)
-const burnStatus = this.statuses.find(s => s.type === 'burn');
-if (burnStatus && burnStatus.damage) {
-    this.currentHealth -= burnStatus.damage * dt;
+for (let i = 0; i < this.statuses.length; i++) {
+    if (this.statuses[i].type === 'burn') {
+        this.currentHealth -= this.statuses[i].power * dt; // TRUE damage
+        if (this.currentHealth <= 0) {
+            this.currentHealth = 0;
+            // Emit death events for proper death handling
+            EventBus.getInstance().emit(Events.ENEMY_DIED, { enemy: this });
+        }
+        break; // One burn source
+    }
 }
 ```
 
+> ⚠️ **Важно:** Burn использует прямое вычитание HP (`currentHealth -= power * dt`), а НЕ `takeDamage()`, чтобы избежать hit flash, invulnerability checks и armor. Но при смерти от DOT **обязательно** эмитить `ENEMY_DIED` для корректного награждения и спавна (sapper_rat, Flesh Colossus).
+
 **Стакинг:** Только последний примененный burn активен (перезаписывает предыдущий)
 
-**Визуальный эффект:** Огненные частицы вокруг врага
+**Визуальный эффект:** Огненные частицы вокруг врага (PERF: `fillRect` + `globalAlpha`, без `ctx.arc` и `rgba()` — см. `performance_guidelines.md`)
 
 ---
 

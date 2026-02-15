@@ -16,9 +16,9 @@
 |---------|--------------|---------|
 | Уровень | Модификаторы | Эффекты |
 |---------|--------------|---------|
-| ★ | +12 урон, -15% скорость | Splash 45px |
-| ★★ | +22 урон, -10% скорость | Splash 70px |
-| ★★★ | +25 урон, -10% скорость | Splash 80px, 50% взрывной урон |
+| ★ | +12 урон, -15% скорость | Splash 45px, **Burn 3s (5 DPS)** |
+| ★★ | +22 урон, -10% скорость | Splash 70px, **Burn 4s (8 DPS)** |
+| ★★★ | +25 урон, -10% скорость | Splash 80px, 50% взрывной урон, **Burn 5s (12 DPS)** |
 
 **Тип снаряда:** `FIRE`  
 **Визуальный эффект:** Огненный шар, trail из искр, взрыв при попадании
@@ -91,9 +91,9 @@
 |---------|--------------|---------|
 | Уровень | Модификаторы | Эффекты |
 |---------|--------------|---------|
-| ★ | x2.65 скорость, 0.55x урон | Spinup (+4 DPS, 5s max), **Fast Turn** |
-| ★★ | x2.80 скорость, 0.65x урон | Spinup (+5 DPS, +2.5% crit/s), **Fast Turn** |
-| ​​★★★ | x2.75 скорость, 0.80x урон | Spinup (Stepped Damage +6 to +45), **Fast Turn** |
+| ★ | x2.65 скорость, 0.55x урон | Spinup (+4 DPS, 5s max, **+1.5x speed**), **Fast Turn** |
+| ★★ | x2.80 скорость, 0.65x урон | Spinup (+5 DPS, +2.5% crit/s, **+1.8x speed**), **Fast Turn** |
+| ​​★★★ | x2.75 скорость, 0.80x урон | Spinup (Stepped Damage +6 to +45, **+2.0x speed**), **Fast Turn** |
 
 > **Fast Turn:** Башня вертится быстро (15.0) и имеет широкий сектор обстрела (34°).
 
@@ -101,6 +101,7 @@
 
 - Башня "разгоняется" — стреляет медленно, затем ускоряется до максимума
 - Разгон сбрасывается при смене цели
+- **spinupSpeedBonus** — множитель скорости атаки, линейно растёт с разгоном (0 → bonus за `maxSpinupSeconds`)
 - **Пенальти за стакинг:** каждая дополнительная Minigun карта уменьшает урон на 5-9%
 
 **Тип снаряда:** `MINIGUN`  
@@ -323,19 +324,23 @@ interface CardType {
 ### Расчет статов башни
 
 ```typescript
-// В Tower.ts
+// В Tower.ts — Двухуровневый кэш (PERF)
 getStats() {
-    const merged = mergeCardsWithStacking(this.cards);
+    // Tier 1: Полный пересчет только при изменении карт (statsDirty)
+    if (this.statsDirty || !this.cachedStats) {
+        const merged = mergeCardsWithStacking(this.cards);
+        this.cachedStats = { ...baseStats, ...merged };
+        // Кэшируем _baseDamage, _baseCrit, _baseCd для Tier 2
+        this.statsDirty = false;
+    }
     
-    // Базовые статы
-    let stats = { damage: BASE_DAMAGE, range: BASE_RANGE, ... };
-    
-    // Применение модификаторов
-    stats.damage += merged.modifiers.damage;
-    stats.range *= merged.modifiers.rangeMultiplier;
-    stats.attackSpeed *= merged.modifiers.attackSpeedMultiplier;
-    
-    return stats;
+    // Tier 2: Легкий оверлей spinup (каждый кадр, ~3 арифм. операции)
+    if (spinupEffect && this.spinupTime > 0) {
+        cached.dmg = _baseDamage + bonusDamage;
+        cached.critChance = _baseCrit + bonusCrit;
+        cached.cd = _baseCd / (_baseSpeedMult + spinupSpeedBonus);
+    }
+    return cached;
 }
 ```
 

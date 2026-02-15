@@ -115,159 +115,154 @@ export class Tower {
     }
 
     getStats(): IProjectileStats & { range: number; cd: number; projCount: number; spread: number; projectileType: string; attackSpeedMultiplier: number } {
-        // PERF: Only recalculate when dirty
-        // CRITICAL FIX: Bypass cache when spinup is active (spinupTime changes every frame)
-        const hasActiveSpinup = this.spinupTime > 0 || this.isOverheated;
-        if (!this.statsDirty && this.cachedStats && !hasActiveSpinup) {
-            return this.cachedStats;
-        }
+        // === PERF: Two-tier caching ===
+        // Tier 1 (Dirty Flag): Full recalculation only when cards change
+        // Tier 2 (Spinup Overlay): Lightweight recalc of spinup-dependent values every frame
 
-        // Start with base stats
-        let range = CONFIG.TOWER.BASE_RANGE;
-        let damage = CONFIG.TOWER.BASE_DMG;
-        let attackSpeed = CONFIG.TOWER.BASE_CD;
-        let speed = 480; // 8 * 60
-        let color = VISUALS.PROJECTILES.STANDARD;
-        let critChance = 0;
-        let pierce = 0;
-        let projectileType = 'standard';
+        if (this.statsDirty || !this.cachedStats) {
+            // === FULL RECALCULATION (only on card add/remove) ===
+            let range = CONFIG.TOWER.BASE_RANGE;
+            let damage = CONFIG.TOWER.BASE_DMG;
+            let attackSpeed = CONFIG.TOWER.BASE_CD;
+            let speed = 480; // 8 * 60
+            let color = VISUALS.PROJECTILES.STANDARD;
+            let critChance = 0;
+            let pierce = 0;
+            let projectileType = 'standard';
 
-        // Use new card stacking system
-        const { modifiers: mergedMods, effects: allEffects } = mergeCardsWithStacking(this.cards);
+            // PERF: mergeCardsWithStacking is expensive — only run when dirty
+            const { modifiers: mergedMods, effects: allEffects } = mergeCardsWithStacking(this.cards);
 
-        // Calculate damage with proper order:
-        // 1. Collect base damage and flat bonuses
-        const baseDamage = CONFIG.TOWER.BASE_DMG;
-        const flatDamageBonuses = mergedMods.damage || 0;
+            const baseDamage = CONFIG.TOWER.BASE_DMG;
+            const flatDamageBonuses = mergedMods.damage || 0;
 
-        // 2. Apply damageMultiplier if present (Minigun)
-        //    This affects both base and bonuses for better balance
-        if (mergedMods.damageMultiplier !== undefined) {
-            damage = (baseDamage + flatDamageBonuses) * mergedMods.damageMultiplier;
-        } else {
-            damage = baseDamage + flatDamageBonuses;
-        }
-
-        // Apply range modifiers
-        range += mergedMods.range || 0;
-        range *= mergedMods.rangeMultiplier || 1.0;
-
-        // Apply crit chance
-        critChance = mergedMods.critChance || 0;
-
-        // Handle multishot cards
-        let projCount = 1;
-        let damageMultiplier = 1.0;
-        let spread = 0;
-        const multiCards = this.cards.filter((c) => c.type.id === 'multi');
-
-        // Get visual overrides from first card (data-driven approach)
-        const mainCard = this.cards[0];
-        if (mainCard) {
-            const upgrade = getCardUpgrade(mainCard.type.id, mainCard.level, mainCard.evolutionPath);
-            if (upgrade?.visualOverrides) {
-                projectileType = upgrade.visualOverrides.projectileType || 'standard';
-                color = upgrade.visualOverrides.projectileColor || VISUALS.PROJECTILES.STANDARD;
-                speed = upgrade.visualOverrides.projectileSpeed || 480;
-            } else if (mainCard.type.id === 'multi') {
-                // Fallback for multishot (no visual overrides needed, it modifies count)
-                projectileType = 'split';
-                color = VISUALS.PROJECTILES.SPLIT;
+            if (mergedMods.damageMultiplier !== undefined) {
+                damage = (baseDamage + flatDamageBonuses) * mergedMods.damageMultiplier;
+            } else {
+                damage = baseDamage + flatDamageBonuses;
             }
-        }
 
-        if (multiCards.length > 0) {
-            // Find strongest multishot card
-            // Sort by level descending
-            multiCards.sort((a, b) => b.level - a.level);
-            const activeMultiCard = multiCards[0];
+            range += mergedMods.range || 0;
+            range *= mergedMods.rangeMultiplier || 1.0;
+            critChance = mergedMods.critChance || 0;
 
-            const multiConfig = getMultishotConfig(activeMultiCard.level, activeMultiCard.evolutionPath);
-            projCount = multiConfig.projectileCount;
-            damageMultiplier = multiConfig.damageMultiplier;
-            spread = multiConfig.spread; // NEW: Get spread from config
+            let projCount = 1;
+            let damageMultiplier = 1.0;
+            let spread = 0;
 
-            // If main card is NOT multishot, but we have multishot upgrades, 
-            // the projectile type stays as main card (e.g. Ice + Split = 3 Ice Shards)
-            // But if Multishot is the FIRST card, then it's a "Split Tower"
-        }
-
-        // Apply multishot damage penalty
-        damage *= damageMultiplier;
-
-        // Find pierce effect
-        const pierceEffect = allEffects.find(e => e.type === 'pierce');
-        if (pierceEffect) {
-            pierce = pierceEffect.pierceCount || 0;
-        }
-
-        // === SPINUP MECHANIC ===
-        // Find spinup effect and apply bonuses based on current spinupTime
-        const spinupEffect = allEffects.find(e => e.type === 'spinup');
-        let spinupSpeedBonus = 0;
-
-        if (spinupEffect) {
-            const spinupSeconds = this.spinupTime; // already in seconds
-
-            // Apply damage bonus
-            if (spinupEffect.spinupSteps) {
-                // Stepped damage (Level 3) - optimized to find max applicable step
-                let maxStepDamage = 0;
-                for (const step of spinupEffect.spinupSteps) {
-                    if (spinupSeconds >= step.threshold) {
-                        maxStepDamage = step.damage;
-                    } else {
-                        // Steps are ordered, so no need to check further
-                        break;
-                    }
+            // PERF: Manual scan instead of .filter() (Rule 4: no .filter() in hot path)
+            let bestMultiLevel = -1;
+            let bestMultiCard: ICard | null = null;
+            for (let i = 0; i < this.cards.length; i++) {
+                if (this.cards[i].type.id === 'multi' && this.cards[i].level > bestMultiLevel) {
+                    bestMultiLevel = this.cards[i].level;
+                    bestMultiCard = this.cards[i];
                 }
-                damage = damage + maxStepDamage;
-            } else if (spinupEffect.spinupDamagePerSecond) {
-                // Linear damage (Level 1-2)
-                const bonusDamage = spinupEffect.spinupDamagePerSecond * spinupSeconds;
-                damage += bonusDamage;
             }
 
-            // Apply crit chance bonus
-            if (spinupEffect.spinupCritPerSecond) {
-                const bonusCrit = spinupEffect.spinupCritPerSecond * spinupSeconds;
-                critChance += bonusCrit;
+            const mainCard = this.cards[0];
+            if (mainCard) {
+                const upgrade = getCardUpgrade(mainCard.type.id, mainCard.level, mainCard.evolutionPath);
+                if (upgrade?.visualOverrides) {
+                    projectileType = upgrade.visualOverrides.projectileType || 'standard';
+                    color = upgrade.visualOverrides.projectileColor || VISUALS.PROJECTILES.STANDARD;
+                    speed = upgrade.visualOverrides.projectileSpeed || 480;
+                } else if (mainCard.type.id === 'multi') {
+                    projectileType = 'split';
+                    color = VISUALS.PROJECTILES.SPLIT;
+                }
             }
 
-            // NEW: Apply Speed Bonus
-            if (spinupEffect.spinupSpeedBonus) {
-                const maxSpinup = spinupEffect.maxSpinupSeconds || 5;
-                const ratio = Math.min(1, spinupSeconds / maxSpinup);
-                spinupSpeedBonus = spinupEffect.spinupSpeedBonus * ratio;
+            if (bestMultiCard) {
+                const multiConfig = getMultishotConfig(bestMultiCard.level, bestMultiCard.evolutionPath);
+                projCount = multiConfig.projectileCount;
+                damageMultiplier = multiConfig.damageMultiplier;
+                spread = multiConfig.spread;
             }
 
-            // Cap spinup at max seconds
-            // (actual capping happens in WeaponSystem)
+            damage *= damageMultiplier;
+
+            // PERF: Manual scan instead of .find() (no closure allocation)
+            let pierceEffect = null;
+            let spinupEffect = null;
+            for (let i = 0; i < allEffects.length; i++) {
+                if (allEffects[i].type === 'pierce') pierceEffect = allEffects[i];
+                else if (allEffects[i].type === 'spinup') spinupEffect = allEffects[i];
+            }
+            if (pierceEffect) {
+                pierce = pierceEffect.pierceCount || 0;
+            }
+
+            const baseSpeedMult = mergedMods.attackSpeedMultiplier || 1.0;
+
+            this.cachedStats = {
+                range: Math.round(range),
+                dmg: damage,
+                cd: attackSpeed,
+                speed,
+                color,
+                effects: allEffects,
+                pierce,
+                projCount,
+                spread,
+                critChance,
+                projectileType,
+                attackSpeedMultiplier: baseSpeedMult,
+                // Cache spinup inputs for Tier 2 overlay
+                _baseDamage: damage,
+                _baseCrit: critChance,
+                _baseCd: attackSpeed,
+                _baseSpeedMult: baseSpeedMult,
+                _spinupEffect: spinupEffect,
+            } as any;
+            this.statsDirty = false;
         }
 
-        // Calculate Final Attack Speed
-        // Base CD / (Card Multiplier + Spinup Bonus)
-        const baseSpeedMult = mergedMods.attackSpeedMultiplier || 1.0;
-        attackSpeed = attackSpeed / (baseSpeedMult + spinupSpeedBonus);
+        // === TIER 2: Lightweight spinup overlay (runs every frame for Minigun) ===
+        const cached = this.cachedStats!;
+        const se = (cached as any)._spinupEffect;
 
-        const stats = {
-            range: Math.round(range),
-            dmg: damage,
-            cd: attackSpeed,
-            speed,
-            color,
-            effects: allEffects,
-            pierce,
-            projCount,
-            spread,
-            critChance,
-            projectileType,
-            attackSpeedMultiplier: mergedMods.attackSpeedMultiplier || 1.0
-        };
+        if (se && this.spinupTime > 0) {
+            const spinupSeconds = this.spinupTime;
+            let bonusDamage = 0;
+            let bonusCrit = 0;
+            let spinupSpeedBonus = 0;
 
-        this.cachedStats = stats;
-        this.statsDirty = false;
-        return stats;
+            // Damage bonus
+            if (se.spinupSteps) {
+                for (const step of se.spinupSteps) {
+                    if (spinupSeconds >= step.threshold) {
+                        bonusDamage = step.damage;
+                    } else break;
+                }
+            } else if (se.spinupDamagePerSecond) {
+                bonusDamage = se.spinupDamagePerSecond * spinupSeconds;
+            }
+
+            // Crit bonus
+            if (se.spinupCritPerSecond) {
+                bonusCrit = se.spinupCritPerSecond * spinupSeconds;
+            }
+
+            // Speed bonus
+            if (se.spinupSpeedBonus) {
+                const maxSpinup = se.maxSpinupSeconds || 5;
+                const ratio = Math.min(1, spinupSeconds / maxSpinup);
+                spinupSpeedBonus = se.spinupSpeedBonus * ratio;
+            }
+
+            // Apply overlays (mutate cached — it's our own object)
+            cached.dmg = (cached as any)._baseDamage + bonusDamage;
+            cached.critChance = (cached as any)._baseCrit + bonusCrit;
+            cached.cd = (cached as any)._baseCd / ((cached as any)._baseSpeedMult + spinupSpeedBonus);
+        } else if (se) {
+            // No spinup active — restore base values
+            cached.dmg = (cached as any)._baseDamage;
+            cached.critChance = (cached as any)._baseCrit;
+            cached.cd = (cached as any)._baseCd / (cached as any)._baseSpeedMult;
+        }
+
+        return cached;
     }
 
     addCard(c: ICard): boolean {
