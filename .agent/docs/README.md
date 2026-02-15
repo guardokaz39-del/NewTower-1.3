@@ -100,12 +100,17 @@
 
 **Архитектура пользовательского интерфейса:**
 
+- **Design Tokens**: Централизованные токены (цвета, отступы, радиусы, тени, переходы)
+- **Glassmorphism**: Стеклянные панели с `backdrop-filter: blur`
+- **Hand Fan**: Система overlap/fan для руки карт с `:has()` selector
+- **Slot System**: Карты в слотах с `scale(0.8)`, пустые состояния через `::before`/`::after`
+- **Drag Feedback**: `.dragging-placeholder` и `#drag-ghost` CSS
+- **HUD Animations**: Pulse/glow микро-анимации для HP/золота
 - **Strict Lifecycle**: `destroy()` метод для очистки слушателей
 - **EventBus**: Правила подписки (ID vs Callback)
-- **Layering**: Статические vs Динамические слои
 - **IGameScene**: Контракт взаимодействия сцен и UI
 
-**Когда использовать:** Если вы работаете над UI (HUD, Shop, Menu) или системой ивентов.
+**Когда использовать:** Если вы работаете над UI (HUD, Shop, Menu), стилями или системой ивентов.
 
 ---
 
@@ -127,7 +132,8 @@
 
 1. **Башни:** [Tower Visual Design](./tower_visual_design.md)
 2. **Враги:** [Enemy Visual Design](./enemy_visual_design.md)
-3. **Общая структура:** [Architecture](./architecture.md) → Rendering System
+3. **UI стили:** [UI Architecture](./ui_architecture.md) → Design Token System
+4. **Общая структура:** [Architecture](./architecture.md) → Rendering System
 
 ---
 
@@ -143,6 +149,13 @@ src/
 │   ├── Enemies.ts      # Enemy types & stats
 │   ├── Towers.ts
 │   └── Levels.ts
+├── design/             # UI design tokens
+│   ├── colors.ts       # UI_COLORS (glass.bg, glass.border, статусы)
+│   ├── spacing.ts      # UI_SPACING (xs/sm/md/lg/xl)
+│   ├── borders.ts      # UI_BORDERS (radius sm/md/lg)
+│   ├── shadows.ts      # UI_SHADOWS
+│   ├── transitions.ts  # UI_TRANSITIONS (fast/normal)
+│   └── fonts.ts        # UI_FONTS
 ├── renderers/
 │   ├── turrets/        # Tower rendering
 │   │   ├── FireTurretRenderer.ts
@@ -157,6 +170,9 @@ src/
 │   ├── CardSystem.ts
 │   ├── ForgeSystem.ts
 │   └── ...
+├── ui/                 # UI Components
+│   ├── GameHUD.ts      # HUD (жизни, золото, волна, кнопки)
+│   └── ShopUI.ts       # Магазин (слоты, покупка, реролл)
 └── scenes/             # Game scenes
     ├── GameScene.ts
     ├── EditorScene.ts

@@ -361,11 +361,12 @@ export class ForgeSystem {
             el.innerHTML = '';
             const slotCard = this.forgeSlots[idx];
             if (slotCard) {
+                el.classList.remove('slot-empty');
                 const cardEl = CardSystem.createCardElement(slotCard);
                 cardEl.onclick = () => this.returnFromForge(idx);
                 el.appendChild(cardEl);
             } else {
-                el.innerText = (idx + 1).toString();
+                el.classList.add('slot-empty');
             }
         });
     }

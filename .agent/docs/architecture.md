@@ -127,10 +127,19 @@ The game uses a **Logical Coordinate System** decoupled from physical pixels to 
 | `src/ForgeSystem.ts` | Card combining/upgrading |
 | `src/systems/TargetingSystem.ts` | Centralized O(1) targeting logic with hysteresis |
 | `src/systems/ProjectileSystem.ts` | Projectile pooling and lifecycle management |
-| `src/systems/TargetingSystem.ts` | Centralized O(1) targeting logic with hysteresis |
-| `src/systems/ProjectileSystem.ts` | Projectile pooling and lifecycle management |
 | `src/WeaponSystem.ts` | Firing logic, cooldowns, recoil, gated shooting |
 | `src/SaveManager.ts` | Persistence, schema versioning, safe save cadence |
+
+---
+
+### 🖥️ UI Components
+
+| File | Role |
+|------|------|
+| `index.html` | All CSS styles + HTML structure for UI panels |
+| `src/ui/GameHUD.ts` | HUD: Lives, Money, Wave, Enemy counter, Forge button |
+| `src/ui/ShopUI.ts` | Shop: Slot rendering, Buy/Reroll, selection logic |
+| `src/ForgeSystem.ts` | Forge: Slot management, drag-drop, evolution modal |
 
 ---
 
@@ -173,13 +182,30 @@ The game uses a **Logical Coordinate System** decoupled from physical pixels to 
 
 ---
 
+### 🎨 Design Token System (`src/design/`)
+
+UI styling uses a centralized token system for visual consistency:
+
+| File | Exports | Purpose |
+|------|---------|--------|
+| `colors.ts` | `UI_COLORS` | Primary, status, glass bg/border |
+| `spacing.ts` | `UI_SPACING` | xs/sm/md/lg/xl scale |
+| `borders.ts` | `UI_BORDERS` | radius (sm/md/lg), width, style |
+| `shadows.ts` | `UI_SHADOWS` | Drop shadows for elements |
+| `transitions.ts` | `UI_TRANSITIONS` | Duration (fast/normal), easing |
+| `fonts.ts` | `UI_FONTS` | Families, sizes, weights |
+
+> CSS values in `index.html` should reference these tokens via comments (e.g., `/* = UI_BORDERS.radius.lg */`).
+
+---
+
 ### 📁 Directory Structure
 
 ```
 src/
 ├── cards/              # Card type definitions
 ├── config/             # Game config (Enemies, Towers, Levels)
-├── design/             # UI design tokens
+├── design/             # UI design tokens (colors, spacing, borders, shadows, transitions)
 ├── editor/             # Wave editor components
 ├── effects/            # Visual effect helpers
 ├── renderers/          # All rendering logic
@@ -187,7 +213,7 @@ src/
 │   └── units/          # Enemy renderers
 ├── scenes/             # Game scenes
 ├── systems/            # Subsystems
-├── ui/                 # UI components
+├── ui/                 # UI components (GameHUD, ShopUI)
 └── utils/              # Utility functions
 ```
 

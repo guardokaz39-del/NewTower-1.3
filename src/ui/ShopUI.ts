@@ -204,9 +204,9 @@ export class ShopUI {
             }
 
             // Clean inline styles that might persist if we swapped logic
-            slot.style.border = '';
-            slot.style.boxShadow = '';
-            slot.style.background = '';
+            // slot.style.border = '';
+            // slot.style.boxShadow = '';
+            // slot.style.background = '';
 
             slot.style.cursor = 'pointer';
             slot.onclick = () => this.selectSlot(idx);

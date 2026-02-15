@@ -91,22 +91,40 @@ export class GameHUD {
     }
 
     private updateMoney(newMoney: number) {
-        // Flash animation
         const current = parseInt(this.elMoney.innerText) || 0;
+
+        // Gold Glow Animation
         if (newMoney > current) {
-            UIUtils.flashElement(this.elMoney.parentElement || this.elMoney, VISUALS.UI.COLORS.success);
+            const el = this.elMoney.parentElement || this.elMoney;
+            el.classList.remove('hud-glow-gold');
+            void el.offsetWidth; // Reflow to restart animation
+            el.classList.add('hud-glow-gold');
+            el.addEventListener('animationend', () => el.classList.remove('hud-glow-gold'), { once: true });
+
+            // Keep legacy flash if needed, or remove. Let's keep for color tint.
+            UIUtils.flashElement(el, VISUALS.UI.COLORS.success);
         } else if (newMoney < current) {
             UIUtils.flashElement(this.elMoney.parentElement || this.elMoney, VISUALS.UI.COLORS.danger);
         }
+
         this.elMoney.innerText = newMoney.toString();
         this.updateForgeBtn(newMoney);
     }
 
     private updateLives(newLives: number) {
         const current = parseInt(this.elLives.innerText) || 0;
+
+        // Danger Pulse Animation
         if (newLives < current) {
-            UIUtils.flashElement(this.elLives.parentElement || this.elLives, VISUALS.UI.COLORS.danger);
+            const el = this.elLives.parentElement || this.elLives;
+            el.classList.remove('hud-pulse-danger');
+            void el.offsetWidth;
+            el.classList.add('hud-pulse-danger');
+            el.addEventListener('animationend', () => el.classList.remove('hud-pulse-danger'), { once: true });
+
+            UIUtils.flashElement(el, VISUALS.UI.COLORS.danger);
         }
+
         this.elLives.innerText = newLives.toString();
     }
 
@@ -150,7 +168,7 @@ export class GameHUD {
             this.elForgeBtn.style.opacity = '1';
         } else {
             this.elForgeBtn.disabled = true;
-            if (!canForge) this.elForgeBtn.innerHTML = `<span>⚒️</span> НЕТ КАРТ`;
+            if (!canForge) this.elForgeBtn.innerHTML = `<span>⚒️</span> Ковка`;
             else if (!hasMoney) this.elForgeBtn.innerHTML = `<span>⚒️</span> ${forgeCost}💰`;
         }
     }
