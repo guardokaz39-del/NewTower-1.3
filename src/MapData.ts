@@ -61,6 +61,7 @@ export interface IMapData {
     manualPath?: boolean; // @deprecated use waypointsMode
     waypointsMode?: WaypointsMode; // Defines the source of truth for navigation
     fogData?: number[]; // ARRAY: fog density per tile (0=Visible, 1-5=Fog density 20%-100%)
+    schemaVersion?: number;
 }
 
 export type WaypointsMode = 'ENDPOINTS' | 'FULLPATH';
@@ -79,3 +80,47 @@ export const DEMO_MAP: IMapData = {
     startingLives: 20,
     fogData: [],
 };
+
+export const MAP_SCHEMA_VERSION = 1;
+
+/**
+ * Validates and migrates raw map data from any source (localStorage, JSON import, etc.)
+ * to the current IMapData format, filling in missing fields with safe defaults.
+ * 
+ * @throws Error if data is fundamentally broken (no tiles, wrong shape)
+ */
+export function migrateMapData(raw: unknown): IMapData {
+    if (!raw || typeof raw !== 'object') {
+        throw new Error('Map data is not an object');
+    }
+
+    const data = raw as Record<string, unknown>;
+
+    // Required: tiles must be 2D number array
+    if (!Array.isArray(data.tiles) || data.tiles.length === 0) {
+        throw new Error('Map data missing tiles array');
+    }
+
+    const tiles = data.tiles as number[][];
+    const height = tiles.length;
+    const width = tiles[0]?.length ?? 0;
+    if (width === 0) {
+        throw new Error('Map data has empty tile rows');
+    }
+
+    return {
+        width: typeof data.width === 'number' ? data.width : width,
+        height: typeof data.height === 'number' ? data.height : height,
+        tiles,
+        waypoints: Array.isArray(data.waypoints) ? data.waypoints : [],
+        objects: Array.isArray(data.objects) ? (data.objects as IMapObject[]) : [],
+        waves: Array.isArray(data.waves) ? (data.waves as IWaveConfig[]) : [],
+        startingMoney: typeof data.startingMoney === 'number' ? data.startingMoney : 100,
+        startingLives: typeof data.startingLives === 'number' ? data.startingLives : 20,
+        waypointsMode: (data.waypointsMode === 'FULLPATH' || (data.waypointsMode === undefined && data.manualPath === true))
+            ? 'FULLPATH'
+            : 'ENDPOINTS',
+        fogData: Array.isArray(data.fogData) ? (data.fogData as number[]) : [],
+        schemaVersion: MAP_SCHEMA_VERSION,
+    };
+}

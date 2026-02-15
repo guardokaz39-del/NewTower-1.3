@@ -53,6 +53,60 @@ export class EditorHistory {
     public canRedo(): boolean {
         return this.redoStack.length > 0;
     }
+
+    // --- Compound Action Support ---
+
+    private pendingCompound: IEditorAction[] | null = null;
+    private pendingLabel: string = '';
+
+    public beginCompound(label: string): void {
+        this.pendingCompound = [];
+        this.pendingLabel = label;
+    }
+
+    public pushInCompound(action: IEditorAction): void {
+        if (this.pendingCompound) {
+            this.pendingCompound.push(action);
+        } else {
+            // Fallback: no active compound, push directly
+            this.push(action);
+        }
+    }
+
+    public commitCompound(): void {
+        if (!this.pendingCompound || this.pendingCompound.length === 0) {
+            this.pendingCompound = null;
+            return;
+        }
+
+        const actions = this.pendingCompound;
+        this.pendingCompound = null;
+
+        // Single undo step that reverses all sub-actions
+        this.push({
+            type: actions[0].type,
+            undo: () => {
+                for (let i = actions.length - 1; i >= 0; i--) {
+                    actions[i].undo();
+                }
+            },
+            redo: () => {
+                for (let i = 0; i < actions.length; i++) {
+                    actions[i].redo();
+                }
+            }
+        });
+    }
+
+    public cancelCompound(): void {
+        // Undo any already applied actions in the compound
+        if (this.pendingCompound) {
+            for (let i = this.pendingCompound.length - 1; i >= 0; i--) {
+                this.pendingCompound[i].undo();
+            }
+        }
+        this.pendingCompound = null;
+    }
 }
 
 // Action factory helpers

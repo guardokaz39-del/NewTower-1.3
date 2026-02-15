@@ -1,5 +1,5 @@
 import { CONFIG } from './Config';
-import { IMapData, Cell, IMapObject, WaypointsMode } from './MapData';
+import { IMapData, Cell, IMapObject, WaypointsMode, IWaveConfig } from './MapData';
 import { Assets } from './Assets';
 import { Pathfinder } from './Pathfinder';
 import { FlowField } from './FlowField';
@@ -22,7 +22,7 @@ export class MapManager {
     public waypoints: { x: number; y: number }[] = [];
     public waypointsMode: WaypointsMode = 'ENDPOINTS'; // Default
 
-    public waves: any[] = [];
+    public waves: IWaveConfig[] = [];
     public lighting?: LightingSystem;
     public objects: IMapObject[] = []; // Objects for decoration and blocking
     public flowField: FlowField;
@@ -40,7 +40,7 @@ export class MapManager {
         this.cols = data.width;
         this.rows = data.height;
         this.tiles = data.tiles;
-        this.waves = data.waves || [];
+        this.waves = (data.waves as IWaveConfig[]) || [];
         this.objects = data.objects || []; // Load objects
 
         // Default or Derived Waypoints Mode

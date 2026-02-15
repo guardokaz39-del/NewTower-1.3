@@ -2,7 +2,7 @@ import { BaseScene } from '../BaseScene';
 import { Game } from '../Game';
 import { MapManager } from '../Map';
 import { CONFIG } from '../Config';
-import { IMapData, IMapObject } from '../MapData';
+import { IMapData, IMapObject, migrateMapData } from '../MapData';
 import { serializeMap, saveMapToStorage, getSavedMaps, deleteMapFromStorage } from '../Utils';
 import { UIUtils } from '../UIUtils';
 import { Pathfinder } from '../Pathfinder';
@@ -20,6 +20,7 @@ export class EditorScene extends BaseScene {
     private controlsContainer!: HTMLElement;
     private waypointMgr!: WaypointManager;
     private history!: EditorHistory;
+    private activeWaveEditor: WaveEditor | null = null;
 
     private mode: EditorMode = 'paint_road';
 
@@ -76,15 +77,36 @@ export class EditorScene extends BaseScene {
     }
 
     protected onExitImpl() {
-        this.toolbar.hide();
-        this.controlsContainer.style.display = 'none';
-        this.mapsPanel.style.display = 'none';
-        // Cleanup handled by BaseScene.dispose()
+        // Full DOM cleanup (EditorScene is recreated each time by Game.toEditor())
+        if (this.toolbar) {
+            this.toolbar.destroy();
+        }
+        if (this.controlsContainer && this.controlsContainer.parentNode) {
+            this.controlsContainer.parentNode.removeChild(this.controlsContainer);
+        }
+        if (this.mapsPanel && this.mapsPanel.parentNode) {
+            this.mapsPanel.parentNode.removeChild(this.mapsPanel);
+        }
+        if (this.history) {
+            this.history.clear();
+        }
+        if (this.activeWaveEditor) {
+            this.activeWaveEditor.destroy();
+            this.activeWaveEditor = null;
+        }
+        // BaseScene.dispose() handles listener cleanup
     }
 
     public update(dt: number) {
         // Don't update fog animation in editor - only static rendering
         const input = this.game.input;
+
+        // Begin compound action on mouse down (for paint modes)
+        if (input.isMouseDown && !this.prevMouseDown) {
+            if (this.isPaintMode(this.mode)) {
+                this.history.beginCompound(this.mode);
+            }
+        }
 
         // Handle mouse input - works on hold
         if (input.isMouseDown && input.hoverCol >= 0 && input.hoverRow >= 0) {
@@ -101,6 +123,11 @@ export class EditorScene extends BaseScene {
                 // Trigger fog re-render after data change (static, no animation)
                 this.fog.update(0);
             }
+        }
+
+        // Mouse release -> Commit
+        if (!input.isMouseDown && this.prevMouseDown) {
+            this.history.commitCompound();
         }
 
         // Update previous state
@@ -121,17 +148,19 @@ export class EditorScene extends BaseScene {
         if (this.mode === 'paint_road') {
             console.log('[EditorScene] paint_road mode active, tile type:', oldTileType, '→ 1');
             if (oldTileType !== 1) {
-                this.history.push(EditorActions.createTileAction(this.map.grid, col, row, oldTileType, 1));
+                this.history.pushInCompound(EditorActions.createTileAction(this.map.grid, col, row, oldTileType, 1));
                 this.map.grid[row][col].type = 1;
                 this.map.grid[row][col].decor = null;
+                Pathfinder.invalidateCache();
                 console.log('[EditorScene] Road painted at', col, row);
             } else {
                 console.log('[EditorScene] Tile already road, skipping');
             }
         } else if (this.mode === 'paint_grass') {
             if (oldTileType !== 0) {
-                this.history.push(EditorActions.createTileAction(this.map.grid, col, row, oldTileType, 0));
+                this.history.pushInCompound(EditorActions.createTileAction(this.map.grid, col, row, oldTileType, 0));
                 this.map.grid[row][col].type = 0;
+                Pathfinder.invalidateCache();
             }
         } else if (this.mode === 'eraser') {
             // FEATURE: Eraser - reset to grass, remove fog, and remove objects
@@ -144,13 +173,14 @@ export class EditorScene extends BaseScene {
             if (oldTileType !== 0 || oldFogDensity !== 0 || hasObject) {
                 // Сброс тайла в траву
                 if (oldTileType !== 0) {
-                    this.history.push(EditorActions.createTileAction(this.map.grid, col, row, oldTileType, 0));
+                    this.history.pushInCompound(EditorActions.createTileAction(this.map.grid, col, row, oldTileType, 0));
                     this.map.grid[row][col].type = 0;
                     this.map.grid[row][col].decor = null;
+                    Pathfinder.invalidateCache();
                 }
                 // Удаление тумана
                 if (oldFogDensity !== 0) {
-                    this.history.push(EditorActions.createFogAction(this.fog, col, row, oldFogDensity, 0));
+                    this.history.pushInCompound(EditorActions.createFogAction(this.fog, col, row, oldFogDensity, 0));
                     this.fog.setFog(col, row, 0);
                 }
                 // Удаление объектов (все объекты, перекрывающие этот тайл)
@@ -196,7 +226,7 @@ export class EditorScene extends BaseScene {
             this.fog.cycleFogDensity(col, row);
             const newFogDensity = this.fog.getFog(col, row);
             if (oldFogDensity !== newFogDensity) {
-                this.history.push(EditorActions.createFogAction(this.fog, col, row, oldFogDensity, newFogDensity));
+                this.history.pushInCompound(EditorActions.createFogAction(this.fog, col, row, oldFogDensity, newFogDensity));
             }
         } else if (this.mode === 'place_stone') {
             this.placeObject(col, row, 'stone', 1);
@@ -311,22 +341,39 @@ export class EditorScene extends BaseScene {
             return;
         }
 
-        const currentWaves = (this.map as any).waves || [];
+        const currentWaves = this.map.waves || [];
 
-        new WaveEditor(
+        this.activeWaveEditor = new WaveEditor(
             currentWaves,
             (waves) => {
                 this.saveMap(waves);
+                this.activeWaveEditor = null;
             },
             () => {
                 // Cancelled
+                this.activeWaveEditor = null;
             },
         );
     }
 
     private saveMap(waves: any[]) {
         // [FIX] Ensure map waves are updated before serialization
-        (this.map as any).waves = waves;
+        this.map.waves = waves;
+
+        // Sync waypoints for validation
+        if (this.waypointMgr.isValid()) {
+            this.map.waypoints = this.waypointMgr.getFullPath();
+            this.map.waypointsMode = 'FULLPATH';
+        }
+
+        // Validate before save
+        Pathfinder.invalidateCache(); // Ensure fresh BFS
+        const errors = this.map.validatePath();
+        if (errors.length > 0) {
+            const reasons = errors.map(e => `  (${e.x},${e.y}): ${e.reason}`).join('\n');
+            alert(`Cannot save map — path validation failed:\n${reasons}`);
+            return;
+        }
 
         const data = serializeMap(this.map);
         data.fogData = this.fog.getFogData();
@@ -517,25 +564,36 @@ export class EditorScene extends BaseScene {
     private loadMap(name: string, data: any) {
         if (!confirm(`Load map "${name}"? Current work will be lost.`)) return;
 
+        let mapData: IMapData;
+        try {
+            mapData = migrateMapData(data);
+        } catch (e) {
+            alert(`Failed to load map "${name}": ${(e as Error).message}`);
+            return;
+        }
+
         // Load map data into editor
-        this.currentMapName = name; // [FIX] Track loaded map name
-        this.map = new MapManager(data);
-        this.fog = new FogSystem(data);
+        this.currentMapName = name;
+        this.map = new MapManager(mapData);
+        this.fog = new FogSystem(mapData);
+
+        // Clear history on new map load
+        this.history.clear();
 
         // Load waypoints into WaypointManager
         this.waypointMgr.clearAll();
-        if (data.waypoints && data.waypoints.length > 0) {
+        if (mapData.waypoints && mapData.waypoints.length > 0) {
             // First point is always Start
-            this.waypointMgr.setStart(data.waypoints[0]);
+            this.waypointMgr.setStart(mapData.waypoints[0]);
 
             // Last point is always End (if more than 1)
-            if (data.waypoints.length > 1) {
-                this.waypointMgr.setEnd(data.waypoints[data.waypoints.length - 1]);
+            if (mapData.waypoints.length > 1) {
+                this.waypointMgr.setEnd(mapData.waypoints[mapData.waypoints.length - 1]);
             }
 
             // Middle points are waypoints
-            for (let i = 1; i < data.waypoints.length - 1; i++) {
-                this.waypointMgr.addWaypoint(data.waypoints[i]);
+            for (let i = 1; i < mapData.waypoints.length - 1; i++) {
+                this.waypointMgr.addWaypoint(mapData.waypoints[i]);
             }
         }
 
@@ -598,4 +656,8 @@ export class EditorScene extends BaseScene {
         }
     }
 
+    private isPaintMode(mode: EditorMode): boolean {
+        return mode === 'paint_road' || mode === 'paint_grass' ||
+            mode === 'eraser' || mode === 'paint_fog';
+    }
 }

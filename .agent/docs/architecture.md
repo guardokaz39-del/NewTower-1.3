@@ -53,7 +53,7 @@ graph TB
 |------|------|
 | `src/Game.ts` | Main game loop, scene management, input |
 | `src/scenes/GameScene.ts` | Core gameplay orchestrator, implements `IGameScene` |
-| `src/scenes/EditorScene.ts` | Wave/map editor |
+| `src/scenes/EditorScene.ts` | Wave/map editor ([Docs](editor_system.md)) |
 
 ---
 

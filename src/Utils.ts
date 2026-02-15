@@ -1,5 +1,5 @@
 import { MapManager } from './Map';
-import { IMapData, IWaveConfig } from './MapData';
+import { IMapData, IWaveConfig, MAP_SCHEMA_VERSION } from './MapData';
 import { CONFIG } from './Config';
 
 // Fast ID generator using counter instead of regex-based UUID
@@ -107,6 +107,8 @@ export function serializeMap(map: MapManager): IMapData {
         waves: map.waves && map.waves.length > 0 ? map.waves : generateDefaultWaves(15),
         startingMoney: CONFIG.PLAYER.START_MONEY,
         startingLives: CONFIG.PLAYER.START_LIVES,
+        waypointsMode: map.waypointsMode,
+        schemaVersion: MAP_SCHEMA_VERSION,
     };
 }
 
