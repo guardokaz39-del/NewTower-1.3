@@ -178,6 +178,8 @@ class PathCache {
     getPath(start: Point, end: Point): Path {
         const key = `${start.x},${start.y}-${end.x},${end.y}`;
         if (!this.cache.has(key)) {
+            // [NEW] Hard limit check
+            if (this.cache.size > 512) this.cache.clear(); 
             this.cache.set(key, Pathfinder.calculate(start, end));
         }
         return this.cache.get(key)!;
@@ -189,6 +191,11 @@ class PathCache {
 }
 ```
 
+### 11. AssetCache Constraints [NEW]
+
+- **Hard Limit**: `AssetCache` и любые другие кэши (Pathfinding, FlowField) **ОБЯЗАНЫ** иметь лимит размера (напр. 512 элементов).
+- **Overflow Strategy**: При переполнении — полный сброс (`clear()`). LRU слишком дорог для JS.
+
 ---
 
 ## 📊 Метрики и Бенчмарки
@@ -196,7 +203,7 @@ class PathCache {
 ### Целевые показатели
 
 | Метрика | Цель | Критический уровень |
-|---------|------|---------------------|
+| :--- | :--- | :--- |
 | FPS | ≥ 60 | < 45 |
 | Frame Time | ≤ 16ms | > 20ms |
 | GC Pause | ≤ 5ms | > 10ms |

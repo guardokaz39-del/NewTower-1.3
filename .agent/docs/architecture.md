@@ -98,6 +98,15 @@ The game uses a **Logical Coordinate System** decoupled from physical pixels to 
 - **Physical Size (Buffer):** `canvas.width`, `canvas.height` (matches Device Pixels).
 - **Scaling:** `ctx` is automatically scaled by `dpr` (Device Pixel Ratio, capped at 2.0).
 
+**Render Graph Layers (GameScene.draw):**
+
+1. **Map/Ground**: Tiles, Torches, Decals (Acid, Tracks).
+2. **Objects**: Towers, Useable Items.
+3. **Units**: Enemies (Sorted by Y for depth).
+4. **VFX**: Projectiles, Explosions, Particles.
+5. **Overlay**: Fog of War (Post-VFX), Lighting, Emissive.
+6. **UI**: Tooltips, HUD (HTML Overlay).
+
 **Key Rules:**
 
 1. **Always use** `game.width` / `game.height` for logic, UI positioning, and drawing.

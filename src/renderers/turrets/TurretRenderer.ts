@@ -42,7 +42,16 @@ export interface ITurretRenderer {
 
     /**
      * Custom turret drawing (replaces standard sprite drawing)
-     * Called inside rotated context (0,0 is tower center)
+     * 
+     * Rendering Contract (set by TowerRenderer.drawActiveSprite):
+     * 1. Context translated to tower center (tower.x, tower.y).
+     * 2. Context rotated by tower.angle (0 = East/Right).
+     * 3. Context scaled by level multiplier (1.0 + (level-1) * 0.15).
+     * 4. Context translated by tower.barrelRecoil on X axis (negative = kickback).
+     * 5. +X axis is forward (towards target).
+     * 6. Origin (0,0) is tower center.
+     * 7. drawEffects() is called in the SAME transformed context.
+     * 
      * @param ctx Context to draw to
      * @param tower Tower instance
      */

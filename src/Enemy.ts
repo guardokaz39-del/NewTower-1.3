@@ -47,6 +47,7 @@ export class Enemy {
     public hitFlashTimer: number = 0;        // Timer for white flash on hit
 
     public lastFacingLeft: boolean = false; // Persistent facing state
+    private static readonly FACING_VX_EPSILON = 0.1;
 
     // Targeting Support
     public threatPriority: number = 0;       // 0 = Normal, >0 = High Priority (Taunt)
@@ -276,7 +277,7 @@ export class Enemy {
 
             // Update Facing State (Stabilized)
             // Use a threshold to prevent flipping when moving vertically (jitter)
-            if (Math.abs(vector.x) > 0.1) {
+            if (Math.abs(vector.x) > Enemy.FACING_VX_EPSILON) {
                 this.lastFacingLeft = vector.x < 0;
             }
         }

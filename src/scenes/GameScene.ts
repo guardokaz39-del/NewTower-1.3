@@ -441,7 +441,9 @@ export class GameScene extends BaseScene implements IGameScene {
         // ctx.restore();
         // === END VIGNETTE ===
 
-        this.fog.draw(ctx);
+        // Draw ground decals (acid puddles, tracks) - Layer 2 (After Map, Before Objects)
+        this.acidSystem.draw();
+        this.commanderSystem.draw();
 
         // Draw path preview
         this.drawPathPreview(ctx);
@@ -458,10 +460,6 @@ export class GameScene extends BaseScene implements IGameScene {
 
         // Draw targeting mode tooltip for hovered tower
         this.drawTargetingModeTooltip(ctx);
-
-        // Draw acid puddles UNDER enemies (z-order fix)
-        this.acidSystem.draw();
-        this.commanderSystem.draw();
 
         const viewW = this.game.width;
         const viewH = this.game.height;
@@ -482,6 +480,9 @@ export class GameScene extends BaseScene implements IGameScene {
         this.projectileSystem.draw(ctx);
         // Draw effects
         this.effects.draw();
+
+        // Draw Fog Overlay (After units/effects, before lighting)
+        this.fog.draw(ctx);
 
         // Draw lighting (over everything except UI)
         // Update size if needed

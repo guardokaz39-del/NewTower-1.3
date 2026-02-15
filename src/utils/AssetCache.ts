@@ -8,6 +8,12 @@ export class AssetCache {
      */
     public static get(key: string, factory: (ctx: CanvasRenderingContext2D, w: number, h: number) => void, width: number, height: number): HTMLCanvasElement {
         if (!this.cache.has(key)) {
+            // Simple Cache Cap (Phase 5.C Lite)
+            // If cache grows too large, clear it completely to prevent memory leaks
+            if (this.cache.size > 512) {
+                this.cache.clear();
+            }
+
             const canvas = document.createElement('canvas');
             canvas.width = width;
             canvas.height = height;
