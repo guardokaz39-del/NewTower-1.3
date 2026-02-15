@@ -278,6 +278,13 @@ function applyEffectsWithBonus(
             if (effect.chainRadius !== undefined && existing.chainRadius !== undefined) {
                 existing.chainRadius = Math.max(existing.chainRadius, effect.chainRadius);
             }
+            // Burn effect: keep strongest values
+            if (effect.burnDps !== undefined && existing.burnDps !== undefined) {
+                existing.burnDps = Math.max(existing.burnDps, effect.burnDps);
+            }
+            if (effect.burnDuration !== undefined && existing.burnDuration !== undefined) {
+                existing.burnDuration = Math.max(existing.burnDuration, effect.burnDuration);
+            }
             // Spinup effects - keep from main card (already handled in processMinigunGroup)
         }
     }

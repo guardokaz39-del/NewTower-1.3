@@ -333,35 +333,24 @@ export class Enemy {
         for (let i = 0; i < this.statuses.length; i++) {
             if (this.statuses[i].type === 'burn') {
                 // power = burnDps (damage per second)
-                // Apply damage logic directly or via takeDamage? 
-                // Using direct health modification to avoid triggering hit flash/immunity mechanics for DOT?
-                // Or better to use takeDamage for consistency (but might spam mechanics).
-                // Plan said: "this.currentHealth -= this.statuses[i].power * dt;"
-
+                // Direct health subtraction (bypasses armor — burn is TRUE damage)
                 this.currentHealth -= this.statuses[i].power * dt;
 
                 // Check death from DOT
                 if (this.currentHealth <= 0) {
                     this.currentHealth = 0;
-                    // We need to trigger death logic if it kills
-                    // But takeDamage handles death events. 
-                    // If we just set health to 0, isAlive() becomes false, but who calls onDeath?
-                    // Enemy loop usually checks isAlive(). 
-                    // CollisionSystem calls handleEnemyDeath if !target.isAlive().
-                    // But here we are in update().
-                    // If we want proper death handling (gold, events), we should probably use takeDamage(dmg, null).
-                    // BUT for now, let's stick to the plan: simple subtraction.
-                    // The GameScene likely cleans up dead enemies and awards reward?
-                    // Let's check GameScene or LevelSystem for cleanup.
-                    // Actually, takeDamage emits ENEMY_DIED. We probably want that.
-                    // But takeDamage has armor/invuln logic. DOT usually ignores armor or has special rules.
-                    // Napalm description says "Burn 32 damage".
-                    // Let's stick to the plan's direct subtraction for now to be safe and simple 
-                    // as originally designed, but we might miss the 'death' event if it dies purely from burn.
-                    // However, `update` doesn't return anything. 
-                    // The main loop checks `isAlive`.
-                    // If we want proper death, we should call takeDamage. 
-                    // Let's stick to the exact plan code first.
+
+                    // Emit death events — same as takeDamage() death path
+                    // Without this, deathSpawns (Flesh Colossus), sapper_rat explosion,
+                    // and ENEMY_DIED listeners won't fire for burn kills
+                    const typeConfig = getEnemyType(this.typeId);
+                    if (typeConfig?.deathSpawns && typeConfig.deathSpawns.length > 0) {
+                        EventBus.getInstance().emit('ENEMY_DEATH_SPAWN', {
+                            enemy: this,
+                            spawns: typeConfig.deathSpawns
+                        });
+                    }
+                    EventBus.getInstance().emit(Events.ENEMY_DIED, { enemy: this });
                 }
                 break; // One burn source (last applied overwrites)
             }

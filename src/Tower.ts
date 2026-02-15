@@ -115,7 +115,10 @@ export class Tower {
     }
 
     getStats(): IProjectileStats & { range: number; cd: number; projCount: number; spread: number; projectileType: string; attackSpeedMultiplier: number } {
-        if (!this.statsDirty && this.cachedStats) {
+        // PERF: Only recalculate when dirty
+        // CRITICAL FIX: Bypass cache when spinup is active (spinupTime changes every frame)
+        const hasActiveSpinup = this.spinupTime > 0 || this.isOverheated;
+        if (!this.statsDirty && this.cachedStats && !hasActiveSpinup) {
             return this.cachedStats;
         }
 
@@ -148,9 +151,6 @@ export class Tower {
         // Apply range modifiers
         range += mergedMods.range || 0;
         range *= mergedMods.rangeMultiplier || 1.0;
-
-        // Apply attack speed
-        attackSpeed = attackSpeed / (mergedMods.attackSpeedMultiplier || 1.0);
 
         // Apply crit chance
         critChance = mergedMods.critChance || 0;
@@ -204,6 +204,8 @@ export class Tower {
         // === SPINUP MECHANIC ===
         // Find spinup effect and apply bonuses based on current spinupTime
         const spinupEffect = allEffects.find(e => e.type === 'spinup');
+        let spinupSpeedBonus = 0;
+
         if (spinupEffect) {
             const spinupSeconds = this.spinupTime; // already in seconds
 
@@ -232,9 +234,21 @@ export class Tower {
                 critChance += bonusCrit;
             }
 
+            // NEW: Apply Speed Bonus
+            if (spinupEffect.spinupSpeedBonus) {
+                const maxSpinup = spinupEffect.maxSpinupSeconds || 5;
+                const ratio = Math.min(1, spinupSeconds / maxSpinup);
+                spinupSpeedBonus = spinupEffect.spinupSpeedBonus * ratio;
+            }
+
             // Cap spinup at max seconds
             // (actual capping happens in WeaponSystem)
         }
+
+        // Calculate Final Attack Speed
+        // Base CD / (Card Multiplier + Spinup Bonus)
+        const baseSpeedMult = mergedMods.attackSpeedMultiplier || 1.0;
+        attackSpeed = attackSpeed / (baseSpeedMult + spinupSpeedBonus);
 
         const stats = {
             range: Math.round(range),

@@ -40,6 +40,7 @@ export interface ICardEffect {
     // Spinup properties (Minigun mechanic)
     spinupDamagePerSecond?: number;   // Flat damage bonus per second of continuous fire
     spinupCritPerSecond?: number;     // Crit chance bonus per second (0.02 = 2%)
+    spinupSpeedBonus?: number;        // NEW: Max speed bonus at full spinup (e.g. 1.5 = +150%)
     spinupSteps?: Array<{ threshold: number; damage: number }>; // For stepped damage (level 3)
     maxSpinupSeconds?: number;        // Maximum spinup time (7 seconds)
     overheatDuration?: number;        // Overheat lockout duration in frames (90 or 180)

@@ -21,6 +21,7 @@ export const MINIGUN_UPGRADES: Record<number, IUpgradeCard> = {
             {
                 type: 'spinup',
                 spinupDamagePerSecond: 4,  // Buffed from 3
+                spinupSpeedBonus: 1.5,     // NEW: Ramps up speed by +1.5x
                 maxSpinupSeconds: 5,
                 overheatDuration: 1.2,     // Slightly reduced from 1.5
                 overheatExtensionWithIce: 2.5,
@@ -43,6 +44,7 @@ export const MINIGUN_UPGRADES: Record<number, IUpgradeCard> = {
                 type: 'spinup',
                 spinupDamagePerSecond: 5,  // Buffed from 3
                 spinupCritPerSecond: 0.025, // Buffed from 0.02
+                spinupSpeedBonus: 1.8,      // NEW: +1.8x speed at max
                 maxSpinupSeconds: 6,       // Extended from 5
                 overheatDuration: 1.0,     // Reduced from 1.5
                 overheatExtensionWithIce: 2.5,
@@ -66,6 +68,7 @@ export const MINIGUN_UPGRADES: Record<number, IUpgradeCard> = {
                     { threshold: 5, damage: 45 },  // Buffed from 30
                 ],
                 spinupCritPerSecond: 0.03,
+                spinupSpeedBonus: 2.0,     // NEW: +2.0x speed at max
                 maxSpinupSeconds: 6,       // Extended
                 overheatDuration: 1.2,     // Reduced
                 overheatExtensionWithIce: 3,

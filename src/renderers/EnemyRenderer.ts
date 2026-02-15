@@ -128,9 +128,11 @@ export class EnemyRenderer {
     }
 
     private static drawStatusEffects(ctx: CanvasRenderingContext2D, enemy: Enemy) {
+        // PERF: use performance.now() once
+        const time = performance.now() * 0.003;
+
+        // SLOW (Blue Orbs)
         if (enemy.statuses.some(s => s.type === 'slow')) {
-            // PERF: use performance.now() instead of Date.now()
-            const time = performance.now() * 0.003;
             for (let i = 0; i < 3; i++) {
                 const angle = time + (i * Math.PI * 2 / 3);
                 const orbX = Math.cos(angle) * 20;
@@ -143,6 +145,29 @@ export class EnemyRenderer {
                 ctx.fillStyle = '#e1f5fe';
                 ctx.beginPath();
                 ctx.arc(orbX, orbY, 1.5, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        }
+
+        // BURN (Rising Fire Particles)
+        if (enemy.statuses.some(s => s.type === 'burn')) {
+            for (let i = 0; i < 3; i++) {
+                // Deterministic offset based on ID to desync particles
+                const offset = (enemy.id * 10) + i * 100;
+                const progress = ((Date.now() + offset) % 600) / 600; // 0..1 loop every 600ms
+
+                // Rising motion with slight wiggle
+                const pY = 10 - (progress * 30); // Start low, rise up
+                const pX = Math.sin(progress * 10 + enemy.id) * 5;
+
+                const alpha = 1 - progress; // Fade out
+                const size = 3 + (1 - progress) * 2; // Shrink as they rise
+
+                // Deterministic color variation (no Math.random() in render loop!)
+                const greenChannel = 100 + ((enemy.id * 37 + i * 73) % 100);
+                ctx.fillStyle = `rgba(255, ${greenChannel}, 0, ${alpha})`;
+                ctx.beginPath();
+                ctx.arc(pX, pY, size, 0, Math.PI * 2);
                 ctx.fill();
             }
         }

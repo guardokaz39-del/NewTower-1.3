@@ -21,6 +21,11 @@ export const FIRE_UPGRADES: Record<number, IUpgradeCard> = {
             {
                 type: 'splash',
                 splashRadius: 45,     // Nerfed from 50
+            },
+            {
+                type: 'burn',
+                burnDuration: 3,
+                burnDps: 5
             }
         ],
         visualOverrides: {
@@ -39,6 +44,11 @@ export const FIRE_UPGRADES: Record<number, IUpgradeCard> = {
             {
                 type: 'splash',
                 splashRadius: 70,     // Nerfed from 85
+            },
+            {
+                type: 'burn',
+                burnDuration: 4,
+                burnDps: 8
             }
         ]
     },
@@ -52,6 +62,11 @@ export const FIRE_UPGRADES: Record<number, IUpgradeCard> = {
             {
                 type: 'splash',
                 splashRadius: 80,     // Nerfed from 90
+            },
+            {
+                type: 'burn',
+                burnDuration: 5,
+                burnDps: 12
             },
             {
                 type: 'explodeOnDeath',
