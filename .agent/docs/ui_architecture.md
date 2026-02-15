@@ -33,26 +33,23 @@ class BadUI {
 
 ```typescript
 class GoodUI {
-    private subId: number = -1;
+    private unsubEvent: () => void = () => {};
     private boundClick: () => void;
 
     constructor() {
         this.boundClick = () => this.onClick();
         btn.addEventListener('click', this.boundClick);
         
-        // Store Subscription ID
-        this.subId = EventBus.getInstance().on('EVENT', this.onEvent);
+        // Store Unsubscribe Function
+        this.unsubEvent = EventBus.getInstance().on(Events.MONEY_CHANGED, this.onEvent);
     }
 
     destroy() {
-        // Remove DOM Listener (must use exact same reference)
+        // Remove DOM Listener
         btn.removeEventListener('click', this.boundClick);
         
-        // Remove EventBus Subscription (must use ID)
-        if (this.subId !== -1) {
-            EventBus.getInstance().off(this.subId);
-            this.subId = -1;
-        }
+        // Call Unsubscribe Function
+        this.unsubEvent();
     }
 }
 ```
@@ -63,24 +60,21 @@ class GoodUI {
 
 We use a singleton `EventBus` for decoupled communication between Systems and UI.
 
-### Subscription IDs
+### Unsubscribe Functions
 
-The `EventBus.on()` method returns a unique `number` ID. **You must store this ID** to unsubscribe later.
+The `EventBus.on()` method returns a **function** `() => void`. **You must store this function** and call it to unsubscribe later.
 
 **Why?**
-Passing functions to `off()` is unreliable if:
-
-- You use anonymous arrow functions `() => {}` (different references).
-- You use `.bind(this)` (creates a new wrapper).
+This eliminates the need to manage numeric IDs or track function references manually. It is cleaner and prevents "dangling ID" bugs.
 
 **API:**
 
 ```typescript
 // Subscribe
-const id = EventBus.getInstance().on(Events.MONEY_CHANGED, (amt) => update(amt));
+const unsub = EventBus.getInstance().on(Events.MONEY_CHANGED, (amt) => update(amt));
 
 // Unsubscribe
-EventBus.getInstance().off(id);
+unsub();
 ```
 
 ---
@@ -99,6 +93,16 @@ The `UIRoot` class manages high-level DOM containers.
 2. **Dynamic Layers (`#hand-container`, `#tooltip-container`)**:
     - Contains elements created/destroyed at runtime (e.g., Cards in hand, Tooltips).
     - **Always clear** these in `UIManager.destroy()`.
+
+### UI Modes
+
+The `UIManager` now controls the high-level state of the interface via `setMode(mode: UIMode)`.
+
+- **`'menu'`**: Hides Game HUD, Shop, Game Over. Shows Main Menu (managed by MenuScene).
+- **`'game'`**: Shows Game HUD, Shop. Hides Game Over.
+- **`'gameOver'`**: Shows Game Over overlay on top of the Game HUD.
+
+Always use `ui.setMode()` instead of manually toggling elements when switching states.
 
 ### Scene Integration
 

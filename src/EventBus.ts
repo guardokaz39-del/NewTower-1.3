@@ -3,12 +3,40 @@
  * Decouples game systems using the Observer pattern.
  */
 
-export type EventCallback<T = any> = (data: T) => void;
+export interface EventPayloadMap {
+    // Economy
+    MONEY_CHANGED: number;
+    LIVES_CHANGED: number;
+
+    // Wave
+    WAVE_STARTED: number;
+    WAVE_COMPLETED: number;
+
+    // Game State
+    GAME_OVER: number;
+    GAME_RESTART: void;
+    TOGGLE_PAUSE: boolean;
+
+    // Entities
+    ENEMY_IMMUNE: { x: number; y: number };
+    ENEMY_DIED: { enemy: any }; // Using any to avoid circular dependency with Enemy for now, or use interface
+    ENEMY_SPAWNED: string;
+    SPAWN_PUDDLE: { x: number; y: number };
+
+    // Boss Mechanics
+    ENEMY_SPLIT: { enemy: any; threshold: number };
+    ENEMY_DEATH_SPAWN: { enemy: any; spawns: string[] };
+
+    // Cards (Phase 6.C)
+    CARD_DROPPED: { card: any; x: number; y: number; actionId?: string }; // card is ICard
+}
+
+export type EventCallback<T> = (data: T) => void;
 
 interface IEventSubscription {
     id: number;
     event: string;
-    callback: EventCallback;
+    callback: EventCallback<any>;
 }
 
 export class EventBus {
@@ -27,21 +55,21 @@ export class EventBus {
 
     /**
      * Subscribe to an event
-     * @param event Event name (use constants from Events object)
-     * @param callback Function to call when event is emitted
-     * @returns Subscription ID (can be used to unsubscribe)
+     * @returns Unsubscribe function
      */
-    public on<T = any>(event: string, callback: EventCallback<T>): number {
+    public on<K extends keyof EventPayloadMap>(event: K, callback: EventCallback<EventPayloadMap[K]>): () => void {
         const id = this.nextId++;
         if (!this.subscribers.has(event)) {
             this.subscribers.set(event, []);
         }
         this.subscribers.get(event)!.push({ id, event, callback });
-        return id;
+
+        // Return unsubscribe function
+        return () => this.off(id);
     }
 
     /**
-     * Unsubscribe using the ID returned by on()
+     * Unsubscribe using the ID (Deprecated, use returned function from on())
      */
     public off(id: number): void {
         // Optimized: iterate with for loop instead of forEach
@@ -60,12 +88,14 @@ export class EventBus {
     /**
      * Emit an event with data
      */
-    public emit<T = any>(event: string, data?: T): void {
+    public emit<K extends keyof EventPayloadMap>(event: K, data: EventPayloadMap[K]): void {
         const subs = this.subscribers.get(event);
         if (!subs) return;
         // Use for loop instead of forEach for hot path
-        for (let i = 0; i < subs.length; i++) {
-            subs[i].callback(data);
+        // Clone array to avoid issues if subscribers remove themselves during emit
+        const safeSubs = [...subs];
+        for (let i = 0; i < safeSubs.length; i++) {
+            safeSubs[i].callback(data);
         }
     }
 
@@ -78,23 +108,20 @@ export class EventBus {
 }
 
 // Define Event Constants for type safety type feeling
+// Legacy Events object kept for reference if needed, but prefer string literals with types
 export const Events = {
-    // Economy
-    MONEY_CHANGED: 'MONEY_CHANGED', // data: number (new amount)
-    LIVES_CHANGED: 'LIVES_CHANGED', // data: number (new amount)
-
-    // Wave
-    WAVE_STARTED: 'WAVE_STARTED',   // data: number (wave index)
-    WAVE_COMPLETED: 'WAVE_COMPLETED', // data: number (wave index)
-
-    // Game State
-    GAME_OVER: 'GAME_OVER',         // data: number (final wave)
-    GAME_RESTART: 'GAME_RESTART',   // void
-
-    // UI
-    TOGGLE_PAUSE: 'TOGGLE_PAUSE',   // data: boolean (isPaused)
-    ENEMY_IMMUNE: 'ENEMY_IMMUNE',   // data: { x: number, y: number }
-    ENEMY_DIED: 'ENEMY_DIED',       // data: { enemy: Enemy }
-    ENEMY_SPAWNED: 'ENEMY_SPAWNED', // data: string (enemyType)
-    SPAWN_PUDDLE: 'SPAWN_PUDDLE',   // data: { x: number, y: number }
-};
+    MONEY_CHANGED: 'MONEY_CHANGED',
+    LIVES_CHANGED: 'LIVES_CHANGED',
+    WAVE_STARTED: 'WAVE_STARTED',
+    WAVE_COMPLETED: 'WAVE_COMPLETED',
+    GAME_OVER: 'GAME_OVER',
+    GAME_RESTART: 'GAME_RESTART',
+    TOGGLE_PAUSE: 'TOGGLE_PAUSE',
+    ENEMY_IMMUNE: 'ENEMY_IMMUNE',
+    ENEMY_DIED: 'ENEMY_DIED',
+    ENEMY_SPAWNED: 'ENEMY_SPAWNED',
+    SPAWN_PUDDLE: 'SPAWN_PUDDLE',
+    ENEMY_SPLIT: 'ENEMY_SPLIT',
+    ENEMY_DEATH_SPAWN: 'ENEMY_DEATH_SPAWN',
+    CARD_DROPPED: 'CARD_DROPPED'
+} as const;

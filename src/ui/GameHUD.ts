@@ -18,11 +18,11 @@ export class GameHUD {
     private boundStartWave: () => void;
     private boundForge: () => void;
 
-    // Subscription IDs
-    private subMoney: number = -1;
-    private subLives: number = -1;
-    private subWaveStart: number = -1;
-    private subWaveEnd: number = -1;
+    // Subscription Unsubscribers
+    private unsubMoney: () => void = () => { };
+    private unsubLives: () => void = () => { };
+    private unsubWaveStart: () => void = () => { };
+    private unsubWaveEnd: () => void = () => { };
 
     constructor(scene: IGameScene) {
         this.scene = scene;
@@ -71,24 +71,23 @@ export class GameHUD {
 
     private initSubscriptions() {
         const bus = EventBus.getInstance();
-        this.subMoney = bus.on(Events.MONEY_CHANGED, (money: number) => this.updateMoney(money));
-        this.subLives = bus.on(Events.LIVES_CHANGED, (lives: number) => this.updateLives(lives));
-        this.subWaveStart = bus.on(Events.WAVE_STARTED, (wave: number) => {
+        this.unsubMoney = bus.on(Events.MONEY_CHANGED, (money: number) => this.updateMoney(money));
+        this.unsubLives = bus.on(Events.LIVES_CHANGED, (lives: number) => this.updateLives(lives));
+        this.unsubWaveStart = bus.on(Events.WAVE_STARTED, (wave: number) => {
             this.updateWaveText(wave);
             this.updateStartBtn(true);
         });
-        this.subWaveEnd = bus.on(Events.WAVE_COMPLETED, () => this.updateStartBtn(false));
+        this.unsubWaveEnd = bus.on(Events.WAVE_COMPLETED, () => this.updateStartBtn(false));
     }
 
     public destroy() {
         if (this.elStartBtn) this.elStartBtn.removeEventListener('click', this.boundStartWave);
         if (this.elForgeBtn) this.elForgeBtn.removeEventListener('click', this.boundForge);
 
-        const bus = EventBus.getInstance();
-        if (this.subMoney !== -1) bus.off(this.subMoney);
-        if (this.subLives !== -1) bus.off(this.subLives);
-        if (this.subWaveStart !== -1) bus.off(this.subWaveStart);
-        if (this.subWaveEnd !== -1) bus.off(this.subWaveEnd);
+        this.unsubMoney();
+        this.unsubLives();
+        this.unsubWaveStart();
+        this.unsubWaveEnd();
     }
 
     private updateMoney(newMoney: number) {

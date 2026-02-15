@@ -1,6 +1,7 @@
 import { IGameScene } from './scenes/IGameScene';
 import { CONFIG } from './Config';
 import { generateUUID } from './Utils';
+import { EventBus, Events } from './EventBus';
 
 export interface ICard {
     id: string;
@@ -13,6 +14,7 @@ export interface ICard {
 export class CardSystem {
     private scene: IGameScene;
     public hand: ICard[] = [];
+    private static actionCounter: number = 0;
 
     // Dragging state
     public dragCard: ICard | null = null;
@@ -66,7 +68,9 @@ export class CardSystem {
                 // rect.width is display width, game.width is logical width
                 const x = (e.clientX - rect.left) * (this.scene.game.width / rect.width);
                 const y = (e.clientY - rect.top) * (this.scene.game.height / rect.height);
-                this.scene.events.emit('CARD_DROPPED', { card: this.dragCard, x, y });
+
+                const actionId = `card_drop_${Date.now()}_${CardSystem.actionCounter++}`;
+                EventBus.getInstance().emit(Events.CARD_DROPPED, { card: this.dragCard, x, y, actionId });
             }
         }
 

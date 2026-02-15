@@ -6,6 +6,9 @@ export class GameOverUI {
     private elFinalWave: HTMLElement;
     private elRestartBtn: HTMLButtonElement;
 
+    // Bound handler
+    private boundRestart: () => void;
+
     constructor(scene: IGameScene) {
         this.scene = scene;
         this.elGameOver = document.getElementById('game-over')!;
@@ -13,13 +16,22 @@ export class GameOverUI {
         this.elRestartBtn = document.getElementById('restart-btn') as HTMLButtonElement;
 
         this.initListeners();
+
+        this.boundRestart = () => {
+            this.scene.restart();
+            this.hide();
+        };
+        this.elRestartBtn.addEventListener('click', this.boundRestart);
     }
 
     private initListeners() {
-        this.elRestartBtn.addEventListener('click', () => {
-            this.scene.restart();
-            this.hide();
-        });
+        // Empty if everything moved to constructor or keep other listeners here
+    }
+
+    public dispose() {
+        if (this.elRestartBtn) {
+            this.elRestartBtn.removeEventListener('click', this.boundRestart);
+        }
     }
 
     public show(wave: number) {

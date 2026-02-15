@@ -5,7 +5,7 @@ import { getEnemyType } from '../Config';
 export class SkeletonCommanderSystem {
     private ctx: CanvasRenderingContext2D;
     private listenersSetup = false;
-    private listenerId: number = -1;
+    private unsubDied: () => void = () => { };
 
     // Visual Effects List
     private buffEffects: Array<{
@@ -21,16 +21,13 @@ export class SkeletonCommanderSystem {
     constructor(ctx: CanvasRenderingContext2D) {
         this.ctx = ctx;
         if (!this.listenersSetup) {
-            this.listenerId = EventBus.getInstance().on(Events.ENEMY_DIED, this.onEnemyDied.bind(this));
+            this.unsubDied = EventBus.getInstance().on(Events.ENEMY_DIED, this.onEnemyDied.bind(this));
             this.listenersSetup = true;
         }
     }
 
     public destroy() {
-        if (this.listenerId !== -1) {
-            EventBus.getInstance().off(this.listenerId);
-            this.listenerId = -1;
-        }
+        this.unsubDied();
         this.listenersSetup = false;
     }
 

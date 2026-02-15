@@ -1,7 +1,10 @@
 import { ICard } from './CardSystem';
 import { CONFIG } from './Config';
 
+export const CURRENT_SCHEMA_VERSION = 1;
+
 export interface IGlobalSaveData {
+    schemaVersion: number;
     totalMoneyEarned: number;
     enemiesKilled: number;
     wavesCleared: number;
@@ -10,6 +13,7 @@ export interface IGlobalSaveData {
 }
 
 export const DEFAULT_SAVE_DATA: IGlobalSaveData = {
+    schemaVersion: CURRENT_SCHEMA_VERSION,
     totalMoneyEarned: 0,
     enemiesKilled: 0,
     wavesCleared: 0,
@@ -25,7 +29,7 @@ export class SaveManager {
             const raw = localStorage.getItem(this.STORAGE_KEY);
             if (raw) {
                 const data = JSON.parse(raw);
-                return { ...DEFAULT_SAVE_DATA, ...data };
+                return this.migrateSave(data);
             }
         } catch (e) {
             console.error('Failed to load save', e);
@@ -39,6 +43,21 @@ export class SaveManager {
         } catch (e) {
             console.error('Failed to save progress', e);
         }
+    }
+
+
+
+    private static migrateSave(raw: any): IGlobalSaveData {
+        // Safe default
+        const safe: IGlobalSaveData = { ...DEFAULT_SAVE_DATA, ...raw };
+
+        // Force current version
+        safe.schemaVersion = CURRENT_SCHEMA_VERSION;
+
+        // Ensure arrays are arrays (defensive)
+        if (!Array.isArray(safe.unlockedCards)) safe.unlockedCards = [...DEFAULT_SAVE_DATA.unlockedCards];
+
+        return safe;
     }
 
     public static updateProgress(stats: { money: number; kills: number; waves: number; maxWave: number }) {

@@ -19,7 +19,7 @@ export class ShopUI {
     private boundBuy: () => void;
     private boundRefresh: () => void;
     private boundMoneyChanged: (money: number) => void;
-    private moneySubId: number = -1;
+    private unsubMoney: () => void = () => { };
 
     constructor(scene: IGameScene) {
         this.scene = scene;
@@ -40,17 +40,14 @@ export class ShopUI {
         if (this.elShopBtn) this.elShopBtn.addEventListener('click', this.boundBuy);
         if (this.elRefreshBtn) this.elRefreshBtn.addEventListener('click', this.boundRefresh);
 
-        this.moneySubId = EventBus.getInstance().on(Events.MONEY_CHANGED, this.boundMoneyChanged);
+        this.unsubMoney = EventBus.getInstance().on(Events.MONEY_CHANGED, this.boundMoneyChanged);
     }
 
     public destroy() {
         if (this.elShopBtn) this.elShopBtn.removeEventListener('click', this.boundBuy);
         if (this.elRefreshBtn) this.elRefreshBtn.removeEventListener('click', this.boundRefresh);
 
-        if (this.moneySubId !== -1) {
-            EventBus.getInstance().off(this.moneySubId);
-            this.moneySubId = -1;
-        }
+        this.unsubMoney();
     }
 
     public rerollWithCost() {

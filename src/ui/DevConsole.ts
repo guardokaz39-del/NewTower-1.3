@@ -22,7 +22,7 @@ export class DevConsole {
     private graphCtx!: CanvasRenderingContext2D;
     private fpsHistory: number[] = [];
     private eventMarkers: { frame: number; label: string; color: string }[] = [];
-    private graphUpdateInterval: any = null;
+    private graphUpdateInterval: ReturnType<typeof setInterval> | null = null;
 
     // Frame Snapshots - capture game state during FPS drops
     private frameSnapshots: {
@@ -38,7 +38,7 @@ export class DevConsole {
     private isVisible: boolean = false;
     private activeTab: 'log' | 'graph' | 'cheats' | 'tests' = 'log';
     private autoScroll: boolean = true;
-    private stateUpdateInterval: any = null;
+    private stateUpdateInterval: ReturnType<typeof setInterval> | null = null;
 
     // Filters
     private showInfo: boolean = true;
@@ -596,6 +596,9 @@ ${timelineStr}
         }
         if (this.graphUpdateInterval) {
             clearInterval(this.graphUpdateInterval);
+        }
+        if (this.stateUpdateInterval) {
+            clearInterval(this.stateUpdateInterval);
         }
         this.container.remove();
         this.toggleBtn.remove();

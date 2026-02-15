@@ -4,8 +4,12 @@ import { PauseMenu } from './ui/PauseMenu';
 import { GameOverUI } from './ui/GameOverUI';
 import { ShopUI } from './ui/ShopUI';
 
+export type UIMode = 'menu' | 'game' | 'gameOver';
+
 export class UIManager {
     private scene: IGameScene;
+
+    public currentMode: UIMode = 'menu';
 
     // Components
     public shop: ShopUI;
@@ -37,7 +41,25 @@ export class UIManager {
     }
 
     // --- НОВЫЕ МЕТОДЫ УПРАВЛЕНИЯ ВИДИМОСТЬЮ ---
-    public show() {
+    public setMode(mode: UIMode) {
+        this.currentMode = mode;
+
+        switch (mode) {
+            case 'menu':
+                this.hide();
+                break;
+            case 'game':
+                this.show();
+                break;
+            case 'gameOver':
+                // Handled in showGameOver mostly, but ensure overlays
+                this.elUiLayer.style.display = 'block';
+                this.elHandContainer.style.display = 'none'; // Hide hand on game over
+                break;
+        }
+    }
+
+    private show() {
         // Показываем игровые элементы
         this.elUiLayer.style.display = 'block';
         this.elHandContainer.style.display = 'block';
@@ -55,6 +77,7 @@ export class UIManager {
     // ------------------------------------------
 
     public showGameOver(wave: number) {
+        this.setMode('gameOver');
         this.gameOver.show(wave);
     }
 
@@ -73,6 +96,7 @@ export class UIManager {
         // Destroy components to clean up listeners
         if (this.shop) this.shop.destroy();
         if (this.hud) this.hud.destroy();
+        if (this.gameOver) this.gameOver.dispose();
 
         // Clear dynamic UI layers (hand), but KEEP static UI layer (HUD/Shop structure)
         if (this.scene && this.scene.game && this.scene.game.uiRoot) {

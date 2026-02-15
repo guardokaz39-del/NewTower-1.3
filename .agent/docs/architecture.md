@@ -127,7 +127,10 @@ The game uses a **Logical Coordinate System** decoupled from physical pixels to 
 | `src/ForgeSystem.ts` | Card combining/upgrading |
 | `src/systems/TargetingSystem.ts` | Centralized O(1) targeting logic with hysteresis |
 | `src/systems/ProjectileSystem.ts` | Projectile pooling and lifecycle management |
+| `src/systems/TargetingSystem.ts` | Centralized O(1) targeting logic with hysteresis |
+| `src/systems/ProjectileSystem.ts` | Projectile pooling and lifecycle management |
 | `src/WeaponSystem.ts` | Firing logic, cooldowns, recoil, gated shooting |
+| `src/SaveManager.ts` | Persistence, schema versioning, safe save cadence |
 
 ---
 

@@ -10,6 +10,7 @@ import { MetricsSystem } from '../MetricsSystem';
 import { IMapData } from '../MapData';
 import { EventEmitter } from '../Events';
 import { SoundManager } from '../SoundManager';
+import { EventBus, Events } from '../EventBus';
 
 /**
  * Handles user actions and game controller logic:
@@ -19,8 +20,22 @@ import { SoundManager } from '../SoundManager';
  * - Keyboard hotkeys
  */
 export class GameController {
+    private recentActionIds: Set<string> = new Set();
+    private unsubCardDrop: () => void = () => { };
+
     // Bound handler for safe unsubscription
     private onCardDropped = (data: any) => {
+        if (data.actionId) {
+            if (this.recentActionIds.has(data.actionId)) {
+                console.warn(`Duplicate card action detected: ${data.actionId}`);
+                return;
+            }
+            this.recentActionIds.add(data.actionId);
+            if (this.recentActionIds.size > 256) {
+                const first = this.recentActionIds.values().next().value;
+                if (first) this.recentActionIds.delete(first);
+            }
+        }
         this.handleCardDrop(data.card, data.x, data.y);
     };
 
@@ -37,11 +52,11 @@ export class GameController {
         private cardSys: any, // CardSystem reference
         private events: EventEmitter,
     ) {
-        this.events.on('CARD_DROPPED', this.onCardDropped);
+        this.unsubCardDrop = EventBus.getInstance().on(Events.CARD_DROPPED, this.onCardDropped);
     }
 
     public dispose(): void {
-        this.events.off('CARD_DROPPED', this.onCardDropped);
+        this.unsubCardDrop();
     }
 
     public handleMenuAction(action: { type: 'UNLOCK' | 'CLICK_SLOT' | 'REMOVE_CARD', slotId: number }, tower: Tower) {

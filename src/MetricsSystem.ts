@@ -146,6 +146,14 @@ export class MetricsSystem {
         return { ...this.metrics };
     }
 
+    public getCurrentSessionStats() {
+        return {
+            money: this.currentGameMetrics.moneyEarned,
+            kills: this.currentGameMetrics.enemiesKilled,
+            waves: this.currentGameMetrics.waveReached,
+        };
+    }
+
     public getCardUsagePercentages(): Record<string, number> {
         const total = Object.values(this.metrics.cardsUsed).reduce((a, b) => a + b, 0);
         const percentages: Record<string, number> = {};

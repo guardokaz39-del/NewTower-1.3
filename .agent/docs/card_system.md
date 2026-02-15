@@ -426,5 +426,14 @@ forgeCards(cards: ICard[]): ICard
 
 // CardSystem.ts
 onCardDropOnTower(card: ICard, tower: Tower)
+// CardSystem.ts
+onCardDropOnTower(card: ICard, tower: Tower)
 onCardDropOnForge(card: ICard)
 ```
+
+### Idempotency (Drop Safety)
+
+To prevent duplicate card effects (e.g., double-clicks or lag spikes causing two towers to spawn), every drop event generates a unique `actionId`.
+
+- `CardSystem` generates `actionId`.
+- `GameController` tracks `recentActionIds` (Set) and ignores duplicates.

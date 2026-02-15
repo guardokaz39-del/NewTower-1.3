@@ -39,6 +39,7 @@ import { RendererFactory } from '../RendererFactory';
 import { EnemyRenderer } from '../renderers/EnemyRenderer';
 import { AcidPuddleSystem } from '../systems/AcidPuddleSystem';
 import { SkeletonCommanderSystem } from '../systems/SkeletonCommanderSystem';
+import { SaveManager } from '../SaveManager';
 import { GameSession } from '../GameSession';
 
 /**
@@ -119,6 +120,12 @@ export class GameScene extends BaseScene implements IGameScene {
 
     public get enemyPool() { return this.session.gameState.enemyPool; }
 
+    // Persist Safe Save State
+    private lastSavedStats = { money: 0, kills: 0, waves: 0 };
+
+    // Event Subscriptions
+    private unsubs: (() => void)[] = [];
+
 
     // Ambient cycle
     private dayTime: number = 0;
@@ -175,15 +182,15 @@ export class GameScene extends BaseScene implements IGameScene {
         );
 
         // Listen for Global Events
-        EventBus.getInstance().on(Events.ENEMY_DIED, (data: any) => {
+        this.unsubs.push(EventBus.getInstance().on(Events.ENEMY_DIED, (data: any) => {
             const enemy = data.enemy as Enemy;
             if (enemy && enemy.typeId === 'sapper_rat') {
                 this.triggerExplosion(enemy.x, enemy.y, 45, 200, true); // Visual + Logic (Damage)
             }
-        });
+        }));
 
         // Magma King Split Logic
-        EventBus.getInstance().on('ENEMY_SPLIT', (data: any) => {
+        this.unsubs.push(EventBus.getInstance().on(Events.ENEMY_SPLIT, (data: any) => {
             const enemy = data.enemy as Enemy;
             if (enemy && enemy.typeId === 'magma_king') {
                 const decoy = this.entityManager.spawnEnemy('MAGMA_STATUE', this.map.waypoints);
@@ -204,10 +211,10 @@ export class GameScene extends BaseScene implements IGameScene {
                     this.showFloatingText('DECOY!', enemy.x, enemy.y - 30, '#b0bec5');
                 }
             }
-        });
+        }));
 
         // Flesh Colossus Death-Spawn Logic
-        EventBus.getInstance().on('ENEMY_DEATH_SPAWN', (data: any) => {
+        this.unsubs.push(EventBus.getInstance().on(Events.ENEMY_DEATH_SPAWN, (data: any) => {
             const parent = data.enemy as Enemy;
             const spawns: string[] = data.spawns;
 
@@ -255,16 +262,47 @@ export class GameScene extends BaseScene implements IGameScene {
             this.showFloatingText('BURST!', parent.x, parent.y - 40, '#ff5252');
             SoundManager.play('explosion');
             this.triggerShake(0.35, 7);
-        });
+        }));
+
+        // === SAFE SAVE CADENCE ===
+        // 1. Wave Completed
+        this.unsubs.push(EventBus.getInstance().on(Events.WAVE_COMPLETED, () => {
+            this.saveProgress();
+        }));
+
+        // 2. Card Installed (or just dropped effectively)
+        this.unsubs.push(EventBus.getInstance().on(Events.CARD_DROPPED, (data: any) => {
+            // Only save if actionId is present (implies successful drop logic initiated)
+            // or just save anyway, cheap operation with deltas
+            this.saveProgress();
+        }));
+    }
+
+    private saveProgress() {
+        if (!this.session || !this.session.metrics) return;
+
+        const current = this.session.metrics.getCurrentSessionStats();
+
+        const delta = {
+            money: current.money - this.lastSavedStats.money,
+            kills: current.kills - this.lastSavedStats.kills,
+            waves: current.waves - this.lastSavedStats.waves,
+            maxWave: current.waves // Always pass current max
+        };
+
+        if (delta.money > 0 || delta.kills > 0 || delta.waves > 0) {
+            SaveManager.updateProgress(delta);
+            this.lastSavedStats = { ...current };
+        }
     }
 
     protected onEnterImpl() {
-        const ui = document.getElementById('ui-layer');
-        if (ui) ui.style.display = 'block';
-        const hand = document.getElementById('hand-container');
-        if (hand) hand.style.display = 'flex';
+        // UI Initialization via Manager
+        if (this.ui) {
+            this.ui.setMode('game');
+            this.ui.update();
+        }
 
-        this.ui.update();
         // Use this.on for automatic cleanup
         this.on(window, 'keydown', this.onKeyDown);
     }
@@ -278,6 +316,10 @@ export class GameScene extends BaseScene implements IGameScene {
 
         // 3. Session Cleanup (Systems, Listeners)
         if (this.session) this.session.destroy();
+
+        // 4. Global Event Cleanup
+        this.unsubs.forEach(u => u());
+        this.unsubs = [];
 
         const ui = document.getElementById('ui-layer');
         if (ui) ui.style.display = 'none';
@@ -671,6 +713,7 @@ export class GameScene extends BaseScene implements IGameScene {
     }
 
     public gameOver(): void {
+        this.saveProgress();
         this.gameState.endGame();
         this.metrics.endGame(false);
         this.ui.showGameOver(this.gameState.wave);

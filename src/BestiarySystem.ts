@@ -9,7 +9,7 @@ export class BestiarySystem {
     private ui: BestiaryUI | null = null;
     private btn!: HTMLElement;
 
-    private eventSubId: number = -1;
+    private unsubSpawned: () => void = () => { };
 
     constructor(scene: IGameScene) {
         this.scene = scene;
@@ -20,16 +20,13 @@ export class BestiarySystem {
         this.unlock('grunt');
 
         // Listen for enemy spawns to unlock them
-        this.eventSubId = EventBus.getInstance().on(Events.ENEMY_SPAWNED, (enemyType: string) => {
+        this.unsubSpawned = EventBus.getInstance().on(Events.ENEMY_SPAWNED, (enemyType: string) => {
             this.unlock(enemyType);
         });
     }
 
     public destroy() {
-        if (this.eventSubId !== -1) {
-            EventBus.getInstance().off(this.eventSubId);
-            this.eventSubId = -1;
-        }
+        this.unsubSpawned();
         if (this.btn && this.btn.parentNode) {
             this.btn.parentNode.removeChild(this.btn);
         }
