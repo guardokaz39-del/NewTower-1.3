@@ -61,7 +61,7 @@ graph TB
 
 | File | Role |
 |------|------|
-| `src/Enemy.ts` | Enemy entity with HP, armor, status effects, pathfinding |
+| `src/Enemy.ts` | Enemy entity with HP, armor, status effects (slow, burn DOT tick), pathfinding |
 | `src/Tower.ts` | Tower entity with cards, stats calculation, targeting modes |
 | `src/Projectile.ts` | Pooled projectile with effects, pierce, crits, trails |
 
@@ -120,7 +120,7 @@ The game uses a **Logical Coordinate System** decoupled from physical pixels to 
 | File | Role |
 |------|------|
 | `src/WaveManager.ts` | Wave spawning, patterns (Normal/Random/Swarm) |
-| `src/CollisionSystem.ts` | Projectile-enemy collision via SpatialGrid |
+| `src/CollisionSystem.ts` | Projectile-enemy collision via SpatialGrid, applies splash/slow/burn effects |
 | `src/FlowField.ts` | Vector Field pathfinding for mass unit movement |
 | `src/EffectSystem.ts` | Visual effects: explosions, particles, debris |
 | `src/CardSystem.ts` | Hand management, drag-drop to towers/forge |
@@ -147,10 +147,10 @@ The game uses a **Logical Coordinate System** decoupled from physical pixels to 
 
 | Type | Effect |
 |------|--------|
-| 🔥 FIRE | AoE damage, burn, explosion on death |
+| 🔥 FIRE | AoE splash, burn DOT (Napalm evolution), explosion on death |
 | ❄️ ICE | Slow effect, chains at Lv3 |
 | 🎯 SNIPER | Long range, high damage, crit at Lv3 |
-| 💥 MULTISHOT | Multiple projectiles |
+| 💥 MULTISHOT | Multiple projectiles, evolution-aware config (Barrage/Storm/Homing) |
 | ⚡ MINIGUN | Attack speed ramp, overheat mechanic |
 
 ---
@@ -225,7 +225,7 @@ src/
 2. **Config → Entity**: `CONFIG.ENEMY_TYPES` and `CONFIG.CARD_TYPES` define all types
 3. **Assets → Renderers**: `Assets.get('name')` provides procedural textures
 4. **Scene → Systems**: `GameScene` orchestrates via `IGameScene` interface
-5. **Cards → Tower Stats**: `Tower.getStats()` merges effects via `CardStackingSystem`
+5. **Cards → Tower Stats**: `Tower.getStats()` merges effects via `CardStackingSystem`, multishot config via `getMultishotConfig(level, evolutionPath?)`
 
 ---
 

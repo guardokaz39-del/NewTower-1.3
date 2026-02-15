@@ -177,9 +177,12 @@ export class Tower {
         }
 
         if (multiCards.length > 0) {
-            // Use highest level multishot card
-            const maxLevel = Math.max(...multiCards.map((c) => c.level));
-            const multiConfig = getMultishotConfig(maxLevel);
+            // Find strongest multishot card
+            // Sort by level descending
+            multiCards.sort((a, b) => b.level - a.level);
+            const activeMultiCard = multiCards[0];
+
+            const multiConfig = getMultishotConfig(activeMultiCard.level, activeMultiCard.evolutionPath);
             projCount = multiConfig.projectileCount;
             damageMultiplier = multiConfig.damageMultiplier;
             spread = multiConfig.spread; // NEW: Get spread from config

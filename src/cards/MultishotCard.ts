@@ -1,4 +1,5 @@
 import { IUpgradeCard } from './CardType';
+import { EVOLUTION_UPGRADES } from './CardEvolutions';
 
 /**
  * Multishot Card Upgrades
@@ -31,10 +32,46 @@ export const MULTISHOT_UPGRADES: Record<number, IUpgradeCard> = {
     }
 };
 
+// Lookup tables for Multishot Evolutions
+const EVOLUTION_PROJECTILE_COUNTS: Record<string, number> = {
+    'barrage': 4, 'spread': 2, 'storm': 6,
+    'volley': 4, 'homing': 3, 'twin': 2,
+};
+
+const EVOLUTION_SPREADS: Record<string, number> = {
+    'barrage': 0.35, 'spread': 0.12, 'storm': 0.52,
+    'volley': 0.30, 'homing': 0.20, 'twin': 0.10,
+};
+
 /**
  * Get multishot configuration for a given level
  */
-export function getMultishotConfig(level: number): { projectileCount: number; damageMultiplier: number; spread: number } {
+export function getMultishotConfig(
+    level: number,
+    evolutionPath?: string
+): { projectileCount: number; damageMultiplier: number; spread: number } {
+
+    // Check for evolution first
+    if (evolutionPath && evolutionPath !== 'classic') {
+        // We use local lookup tables and hardcoded damage multipliers 
+        // to avoid circular dependency issues with EVOLUTION_UPGRADES if imported from index.
+        // We DO NOT use EVOLUTION_UPGRADES here to affect the config directly yet, 
+        // to match the previous Safe implementation step.
+
+        const damageMultipliers: Record<string, number> = {
+            'barrage': 0.40, 'spread': 0.85,
+            'storm': 0.30, 'volley': 0.45,
+            'homing': 0.70, 'twin': 1.0,
+        };
+
+        const count = EVOLUTION_PROJECTILE_COUNTS[evolutionPath] || 2;
+        const spread = EVOLUTION_SPREADS[evolutionPath] || 0.30;
+        const dmgMult = damageMultipliers[evolutionPath] || 0.60;
+
+        return { projectileCount: count, damageMultiplier: dmgMult, spread: spread };
+    }
+
+    // Classic path
     switch (level) {
         case 1:
             return { projectileCount: 2, damageMultiplier: 0.60, spread: 0.30 };

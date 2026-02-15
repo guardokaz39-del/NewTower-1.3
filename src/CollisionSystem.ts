@@ -203,6 +203,19 @@ export class CollisionSystem {
             const damageBonus = slow.damageToSlowed || 1.0;
             target.applyStatus('slow', slow.slowDuration || slow.dur || 1.0, slow.slowPower || slow.power || 0.4, damageBonus);
         }
+
+        // Burn effect (Napalm evolution)
+        let burn = null;
+        for (let i = 0; i < p.effects.length; i++) {
+            if (p.effects[i].type === 'burn') {
+                burn = p.effects[i];
+                break;
+            }
+        }
+        if (burn) {
+            // Power = DPS for burn
+            target.applyStatus('burn', burn.burnDuration || 3, burn.burnDps || 5);
+        }
     }
 
     private handleEnemyDeath(enemy: Enemy, killingProjectile: Projectile, wasSlowed: boolean) {

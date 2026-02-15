@@ -73,8 +73,21 @@ export function mergeCardsWithStacking(cards: ICard[]): MergedCardData {
             // Special handling for Minigun
             processMinigunGroup(typeCards, result, allEffects);
         } else if (typeId === 'multi') {
-            // Multishot doesn't add modifiers, skip in this loop
-            // (handled separately in Tower.ts)
+            // Multishot doesn't add standard modifiers usually, 
+            // but Evolutions (like Volley) might have attackSpeedMultiplier.
+
+            // We only look at the main card (highest level) for evolution stats
+            const mainCard = typeCards[0];
+            const upgrade = getCardUpgrade(typeId, mainCard.level, mainCard.evolutionPath);
+
+            if (upgrade && upgrade.modifiers) {
+                // Apply attackSpeedMultiplier if present (e.g. Volley 1.3x)
+                if (upgrade.modifiers.attackSpeedMultiplier) {
+                    result.attackSpeedMultiplier = (result.attackSpeedMultiplier || 1.0) * upgrade.modifiers.attackSpeedMultiplier;
+                }
+                // Note: damageMultiplier is handled in Tower.ts via getMultishotConfig
+                // So we do NOT apply it here to avoid double application.
+            }
             continue;
         } else if (typeCards.length === 1) {
             // Single card of this type: 100% bonus
