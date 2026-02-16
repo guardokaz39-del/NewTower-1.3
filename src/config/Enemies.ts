@@ -2,7 +2,7 @@ import { IEnemyTypeConfig } from '../types';
 
 export const ENEMY_CONFIG = {
     BASE_HP: 25,
-    HP_GROWTH: 1.2
+    HP_GROWTH: 1.2,
 };
 
 export const ENEMY_TYPES: Record<string, IEnemyTypeConfig> = {
@@ -66,7 +66,7 @@ export const ENEMY_TYPES: Record<string, IEnemyTypeConfig> = {
         desc: 'Становится сильнее от смертей союзников',
         archetype: 'SKELETON_COMMANDER',
         scale: 1.3,
-        tint: '#ffd700'
+        tint: '#ffd700',
     },
     SPIDER_POISON: {
         id: 'spider_poison',
@@ -79,7 +79,7 @@ export const ENEMY_TYPES: Record<string, IEnemyTypeConfig> = {
         desc: 'Оставляет лечащую лужу после смерти',
         archetype: 'SPIDER',
         scale: 1.15,
-        tint: '#76ff03'
+        tint: '#76ff03',
     },
     TROLL_ARMORED: {
         id: 'troll_armored',
@@ -92,7 +92,7 @@ export const ENEMY_TYPES: Record<string, IEnemyTypeConfig> = {
         desc: 'Снежный тролль с тяжелой дубиной',
         archetype: 'TROLL',
         scale: 1.3,
-        tint: '#cfd8dc'
+        tint: '#cfd8dc',
     },
     GOBLIN: {
         id: 'goblin',
@@ -156,6 +156,6 @@ export const ENEMY_TYPES: Record<string, IEnemyTypeConfig> = {
         desc: 'Троянский конь. При смерти из него вырываются 2 скелета и адская гончая.',
         archetype: 'FLESH',
         scale: 1.5,
-        deathSpawns: ['GRUNT', 'GRUNT', 'SCOUT']
-    }
+        deathSpawns: ['GRUNT', 'GRUNT', 'SCOUT'],
+    },
 };

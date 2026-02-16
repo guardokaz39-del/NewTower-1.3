@@ -6,7 +6,12 @@ export class AssetCache {
      * @param key Уникальный ключ (напр. 'enemy_orc_walk_0')
      * @param factory Функция, которая нарисует ассет, если его нет
      */
-    public static get(key: string, factory: (ctx: CanvasRenderingContext2D, w: number, h: number) => void, width: number, height: number): HTMLCanvasElement {
+    public static get(
+        key: string,
+        factory: (ctx: CanvasRenderingContext2D, w: number, h: number) => void,
+        width: number,
+        height: number,
+    ): HTMLCanvasElement {
         if (!this.cache.has(key)) {
             // Simple Cache Cap (Phase 5.C Lite)
             // If cache grows too large, clear it completely to prevent memory leaks
@@ -21,7 +26,7 @@ export class AssetCache {
             if (!ctx) return canvas; // Should not happen
 
             // Оптимизация: отключаем сглаживание, если нужен пиксель-арт
-            // ctx.imageSmoothingEnabled = false; 
+            // ctx.imageSmoothingEnabled = false;
 
             factory(ctx, width, height);
             this.cache.set(key, canvas);
@@ -49,18 +54,23 @@ export class AssetCache {
      */
     public static getGlow(color: string, size: number): HTMLCanvasElement {
         const key = `glow_${color}_${size}`;
-        return this.get(key, (ctx, w, h) => {
-            const center = w / 2;
-            const gradient = ctx.createRadialGradient(center, center, 0, center, center, center);
-            gradient.addColorStop(0, color);
-            gradient.addColorStop(1, 'rgba(0,0,0,0)'); // Полная прозрачность на краях
+        return this.get(
+            key,
+            (ctx, w, h) => {
+                const center = w / 2;
+                const gradient = ctx.createRadialGradient(center, center, 0, center, center, center);
+                gradient.addColorStop(0, color);
+                gradient.addColorStop(1, 'rgba(0,0,0,0)'); // Полная прозрачность на краях
 
-            // Fixed: removed confusing 'lighter' op that was immediately overwritten
-            // The 'lighter' effect should be applied when drawing this sprite to the game canvas, not here.
+                // Fixed: removed confusing 'lighter' op that was immediately overwritten
+                // The 'lighter' effect should be applied when drawing this sprite to the game canvas, not here.
 
-            ctx.fillStyle = gradient;
-            ctx.fillRect(0, 0, w, h);
-        }, size, size);
+                ctx.fillStyle = gradient;
+                ctx.fillRect(0, 0, w, h);
+            },
+            size,
+            size,
+        );
     }
 
     public static clear() {

@@ -23,14 +23,19 @@ export class EntityManager {
         private state: GameState,
         private effects: EffectSystem,
         private metrics: MetricsSystem,
-    ) { }
+    ) {}
 
     // === Tower Management ===
 
     /**
      * Validate if a tower can be built at the given position
      */
-    public canBuildTower(col: number, row: number, mapData: any, isBuildable: (c: number, r: number) => boolean): { valid: boolean; reason?: string } {
+    public canBuildTower(
+        col: number,
+        row: number,
+        mapData: any,
+        isBuildable: (c: number, r: number) => boolean,
+    ): { valid: boolean; reason?: string } {
         if (!isBuildable(col, row)) {
             return { valid: false, reason: "Can't build here!" };
         }
@@ -89,7 +94,12 @@ export class EntityManager {
     /**
      * Add a card to a tower or create new tower if none exists
      */
-    public addCardToTower(card: ICard, col: number, row: number, isBuildable: (c: number, r: number) => boolean): boolean {
+    public addCardToTower(
+        card: ICard,
+        col: number,
+        row: number,
+        isBuildable: (c: number, r: number) => boolean,
+    ): boolean {
         let tower = this.state.towers.find((t) => t.col === col && t.row === row);
 
         // If no tower exists, we do NOT build one automatically on drop
@@ -197,7 +207,7 @@ export class EntityManager {
     }
 
     /**
- * Process enemy reaching the end - lose life, cleanup
+     * Process enemy reaching the end - lose life, cleanup
      */
     public handleEnemyFinished(enemy: Enemy): void {
         const damage = enemy.typeId === 'sapper_rat' ? 5 : 1;
@@ -216,7 +226,8 @@ export class EntityManager {
     /**
      * Update all enemies and handle death/finish
      */
-    public updateEnemies(dt: number, flowField: any): void { // Using 'any' to avoid circular ref, but should be FlowField
+    public updateEnemies(dt: number, flowField: any): void {
+        // Using 'any' to avoid circular ref, but should be FlowField
         for (let i = this.state.enemies.length - 1; i >= 0; i--) {
             const e = this.state.enemies[i];
             e.move(dt, flowField);

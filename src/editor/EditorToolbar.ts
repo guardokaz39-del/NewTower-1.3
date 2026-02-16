@@ -52,7 +52,7 @@ export class EditorToolbar {
                     { id: 'paint_grass', label: 'Трава', icon: '🌲', color: '#388e3c' },
                     { id: 'paint_road', label: 'Дорога', icon: '🟫', color: '#795548' },
                     { id: 'paint_fog', label: 'Туман', icon: '🌫️', color: '#607d8b' },
-                ]
+                ],
             },
             {
                 id: 'path',
@@ -62,7 +62,7 @@ export class EditorToolbar {
                     { id: 'set_start', label: 'Старт', icon: '🏁', color: '#00bcd4' },
                     { id: 'set_end', label: 'Финиш', icon: '🛑', color: '#e91e63' },
                     { id: 'place_waypoint', label: 'Точка', icon: '📍', color: '#9c27b0' },
-                ]
+                ],
             },
             {
                 id: 'objects',
@@ -74,16 +74,14 @@ export class EditorToolbar {
                     { id: 'place_tree', label: 'Лес', icon: '🌲', color: '#2e7d32' },
                     { id: 'place_wheat', label: 'Пшеница', icon: '🌾', color: '#f9a825' },
                     { id: 'place_flowers', label: 'Цветы', icon: '🌸', color: '#c2185b' },
-                ]
+                ],
             },
             {
                 id: 'erase',
                 name: 'Стереть',
                 icon: '🧹',
-                tools: [
-                    { id: 'eraser', label: 'Ластик', icon: '🧹', color: '#ff6600', hotkey: 'E' },
-                ]
-            }
+                tools: [{ id: 'eraser', label: 'Ластик', icon: '🧹', color: '#ff6600', hotkey: 'E' }],
+            },
         ];
 
         this.container = this.createContainer();
@@ -110,7 +108,7 @@ export class EditorToolbar {
             padding: `${VISUALS.UI.SPACING.md}px`,
             background: VISUALS.UI.COLORS.glass.bgDark,
             borderRadius: VISUALS.UI.BORDERS.radius.lg,
-            zIndex: '1000'
+            zIndex: '1000',
         });
     }
 
@@ -120,7 +118,7 @@ export class EditorToolbar {
             display: 'flex',
             gap: `${VISUALS.UI.SPACING.xs}px`,
             borderBottom: `${VISUALS.UI.BORDERS.width.normal} solid #444`,
-            paddingBottom: `${VISUALS.UI.SPACING.sm}px`
+            paddingBottom: `${VISUALS.UI.SPACING.sm}px`,
         });
 
         this.categories.forEach((cat, idx) => {
@@ -137,7 +135,7 @@ export class EditorToolbar {
                 cursor: 'pointer',
                 fontSize: VISUALS.UI.FONTS.size.md,
                 fontWeight: VISUALS.UI.FONTS.weight.bold,
-                transition: VISUALS.UI.TRANSITIONS.presets.fast
+                transition: VISUALS.UI.TRANSITIONS.presets.fast,
             });
 
             btn.onclick = () => this.selectCategory(idx);
@@ -152,7 +150,7 @@ export class EditorToolbar {
         Object.assign(container.style, {
             display: 'flex',
             gap: '8px',
-            flexWrap: 'wrap'
+            flexWrap: 'wrap',
         });
 
         return container;
@@ -170,13 +168,13 @@ export class EditorToolbar {
                 Object.assign((btn as HTMLElement).style, {
                     background: VISUALS.UI.COLORS.info,
                     borderColor: '#2196f3',
-                    transform: 'translateY(-2px)'
+                    transform: 'translateY(-2px)',
                 });
             } else {
                 Object.assign((btn as HTMLElement).style, {
                     background: VISUALS.UI.COLORS.neutral.medium,
                     borderColor: VISUALS.UI.COLORS.neutral.light,
-                    transform: 'translateY(0)'
+                    transform: 'translateY(0)',
                 });
             }
         });
@@ -190,7 +188,7 @@ export class EditorToolbar {
 
         const category = this.categories[this.selectedCategory];
 
-        category.tools.forEach(tool => {
+        category.tools.forEach((tool) => {
             const btn = document.createElement('button');
             btn.textContent = `${tool.icon} ${tool.label}`;
             if (tool.hotkey) {
@@ -206,7 +204,7 @@ export class EditorToolbar {
                 cursor: 'pointer',
                 fontSize: VISUALS.UI.FONTS.size.md,
                 fontWeight: VISUALS.UI.FONTS.weight.bold,
-                transition: VISUALS.UI.TRANSITIONS.presets.fast
+                transition: VISUALS.UI.TRANSITIONS.presets.fast,
             });
 
             btn.onmouseenter = () => {

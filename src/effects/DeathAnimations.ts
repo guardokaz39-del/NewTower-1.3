@@ -1,9 +1,9 @@
 /**
  * Death Animation System
- * 
+ *
  * Модульная система анимаций смерти врагов по архетипам.
  * Использует существующий EffectSystem для рендеринга.
- * 
+ *
  * Структура готова к масштабированию:
  * - Аниматоры можно выносить в /animators/*.ts
  * - Хелперы переиспользуются между аниматорами
@@ -40,11 +40,7 @@ const ANIMATORS: Record<string, IDeathAnimator> = {
  * Воспроизвести анимацию смерти врага.
  * Выбирает аниматор по архетипу из конфига.
  */
-export function playDeathAnimation(
-    effects: EffectSystem,
-    enemy: Enemy,
-    config: IEnemyTypeConfig | undefined
-): void {
+export function playDeathAnimation(effects: EffectSystem, enemy: Enemy, config: IEnemyTypeConfig | undefined): void {
     const archetype = config?.archetype || 'SKELETON';
     const animator = ANIMATORS[archetype] || playDefaultDeath;
 
@@ -161,7 +157,7 @@ function addDebris(
     color: string,
     vxRange: number,
     vyBase: number,
-    size = 4
+    size = 4,
 ) {
     for (let i = 0; i < count; i++) {
         e.add({
@@ -183,13 +179,7 @@ function addDebris(
 /**
  * Добавить пыль/дым (мягкие частицы)
  */
-function addDust(
-    e: EffectSystem,
-    x: number,
-    y: number,
-    count: number,
-    color: string
-) {
+function addDust(e: EffectSystem, x: number, y: number, count: number, color: string) {
     for (let i = 0; i < count; i++) {
         e.add({
             type: 'particle',
@@ -207,13 +197,7 @@ function addDust(
 /**
  * Добавить угли/искры (огненные частицы)
  */
-function addEmbers(
-    e: EffectSystem,
-    x: number,
-    y: number,
-    count: number,
-    color: string
-) {
+function addEmbers(e: EffectSystem, x: number, y: number, count: number, color: string) {
     for (let i = 0; i < count; i++) {
         e.add({
             type: 'particle',
@@ -231,13 +215,7 @@ function addEmbers(
 /**
  * Добавить души/орбы (призрачные частицы вверх)
  */
-function addSoulOrbs(
-    e: EffectSystem,
-    x: number,
-    y: number,
-    count: number,
-    color: string
-) {
+function addSoulOrbs(e: EffectSystem, x: number, y: number, count: number, color: string) {
     for (let i = 0; i < count; i++) {
         e.add({
             type: 'particle',

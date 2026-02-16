@@ -9,7 +9,7 @@ export const UI_TRANSITIONS = {
         instant: '0ms',
         fast: '150ms',
         normal: '300ms',
-        slow: '500ms'
+        slow: '500ms',
     },
 
     // Easing curves (Material Design)
@@ -17,15 +17,15 @@ export const UI_TRANSITIONS = {
         standard: 'cubic-bezier(0.4, 0, 0.2, 1)',
         decelerate: 'cubic-bezier(0.0, 0, 0.2, 1)',
         accelerate: 'cubic-bezier(0.4, 0, 1, 1)',
-        sharp: 'cubic-bezier(0.4, 0, 0.6, 1)'
+        sharp: 'cubic-bezier(0.4, 0, 0.6, 1)',
     },
 
     // Preset combinations (duration + easing)
     presets: {
         fast: '150ms cubic-bezier(0.4, 0, 0.2, 1)',
         normal: '300ms cubic-bezier(0.4, 0, 0.2, 1)',
-        slow: '500ms cubic-bezier(0.4, 0, 0.2, 1)'
-    }
+        slow: '500ms cubic-bezier(0.4, 0, 0.2, 1)',
+    },
 } as const;
 
 // Helper function

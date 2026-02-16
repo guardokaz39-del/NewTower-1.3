@@ -43,17 +43,14 @@ export class MenuScene extends BaseScene {
         this.clearMapPreviews();
     }
 
-    public update(dt: number) { }
+    public update(dt: number) {}
 
     public draw(ctx: CanvasRenderingContext2D) {
         // === Фоновое Изображение ===
         const bgImage = Assets.get('menu_start');
         if (bgImage) {
             // Cover-fit с центрированием (масштабирует чтобы покрыть весь canvas)
-            const scale = Math.max(
-                this.game.width / bgImage.width,
-                this.game.height / bgImage.height
-            );
+            const scale = Math.max(this.game.width / bgImage.width, this.game.height / bgImage.height);
             const x = (this.game.width - bgImage.width * scale) / 2;
             const y = (this.game.height - bgImage.height * scale) / 2;
 
@@ -107,7 +104,6 @@ export class MenuScene extends BaseScene {
         ctx.restore();
     }
 
-
     private createUI() {
         this.container = UIUtils.createContainer({
             position: 'absolute',
@@ -120,25 +116,45 @@ export class MenuScene extends BaseScene {
             alignItems: 'flex-start', // Сдвиг влево
             justifyContent: 'center',
             gap: '20px',
-            pointerEvents: 'none'
+            pointerEvents: 'none',
         });
         // Добавляем paddingLeft вручную
         this.container.style.paddingLeft = '15%';
 
-        UIUtils.createButton(this.container, '▶ START GAME', () => {
-            this.showMapSelection();
-        }, { width: '300px', fontSize: '24px', padding: '15px 40px' });
+        UIUtils.createButton(
+            this.container,
+            '▶ START GAME',
+            () => {
+                this.showMapSelection();
+            },
+            { width: '300px', fontSize: '24px', padding: '15px 40px' },
+        );
 
-        UIUtils.createButton(this.container, '🛠 EDITOR', () => {
-            this.game.toEditor();
-        }, { width: '300px', fontSize: '24px', padding: '15px 40px' });
+        UIUtils.createButton(
+            this.container,
+            '🛠 EDITOR',
+            () => {
+                this.game.toEditor();
+            },
+            { width: '300px', fontSize: '24px', padding: '15px 40px' },
+        );
 
-        UIUtils.createButton(this.container, '🧪 STRESS TEST', () => {
-            // Dynamic import to avoid circular dependency if any, 
-            // but standard import is fine here as MenuScene -> StressTestScene is one way usually.
-            // However, to be safe let's use the import at top.
-            this.game.changeScene(new StressTestScene(this.game));
-        }, { width: '300px', fontSize: '24px', padding: '15px 40px', background: 'linear-gradient(135deg, #444, #222)' });
+        UIUtils.createButton(
+            this.container,
+            '🧪 STRESS TEST',
+            () => {
+                // Dynamic import to avoid circular dependency if any,
+                // but standard import is fine here as MenuScene -> StressTestScene is one way usually.
+                // However, to be safe let's use the import at top.
+                this.game.changeScene(new StressTestScene(this.game));
+            },
+            {
+                width: '300px',
+                fontSize: '24px',
+                padding: '15px 40px',
+                background: 'linear-gradient(135deg, #444, #222)',
+            },
+        );
 
         document.body.appendChild(this.container);
     }
@@ -155,7 +171,7 @@ export class MenuScene extends BaseScene {
             alignItems: 'center',
             justifyContent: 'center',
             zIndex: '2000',
-            color: '#fff'
+            color: '#fff',
         });
         // Фоновое изображение вручную (из корня)
         this.mapSelectionContainer.style.backgroundImage = 'url("../map.jpg")';
@@ -173,7 +189,7 @@ export class MenuScene extends BaseScene {
             height: '100%',
             background: 'radial-gradient(circle at center, rgba(0, 0, 0, 0.4) 0%, rgba(0, 0, 0, 0.7) 100%)',
             zIndex: '-1',
-            pointerEvents: 'none'
+            pointerEvents: 'none',
         });
         this.mapSelectionContainer.appendChild(overlay);
 
@@ -184,7 +200,7 @@ export class MenuScene extends BaseScene {
             fontSize: VISUALS.UI.FONTS.size.huge,
             fontWeight: VISUALS.UI.FONTS.weight.bold,
             textShadow: VISUALS.UI.SHADOWS.lg,
-            letterSpacing: '2px'
+            letterSpacing: '2px',
         });
         this.mapSelectionContainer.appendChild(title);
 
@@ -203,7 +219,7 @@ export class MenuScene extends BaseScene {
             backdropFilter: 'blur(10px)',
             boxShadow: VISUALS.UI.SHADOWS.xl,
             scrollbarWidth: 'thin',
-            scrollbarColor: `${VISUALS.UI.COLORS.glass.borderHover} ${VISUALS.UI.COLORS.glass.bgDark}`
+            scrollbarColor: `${VISUALS.UI.COLORS.glass.borderHover} ${VISUALS.UI.COLORS.glass.bgDark}`,
         });
         this.mapSelectionContainer.appendChild(listContainer);
 
@@ -221,18 +237,23 @@ export class MenuScene extends BaseScene {
             }
         };
 
-        UIUtils.createButton(this.mapSelectionContainer, 'BACK', () => {
-            this.mapSelectionContainer.style.display = 'none';
-            this.container.style.display = 'flex';
-        }, {
-            background: `linear-gradient(135deg, ${VISUALS.UI.COLORS.danger}, #b71c1c)`,
-            fontSize: VISUALS.UI.FONTS.size.xl,
-            padding: `${VISUALS.UI.SPACING.md}px ${VISUALS.UI.SPACING.xxl}px`,
-            border: `${VISUALS.UI.BORDERS.width.normal} solid ${VISUALS.UI.COLORS.glass.border}`,
-            borderRadius: VISUALS.UI.BORDERS.radius.lg,
-            boxShadow: VISUALS.UI.SHADOWS.glow.danger,
-            width: 'auto'
-        });
+        UIUtils.createButton(
+            this.mapSelectionContainer,
+            'BACK',
+            () => {
+                this.mapSelectionContainer.style.display = 'none';
+                this.container.style.display = 'flex';
+            },
+            {
+                background: `linear-gradient(135deg, ${VISUALS.UI.COLORS.danger}, #b71c1c)`,
+                fontSize: VISUALS.UI.FONTS.size.xl,
+                padding: `${VISUALS.UI.SPACING.md}px ${VISUALS.UI.SPACING.xxl}px`,
+                border: `${VISUALS.UI.BORDERS.width.normal} solid ${VISUALS.UI.COLORS.glass.border}`,
+                borderRadius: VISUALS.UI.BORDERS.radius.lg,
+                boxShadow: VISUALS.UI.SHADOWS.glow.danger,
+                width: 'auto',
+            },
+        );
 
         document.body.appendChild(this.mapSelectionContainer);
     }
@@ -254,7 +275,7 @@ export class MenuScene extends BaseScene {
                 backdropFilter: 'blur(5px)',
                 transition: VISUALS.UI.TRANSITIONS.presets.normal,
                 boxShadow: VISUALS.UI.SHADOWS.md,
-                transform: 'translateZ(0)' // GPU acceleration
+                transform: 'translateZ(0)', // GPU acceleration
             });
 
             // Preview Canvas
@@ -333,7 +354,7 @@ export class MenuScene extends BaseScene {
 
         // Clear all canvas contexts before removing from DOM
         const canvases = listContainer.querySelectorAll('canvas');
-        canvases.forEach(canvas => {
+        canvases.forEach((canvas) => {
             const ctx = canvas.getContext('2d');
             if (ctx) {
                 ctx.clearRect(0, 0, canvas.width, canvas.height);

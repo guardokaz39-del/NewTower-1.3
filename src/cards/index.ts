@@ -16,7 +16,7 @@ import {
     getEvolutionUpgrade,
     getEvolutionMeta,
     IEvolutionPath,
-    IEvolutionChoice
+    IEvolutionChoice,
 } from './CardEvolutions';
 
 // Export types
@@ -33,17 +33,17 @@ export { EVOLUTION_UPGRADES, EVOLUTION_CHOICES, getEvolutionChoice, getEvolution
  * Card upgrade registry (classic paths)
  */
 const CARD_REGISTRY: Record<string, Record<number, IUpgradeCard>> = {
-    'fire': FIRE_UPGRADES,
-    'ice': ICE_UPGRADES,
-    'sniper': SNIPER_UPGRADES,
-    'multi': MULTISHOT_UPGRADES,
-    'minigun': MINIGUN_UPGRADES,
+    fire: FIRE_UPGRADES,
+    ice: ICE_UPGRADES,
+    sniper: SNIPER_UPGRADES,
+    multi: MULTISHOT_UPGRADES,
+    minigun: MINIGUN_UPGRADES,
 };
 
 /**
  * Get upgrade data for a specific card type and level
  * Prioritizes evolution upgrades if evolutionPath is set
- * 
+ *
  * @param cardTypeId - The card type ID (e.g., 'fire', 'ice', 'sniper', 'multi')
  * @param level - The card level (1-3)
  * @param evolutionPath - Optional evolution path ('inferno', 'napalm', etc.)
@@ -73,4 +73,3 @@ export function getCardUpgrade(cardTypeId: string, level: number, evolutionPath?
 
     return upgrade;
 }
-

@@ -43,8 +43,6 @@ export class GameState {
         this.enemyPool = new ObjectPool(() => new Enemy());
     }
 
-
-
     // === Reset (for restart) ===
     public reset(): void {
         this.wave = 0;
@@ -135,7 +133,7 @@ export class GameState {
     }
 
     public toggleTimeScale(): void {
-        this.timeScale = (this.timeScale === 1.0) ? 2.0 : 1.0;
+        this.timeScale = this.timeScale === 1.0 ? 2.0 : 1.0;
     }
 
     // === Game Over ===

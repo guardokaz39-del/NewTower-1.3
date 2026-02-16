@@ -29,12 +29,12 @@ import { GameController } from './GameController';
 
 enum TestPhase {
     IDLE,
-    WARMUP,     // 0-10s
-    PATHING,    // 10-25s
-    PHYSICS,    // 25-40s
-    RENDER,     // 40-55s
-    RAMP_UP,    // Dynamic
-    FINISHED
+    WARMUP, // 0-10s
+    PATHING, // 10-25s
+    PHYSICS, // 25-40s
+    RENDER, // 40-55s
+    RAMP_UP, // Dynamic
+    FINISHED,
 }
 
 export class StressTestScene extends BaseScene implements IGameScene {
@@ -44,21 +44,51 @@ export class StressTestScene extends BaseScene implements IGameScene {
     private _map: MapManager;
 
     // IGameScene proxies to Session
-    public get gameState() { return this.session.gameState; }
-    public get entityManager() { return this.session.entityManager; }
-    public get waveManager() { return this.session.waveManager; }
-    public get projectileSystem() { return this.session.projectileSystem; }
-    public get collision() { return this.session.collision; }
-    public get metrics() { return this.session.metrics; }
-    public get weaponSystem() { return this.session.weaponSystem; }
-    public get cardSys() { return this.session.cardSys; }
-    public get forge() { return this.session.forge; }
-    public get inspector() { return this.session.inspector; }
-    public get bestiary() { return this.session.bestiary; }
-    public get notifications() { return this.session.notifications; }
-    public get acidSystem() { return this.session.acidSystem; }
-    public get commanderSystem() { return this.session.commanderSystem; }
-    public get effects() { return this._effects; } // Local ref or session ref? Session takes effects in constructor.
+    public get gameState() {
+        return this.session.gameState;
+    }
+    public get entityManager() {
+        return this.session.entityManager;
+    }
+    public get waveManager() {
+        return this.session.waveManager;
+    }
+    public get projectileSystem() {
+        return this.session.projectileSystem;
+    }
+    public get collision() {
+        return this.session.collision;
+    }
+    public get metrics() {
+        return this.session.metrics;
+    }
+    public get weaponSystem() {
+        return this.session.weaponSystem;
+    }
+    public get cardSys() {
+        return this.session.cardSys;
+    }
+    public get forge() {
+        return this.session.forge;
+    }
+    public get inspector() {
+        return this.session.inspector;
+    }
+    public get bestiary() {
+        return this.session.bestiary;
+    }
+    public get notifications() {
+        return this.session.notifications;
+    }
+    public get acidSystem() {
+        return this.session.acidSystem;
+    }
+    public get commanderSystem() {
+        return this.session.commanderSystem;
+    }
+    public get effects() {
+        return this._effects;
+    } // Local ref or session ref? Session takes effects in constructor.
 
     public ui: UIManager;
     public events: EventEmitter;
@@ -66,8 +96,14 @@ export class StressTestScene extends BaseScene implements IGameScene {
     // Visual Systems (Stubs or minimal impl)
     public gameController: GameController;
     public dayTime: number = 0;
-    public fog: any = { update: () => { }, draw: () => { } };
-    public lighting: any = { update: () => { }, render: () => { }, clear: () => { }, resize: () => { }, addLight: () => { } };
+    public fog: any = { update: () => {}, draw: () => {} };
+    public lighting: any = {
+        update: () => {},
+        render: () => {},
+        clear: () => {},
+        resize: () => {},
+        addLight: () => {},
+    };
     public dayNightCycle: any = {};
     public atmosphere: any = {};
     public input: any = { hoverCol: -1, hoverRow: -1 };
@@ -87,32 +123,55 @@ export class StressTestScene extends BaseScene implements IGameScene {
     private lastFps: number = 60;
 
     // IGameScene Props
-    public get wave() { return this.session.waveManager.isWaveActive ? this.session.gameState.wave : 0; }
-    public set wave(v: number) { this.session.gameState.wave = v; } // Setter needed?
-    public get money() { return this.session.gameState.money; }
-    public get lives() { return this.session.gameState.lives; }
-    public get startingLives() { return this.session.gameState.startingLives; }
-    public get enemies() { return this.session.gameState.enemies; }
-    public get towers() { return this.session.gameState.towers; }
-    public get projectiles() { return this.session.projectileSystem.projectiles; }
+    public get wave() {
+        return this.session.waveManager.isWaveActive ? this.session.gameState.wave : 0;
+    }
+    public set wave(v: number) {
+        this.session.gameState.wave = v;
+    } // Setter needed?
+    public get money() {
+        return this.session.gameState.money;
+    }
+    public get lives() {
+        return this.session.gameState.lives;
+    }
+    public get startingLives() {
+        return this.session.gameState.startingLives;
+    }
+    public get enemies() {
+        return this.session.gameState.enemies;
+    }
+    public get towers() {
+        return this.session.gameState.towers;
+    }
+    public get projectiles() {
+        return this.session.projectileSystem.projectiles;
+    }
 
     // Methods
-    public spawnEnemy(type: string) { this.session.gameState.enemies.push(new Enemy()); } // Stub-ish
-    public showFloatingText(text: string, x: number, y: number, color?: string) { }
-    public handleCardDrop(card: ICard, x: number, y: number): boolean { return false; }
-    public giveRandomCard() { }
-    public sellTower(tower: Tower) { }
-    public sellCardFromTower(tower: Tower, cardIndex: number) { }
-    public restart() { }
-    public togglePause() { }
-    public addMoney(amount: number) { this.session.gameState.money += amount; }
-    public spendMoney(amount: number): boolean { return true; }
-    public loseLife(amount?: number) { }
-    public startBuildingTower(col: number, row: number) { }
-    public handleGridClick(col: number, row: number) { }
-    public gameOver() { }
-    public triggerShake(duration: number, intensity: number) { }
-
+    public spawnEnemy(type: string) {
+        this.session.gameState.enemies.push(new Enemy());
+    } // Stub-ish
+    public showFloatingText(text: string, x: number, y: number, color?: string) {}
+    public handleCardDrop(card: ICard, x: number, y: number): boolean {
+        return false;
+    }
+    public giveRandomCard() {}
+    public sellTower(tower: Tower) {}
+    public sellCardFromTower(tower: Tower, cardIndex: number) {}
+    public restart() {}
+    public togglePause() {}
+    public addMoney(amount: number) {
+        this.session.gameState.money += amount;
+    }
+    public spendMoney(amount: number): boolean {
+        return true;
+    }
+    public loseLife(amount?: number) {}
+    public startBuildingTower(col: number, row: number) {}
+    public handleGridClick(col: number, row: number) {}
+    public gameOver() {}
+    public triggerShake(duration: number, intensity: number) {}
 
     constructor(game: Game) {
         super();
@@ -120,9 +179,11 @@ export class StressTestScene extends BaseScene implements IGameScene {
         this.mapData = {
             width: 20,
             height: 20,
-            tiles: Array(20).fill(0).map(() => Array(20).fill(0)),
+            tiles: Array(20)
+                .fill(0)
+                .map(() => Array(20).fill(0)),
             waypoints: [],
-            objects: []
+            objects: [],
         };
         this.rng = new SeededRandom(12345);
 
@@ -132,7 +193,7 @@ export class StressTestScene extends BaseScene implements IGameScene {
         // Init Map
         this._map = new MapManager(this.mapData);
         const mapManager = this._map;
-        // We need to expose mapManager as 'map' property if we want consistency, 
+        // We need to expose mapManager as 'map' property if we want consistency,
         // but for now let's just use it to init session.
         // Wait, StressTestScene uses 'this.map' later.
 
@@ -152,7 +213,10 @@ export class StressTestScene extends BaseScene implements IGameScene {
                 }
             }
         }
-        this.mapData.waypoints = [{ x: 0, y: 10 }, { x: 19, y: 10 }];
+        this.mapData.waypoints = [
+            { x: 0, y: 10 },
+            { x: 19, y: 10 },
+        ];
         mapManager.waypoints = this.mapData.waypoints;
 
         // UI
@@ -163,7 +227,9 @@ export class StressTestScene extends BaseScene implements IGameScene {
     }
 
     // Helper to expose map for existing code
-    public get map() { return this._map; }
+    public get map() {
+        return this._map;
+    }
 
     protected onEnterImpl() {
         // Create Overlay
@@ -179,7 +245,7 @@ export class StressTestScene extends BaseScene implements IGameScene {
         this.map.requestFlowFieldUpdate();
         this.map.update(0);
 
-        console.log("Stress Test Started");
+        console.log('Stress Test Started');
     }
 
     protected onExitImpl() {
@@ -201,7 +267,7 @@ export class StressTestScene extends BaseScene implements IGameScene {
 
         // Emergency Stop Logic
         if (this.timer > 5 && currentFps < 5 && this.phase !== TestPhase.FINISHED) {
-            console.warn("Emergency Stop: FPS too low");
+            console.warn('Emergency Stop: FPS too low');
             this.finishTest();
             return;
         }
@@ -232,11 +298,10 @@ export class StressTestScene extends BaseScene implements IGameScene {
             this.gameState.enemies,
             this.projectileSystem,
             dt,
-            this.effects
+            this.effects,
         );
         PerformanceProfiler.end('Entities');
         PerformanceProfiler.end('Logic'); // End 'Logic' block
-
 
         // 3. Collision & Grid
         PerformanceProfiler.start('Collision');
@@ -248,7 +313,6 @@ export class StressTestScene extends BaseScene implements IGameScene {
         PerformanceProfiler.start('Logic'); // Projectiles move is logic
         this.projectileSystem.update(dt, this.effects);
         PerformanceProfiler.end('Logic');
-
 
         // 5. Render
         // Note: Actual rendering happens in draw(), here we just might simulate load or update effects
@@ -334,14 +398,15 @@ export class StressTestScene extends BaseScene implements IGameScene {
                     // Spawn Particles continuously
                     // We want to force Draw Calls
                     PerformanceProfiler.start('Logic'); // Creating them is logic
-                    for (let i = 0; i < 30; i++) { // Increased to 30 to ensure load
+                    for (let i = 0; i < 30; i++) {
+                        // Increased to 30 to ensure load
                         this.effects.add({
                             type: 'particle',
                             x: this.rng.rangeFloat(0, this.game.width),
                             y: this.rng.rangeFloat(0, this.game.height),
                             life: 0.8,
                             color: this.rng.chance(0.5) ? '#fff' : '#ff0000',
-                            size: 4
+                            size: 4,
                         });
                     }
                     PerformanceProfiler.end('Logic');
@@ -384,7 +449,7 @@ export class StressTestScene extends BaseScene implements IGameScene {
         e.init({
             health: 100, // Dummy stats
             speed: 50,
-            path: this.map.waypoints
+            path: this.map.waypoints,
         });
         e.setType(type);
 
@@ -423,7 +488,7 @@ export class StressTestScene extends BaseScene implements IGameScene {
                     id: `dummy_${count}`,
                     type: CONFIG.CARD_TYPES['MINIGUN'], // We assume CONFIG is available and has MINIGUN
                     level: 1,
-                    isDragging: false
+                    isDragging: false,
                 };
 
                 t.addCard(card);
@@ -446,7 +511,7 @@ export class StressTestScene extends BaseScene implements IGameScene {
 
             // Toggle between Grass(0) and Wall(undefined/Object?)
             const current = this.mapData.tiles[y][x];
-            this.mapData.tiles[y][x] = (current === 0) ? 2 : 0;
+            this.mapData.tiles[y][x] = current === 0 ? 2 : 0;
             this.map.grid[y][x].type = this.mapData.tiles[y][x];
         }
     }
@@ -494,7 +559,10 @@ export class StressTestScene extends BaseScene implements IGameScene {
         PerformanceProfiler.end('Render');
 
         // Log to StressLogger at END of frame (after Render)
-        const totalEntities = this.gameState.enemies.length + this.projectileSystem.projectiles.length + this.effects.activeEffects.length;
+        const totalEntities =
+            this.gameState.enemies.length +
+            this.projectileSystem.projectiles.length +
+            this.effects.activeEffects.length;
         StressLogger.logFrame(this.lastDt, this.lastFps, totalEntities);
     }
 
@@ -512,7 +580,7 @@ export class StressTestScene extends BaseScene implements IGameScene {
             border: '2px solid #0f0',
             borderRadius: '8px',
             zIndex: '9999',
-            boxShadow: '0 0 10px rgba(0, 255, 0, 0.2)'
+            boxShadow: '0 0 10px rgba(0, 255, 0, 0.2)',
         });
         document.body.appendChild(this.uiOverlay);
     }
@@ -526,7 +594,9 @@ export class StressTestScene extends BaseScene implements IGameScene {
         const particles = this.effects.activeEffects.length;
 
         // Memory
-        const mem = (performance as any).memory ? Math.round((performance as any).memory.usedJSHeapSize / 1024 / 1024) : 0;
+        const mem = (performance as any).memory
+            ? Math.round((performance as any).memory.usedJSHeapSize / 1024 / 1024)
+            : 0;
 
         const data = PerformanceProfiler.getFrameData();
         const minFps = data['fps_min'] || 0;
@@ -535,8 +605,7 @@ export class StressTestScene extends BaseScene implements IGameScene {
         // StressLogger calculates minFps for the report.
         // We can just show current FPS which is fine for overlay.
 
-        this.uiOverlay.innerText =
-            `--- DEEP STRESS TEST ---
+        this.uiOverlay.innerText = `--- DEEP STRESS TEST ---
 PHASE: ${phaseName}
 TIME:  ${this.timer.toFixed(1)}s
 FPS:   ${fps.toFixed(0)}
@@ -558,11 +627,12 @@ MEM:   ${mem} MB
         this.uiOverlay.style.textAlign = 'center';
 
         const title = document.createElement('h2');
-        title.innerText = "TEST COMPLETE";
+        title.innerText = 'TEST COMPLETE';
         title.style.color = '#fff';
         this.uiOverlay.appendChild(title);
 
-        const btnStyle = "background:#444; color:#fff; border:1px solid #888; padding:10px 20px; font-size:16px; margin:5px; cursor:pointer;";
+        const btnStyle =
+            'background:#444; color:#fff; border:1px solid #888; padding:10px 20px; font-size:16px; margin:5px; cursor:pointer;';
 
         const createBtn = (text: string, onClick: () => void) => {
             const btn = document.createElement('button');
@@ -572,22 +642,28 @@ MEM:   ${mem} MB
             return btn;
         };
 
-        this.uiOverlay.appendChild(createBtn("COPY REPORT (MD)", () => {
-            navigator.clipboard.writeText(report);
-            alert("Markdown Report copied!");
-        }));
+        this.uiOverlay.appendChild(
+            createBtn('COPY REPORT (MD)', () => {
+                navigator.clipboard.writeText(report);
+                alert('Markdown Report copied!');
+            }),
+        );
 
         this.uiOverlay.appendChild(document.createElement('br'));
 
-        this.uiOverlay.appendChild(createBtn("COPY JSON", () => {
-            navigator.clipboard.writeText(json);
-            alert("JSON copied!");
-        }));
+        this.uiOverlay.appendChild(
+            createBtn('COPY JSON', () => {
+                navigator.clipboard.writeText(json);
+                alert('JSON copied!');
+            }),
+        );
 
         this.uiOverlay.appendChild(document.createElement('br'));
 
-        this.uiOverlay.appendChild(createBtn("EXIT TO MENU", () => {
-            this.game.toMenu();
-        }));
+        this.uiOverlay.appendChild(
+            createBtn('EXIT TO MENU', () => {
+                this.game.toMenu();
+            }),
+        );
     }
 }

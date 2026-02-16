@@ -21,7 +21,7 @@ import { EventBus, Events } from '../EventBus';
  */
 export class GameController {
     private recentActionIds: Set<string> = new Set();
-    private unsubCardDrop: () => void = () => { };
+    private unsubCardDrop: () => void = () => {};
 
     // Bound handler for safe unsubscription
     private onCardDropped = (data: any) => {
@@ -59,7 +59,7 @@ export class GameController {
         this.unsubCardDrop();
     }
 
-    public handleMenuAction(action: { type: 'UNLOCK' | 'CLICK_SLOT' | 'REMOVE_CARD', slotId: number }, tower: Tower) {
+    public handleMenuAction(action: { type: 'UNLOCK' | 'CLICK_SLOT' | 'REMOVE_CARD'; slotId: number }, tower: Tower) {
         if (action.type === 'UNLOCK') {
             const cost = CONFIG.ECONOMY.SLOT_UNLOCK_COST[action.slotId];
             if (this.state.money >= cost) {
@@ -74,7 +74,7 @@ export class GameController {
             }
         } else if (action.type === 'REMOVE_CARD') {
             // Immediate removal (used by Inspector) -> SELLS the card
-            const slot = tower.slots.find(s => s.id === action.slotId);
+            const slot = tower.slots.find((s) => s.id === action.slotId);
             if (slot && slot.card) {
                 const card = tower.removeCardFromSlot(action.slotId);
                 if (card) {
@@ -101,7 +101,7 @@ export class GameController {
             } else {
                 // Second click on SAME slot -> Action (Remove Card)
                 // Only if there is a card
-                const slot = tower.slots.find(s => s.id === action.slotId);
+                const slot = tower.slots.find((s) => s.id === action.slotId);
                 if (slot && slot.card) {
                     const card = tower.removeCardFromSlot(action.slotId);
                     if (card) {
@@ -126,20 +126,18 @@ export class GameController {
         const screenX = col * CONFIG.TILE_SIZE + CONFIG.TILE_SIZE / 2;
         const screenY = row * CONFIG.TILE_SIZE + CONFIG.TILE_SIZE / 2;
 
-
-
         const validation = this.entityManager.canBuildTower(col, row, this.mapData, this.isBuildable);
 
         if (this.map.flowField) {
             // Retrieve spawn points from map waypoints (usually first point is spawn)
             // But we might need all spawns if multiple.
-            // For now, assuming first waypoint is spawn. 
+            // For now, assuming first waypoint is spawn.
             const spawns = this.map.waypoints.length > 0 ? [this.map.waypoints[0]] : [];
 
             // Check if blocking
             const isSafe = this.map.flowField.checkBuildability(this.map.grid, col, row, spawns);
             if (!isSafe) {
-                this.showFloatingText("Path Blocked!", screenX, screenY, 'red');
+                this.showFloatingText('Path Blocked!', screenX, screenY, 'red');
                 return;
             }
         }

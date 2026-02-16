@@ -26,21 +26,27 @@ export class NotificationSystem {
     private initSubscriptions() {
         const bus = EventBus.getInstance();
 
-        this.unsubs.push(bus.on(Events.WAVE_STARTED, (wave: number) => {
-            this.showWaveStart(wave);
-        }));
+        this.unsubs.push(
+            bus.on(Events.WAVE_STARTED, (wave: number) => {
+                this.showWaveStart(wave);
+            }),
+        );
 
-        this.unsubs.push(bus.on(Events.WAVE_COMPLETED, (wave: number) => {
-            this.showWaveClear(wave);
-        }));
+        this.unsubs.push(
+            bus.on(Events.WAVE_COMPLETED, (wave: number) => {
+                this.showWaveClear(wave);
+            }),
+        );
 
-        this.unsubs.push(bus.on(Events.ENEMY_IMMUNE, (data: { x: number; y: number }) => {
-            this.showImmune(data.x, data.y);
-        }));
+        this.unsubs.push(
+            bus.on(Events.ENEMY_IMMUNE, (data: { x: number; y: number }) => {
+                this.showImmune(data.x, data.y);
+            }),
+        );
     }
 
     public destroy() {
-        this.unsubs.forEach(u => u());
+        this.unsubs.forEach((u) => u());
         this.unsubs = [];
     }
 
@@ -60,7 +66,7 @@ export class NotificationSystem {
             life: 1.5, // 90 frames
             color: '#fff',
             fontSize: 48,
-            vy: 0
+            vy: 0,
         });
 
         // Subtitle
@@ -72,7 +78,7 @@ export class NotificationSystem {
             life: 1.1, // 70 frames
             color: '#ff5722',
             fontSize: 24,
-            vy: 0
+            vy: 0,
         });
 
         // Screen flash (red tint)
@@ -81,7 +87,7 @@ export class NotificationSystem {
             x: 0,
             y: 0,
             life: 25,
-            flashColor: 'rgba(255, 50, 50, '
+            flashColor: 'rgba(255, 50, 50, ',
         });
 
         // Sound
@@ -104,7 +110,7 @@ export class NotificationSystem {
             life: 1.3, // 80 frames
             color: '#ffd700',
             fontSize: 36,
-            vy: -30 // -0.5 * 60
+            vy: -30, // -0.5 * 60
         });
 
         // Gold screen flash
@@ -113,7 +119,7 @@ export class NotificationSystem {
             x: 0,
             y: 0,
             life: 20,
-            flashColor: 'rgba(255, 215, 0, '
+            flashColor: 'rgba(255, 215, 0, ',
         });
 
         // Confetti particles
@@ -139,7 +145,7 @@ export class NotificationSystem {
             life: 2.0, // 120
             color: '#ff0000',
             fontSize: 42,
-            vy: 0
+            vy: 0,
         });
 
         // Boss name
@@ -151,7 +157,7 @@ export class NotificationSystem {
             life: 1.6, // 100
             color: '#fff',
             fontSize: 28,
-            vy: 0
+            vy: 0,
         });
 
         // Dark flash
@@ -160,7 +166,7 @@ export class NotificationSystem {
             x: 0,
             y: 0,
             life: 40,
-            flashColor: 'rgba(0, 0, 0, '
+            flashColor: 'rgba(0, 0, 0, ',
         });
 
         // Sound
@@ -186,7 +192,7 @@ export class NotificationSystem {
                 vy: Math.sin(angle) * speed - 120, // Bias upward (2 * 60)
                 life: 0.6 + Math.random() * 0.5, // 40-70 frames
                 color: color,
-                radius: 3 + Math.random() * 3
+                radius: 3 + Math.random() * 3,
             });
         }
     }
@@ -206,7 +212,7 @@ export class NotificationSystem {
             life: duration,
             color: color,
             fontSize: 32,
-            vy: -0.5
+            vy: -0.5,
         });
     }
 
@@ -219,7 +225,7 @@ export class NotificationSystem {
             life: 0.6,
             color: '#ffd700', // Gold
             fontSize: 16, // Smaller than boss text
-            vy: -50 // Float up fast
+            vy: -50, // Float up fast
         });
     }
 }

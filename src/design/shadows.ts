@@ -15,6 +15,6 @@ export const UI_SHADOWS = {
     glow: {
         primary: '0 4px 15px rgba(0, 255, 255, 0.4)',
         success: '0 4px 15px rgba(76, 175, 80, 0.4)',
-        danger: '0 4px 15px rgba(211, 47, 47, 0.5)'
-    }
+        danger: '0 4px 15px rgba(211, 47, 47, 0.5)',
+    },
 } as const;

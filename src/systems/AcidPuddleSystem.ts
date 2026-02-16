@@ -26,7 +26,7 @@ export class AcidPuddle {
             this.healTimer = 0;
             const healAmountPercent = 0.03;
 
-            enemies.forEach(e => {
+            enemies.forEach((e) => {
                 if (!e.isAlive() || e.finished) return;
 
                 const dist = Math.hypot(e.x - this.x, e.y - this.y);
@@ -87,7 +87,7 @@ export class AcidPuddleSystem {
             puddle.update(dt, enemies);
         }
         // Remove expired
-        this.puddles = this.puddles.filter(p => !p.isExpired());
+        this.puddles = this.puddles.filter((p) => !p.isExpired());
     }
 
     public draw() {
@@ -96,9 +96,9 @@ export class AcidPuddleSystem {
         this.ctx.save();
 
         // Toxic Sludge Colors
-        const LIQUID_COLOR = '#33691e';      // Dark swampy base
-        const LIQUID_MID = '#64dd17';        // Poison green mid
-        const LIQUID_HIGHLIGHT = '#ccff90';  // Pale toxic top
+        const LIQUID_COLOR = '#33691e'; // Dark swampy base
+        const LIQUID_MID = '#64dd17'; // Poison green mid
+        const LIQUID_HIGHLIGHT = '#ccff90'; // Pale toxic top
 
         for (const p of this.puddles) {
             const time = Date.now() * 0.001;
@@ -129,7 +129,7 @@ export class AcidPuddleSystem {
                 const br = p.radius * (0.6 + Math.sin(seed * i) * 0.2);
 
                 // Draw distorted blob
-                this.ctx.fillStyle = (i % 2 === 0) ? LIQUID_COLOR : LIQUID_MID;
+                this.ctx.fillStyle = i % 2 === 0 ? LIQUID_COLOR : LIQUID_MID;
                 this.ctx.beginPath();
 
                 const segments = 12;

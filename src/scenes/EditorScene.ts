@@ -164,16 +164,17 @@ export class EditorScene extends BaseScene {
             }
         } else if (this.mode === 'eraser') {
             // FEATURE: Eraser - reset to grass, remove fog, and remove objects
-            const hasObject = this.map.objects.find(obj => {
+            const hasObject = this.map.objects.find((obj) => {
                 const size = obj.size || 1;
-                return col >= obj.x && col < obj.x + size &&
-                    row >= obj.y && row < obj.y + size;
+                return col >= obj.x && col < obj.x + size && row >= obj.y && row < obj.y + size;
             });
 
             if (oldTileType !== 0 || oldFogDensity !== 0 || hasObject) {
                 // Сброс тайла в траву
                 if (oldTileType !== 0) {
-                    this.history.pushInCompound(EditorActions.createTileAction(this.map.grid, col, row, oldTileType, 0));
+                    this.history.pushInCompound(
+                        EditorActions.createTileAction(this.map.grid, col, row, oldTileType, 0),
+                    );
                     this.map.grid[row][col].type = 0;
                     this.map.grid[row][col].decor = null;
                     Pathfinder.invalidateCache();
@@ -185,10 +186,9 @@ export class EditorScene extends BaseScene {
                 }
                 // Удаление объектов (все объекты, перекрывающие этот тайл)
                 if (hasObject) {
-                    this.map.objects = this.map.objects.filter(obj => {
+                    this.map.objects = this.map.objects.filter((obj) => {
                         const size = obj.size || 1;
-                        const overlaps = col >= obj.x && col < obj.x + size &&
-                            row >= obj.y && row < obj.y + size;
+                        const overlaps = col >= obj.x && col < obj.x + size && row >= obj.y && row < obj.y + size;
                         return !overlaps;
                     });
                 }
@@ -197,18 +197,22 @@ export class EditorScene extends BaseScene {
             const oldState = {
                 start: this.waypointMgr.getStart(),
                 end: this.waypointMgr.getEnd(),
-                waypoints: this.waypointMgr.getWaypoints()
+                waypoints: this.waypointMgr.getWaypoints(),
             };
-            this.history.push(EditorActions.createWaypointAction(this.waypointMgr, 'setStart', { x: col, y: row }, oldState));
+            this.history.push(
+                EditorActions.createWaypointAction(this.waypointMgr, 'setStart', { x: col, y: row }, oldState),
+            );
             this.waypointMgr.setStart({ x: col, y: row });
             this.map.grid[row][col].type = 1;
         } else if (this.mode === 'set_end') {
             const oldState = {
                 start: this.waypointMgr.getStart(),
                 end: this.waypointMgr.getEnd(),
-                waypoints: this.waypointMgr.getWaypoints()
+                waypoints: this.waypointMgr.getWaypoints(),
             };
-            this.history.push(EditorActions.createWaypointAction(this.waypointMgr, 'setEnd', { x: col, y: row }, oldState));
+            this.history.push(
+                EditorActions.createWaypointAction(this.waypointMgr, 'setEnd', { x: col, y: row }, oldState),
+            );
             this.waypointMgr.setEnd({ x: col, y: row });
             this.map.grid[row][col].type = 1;
         } else if (this.mode === 'place_waypoint') {
@@ -216,9 +220,11 @@ export class EditorScene extends BaseScene {
                 const oldState = {
                     start: this.waypointMgr.getStart(),
                     end: this.waypointMgr.getEnd(),
-                    waypoints: this.waypointMgr.getWaypoints()
+                    waypoints: this.waypointMgr.getWaypoints(),
                 };
-                this.history.push(EditorActions.createWaypointAction(this.waypointMgr, 'addWaypoint', { x: col, y: row }, oldState));
+                this.history.push(
+                    EditorActions.createWaypointAction(this.waypointMgr, 'addWaypoint', { x: col, y: row }, oldState),
+                );
                 this.waypointMgr.addWaypoint({ x: col, y: row });
             }
         } else if (this.mode === 'paint_fog') {
@@ -226,7 +232,9 @@ export class EditorScene extends BaseScene {
             this.fog.cycleFogDensity(col, row);
             const newFogDensity = this.fog.getFog(col, row);
             if (oldFogDensity !== newFogDensity) {
-                this.history.pushInCompound(EditorActions.createFogAction(this.fog, col, row, oldFogDensity, newFogDensity));
+                this.history.pushInCompound(
+                    EditorActions.createFogAction(this.fog, col, row, oldFogDensity, newFogDensity),
+                );
             }
         } else if (this.mode === 'place_stone') {
             this.placeObject(col, row, 'stone', 1);
@@ -253,11 +261,15 @@ export class EditorScene extends BaseScene {
         }
 
         // Удалить существующие объекты в этой области
-        this.map.objects = this.map.objects.filter(obj => {
+        this.map.objects = this.map.objects.filter((obj) => {
             const objSize = obj.size || 1;
             // Проверка пересечения
-            const overlaps = !(col + size <= obj.x || col >= obj.x + objSize ||
-                row + size <= obj.y || row >= obj.y + objSize);
+            const overlaps = !(
+                col + size <= obj.x ||
+                col >= obj.x + objSize ||
+                row + size <= obj.y ||
+                row >= obj.y + objSize
+            );
             return !overlaps;
         });
 
@@ -267,7 +279,7 @@ export class EditorScene extends BaseScene {
             x: col,
             y: row,
             properties: {},
-            size: size > 1 ? size : undefined
+            size: size > 1 ? size : undefined,
         };
         this.map.objects.push(newObj);
     }
@@ -293,7 +305,6 @@ export class EditorScene extends BaseScene {
 
         // Draw waypoints with WaypointManager
         this.waypointMgr.draw(ctx);
-
 
         const input = this.game.input;
         if (input.hoverCol >= 0) {
@@ -370,7 +381,7 @@ export class EditorScene extends BaseScene {
         Pathfinder.invalidateCache(); // Ensure fresh BFS
         const errors = this.map.validatePath();
         if (errors.length > 0) {
-            const reasons = errors.map(e => `  (${e.x},${e.y}): ${e.reason}`).join('\n');
+            const reasons = errors.map((e) => `  (${e.x},${e.y}): ${e.reason}`).join('\n');
             alert(`Cannot save map — path validation failed:\n${reasons}`);
             return;
         }
@@ -409,7 +420,7 @@ export class EditorScene extends BaseScene {
             padding: '10px',
             background: 'rgba(0,0,0,0.85)',
             borderRadius: '8px',
-            zIndex: '1000'
+            zIndex: '1000',
         });
 
         const addBtn = (text: string, onClick: () => void, color: string = '#444') => {
@@ -420,13 +431,17 @@ export class EditorScene extends BaseScene {
                 borderRadius: '6px',
                 fontSize: '14px',
                 fontWeight: 'bold',
-                width: '100%'
+                width: '100%',
             });
         };
 
-        addBtn('🗑️ Clear Path', () => {
-            this.waypointMgr.clearAll();
-        }, '#e91e63');
+        addBtn(
+            '🗑️ Clear Path',
+            () => {
+                this.waypointMgr.clearAll();
+            },
+            '#e91e63',
+        );
 
         addBtn('⚙️ WAVES & SAVE', () => this.openWaveConfig(), '#ff9800');
         addBtn('🚪 MENU', () => this.game.toMenu(), '#d32f2f');
@@ -447,7 +462,7 @@ export class EditorScene extends BaseScene {
             maxHeight: '80vh',
             overflowY: 'auto',
             display: 'none',
-            zIndex: '2000'
+            zIndex: '2000',
         });
 
         const header = document.createElement('div');
@@ -492,7 +507,6 @@ export class EditorScene extends BaseScene {
         `;
 
         if (!this.mapsPanelExpanded) return;
-
 
         const mapNames = Object.keys(maps);
 
@@ -657,7 +671,6 @@ export class EditorScene extends BaseScene {
     }
 
     private isPaintMode(mode: EditorMode): boolean {
-        return mode === 'paint_road' || mode === 'paint_grass' ||
-            mode === 'eraser' || mode === 'paint_fog';
+        return mode === 'paint_road' || mode === 'paint_grass' || mode === 'eraser' || mode === 'paint_fog';
     }
 }

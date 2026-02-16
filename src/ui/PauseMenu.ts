@@ -60,7 +60,7 @@ export class PauseMenu {
             borderRadius: '8px',
             border: '2px solid #555',
             textAlign: 'center',
-            minWidth: '300px'
+            minWidth: '300px',
         });
 
         content.innerHTML = `
@@ -69,25 +69,54 @@ export class PauseMenu {
         `;
 
         // Continue
-        UIUtils.createButton(content, 'Continue', () => {
-            SoundManager.play('click', SoundPriority.HIGH);
-            this.scene.togglePause();
-        }, { background: '#4caf50', width: '100%', padding: '12px', fontSize: '16px', border: 'none' });
+        UIUtils.createButton(
+            content,
+            'Continue',
+            () => {
+                SoundManager.play('click', SoundPriority.HIGH);
+                this.scene.togglePause();
+            },
+            { background: '#4caf50', width: '100%', padding: '12px', fontSize: '16px', border: 'none' },
+        );
 
         content.appendChild(document.createElement('br'));
 
         // Settings
-        UIUtils.createButton(content, 'Settings', () => {
-            SoundManager.play('click', SoundPriority.HIGH);
-            this.renderSettings(menu);
-        }, { background: '#2196f3', width: '100%', padding: '12px', fontSize: '16px', border: 'none', marginTop: '10px' });
+        UIUtils.createButton(
+            content,
+            'Settings',
+            () => {
+                SoundManager.play('click', SoundPriority.HIGH);
+                this.renderSettings(menu);
+            },
+            {
+                background: '#2196f3',
+                width: '100%',
+                padding: '12px',
+                fontSize: '16px',
+                border: 'none',
+                marginTop: '10px',
+            },
+        );
 
         // Exit
-        UIUtils.createButton(content, 'Exit to Menu', () => {
-            SoundManager.play('click', SoundPriority.HIGH);
-            this.scene.togglePause();
-            this.scene.game.toMenu();
-        }, { background: '#f44336', width: '100%', padding: '12px', fontSize: '16px', border: 'none', marginTop: '10px' });
+        UIUtils.createButton(
+            content,
+            'Exit to Menu',
+            () => {
+                SoundManager.play('click', SoundPriority.HIGH);
+                this.scene.togglePause();
+                this.scene.game.toMenu();
+            },
+            {
+                background: '#f44336',
+                width: '100%',
+                padding: '12px',
+                fontSize: '16px',
+                border: 'none',
+                marginTop: '10px',
+            },
+        );
 
         menu.appendChild(content);
     }
@@ -101,7 +130,7 @@ export class PauseMenu {
             borderRadius: '8px',
             border: '2px solid #555',
             textAlign: 'center',
-            minWidth: '300px'
+            minWidth: '300px',
         });
 
         content.innerHTML = `<h2 style="color:#ffd700; margin:0 0 20px 0;">Audio Settings</h2>`;
@@ -125,14 +154,19 @@ export class PauseMenu {
         };
 
         addSlider('Master', SoundManager.MASTER_VOLUME, (v) => SoundManager.setVolume(v));
-        addSlider('SFX', SoundManager.SFX_VOLUME, (v) => SoundManager.SFX_VOLUME = v);
-        addSlider('Music', SoundManager.MUSIC_VOLUME, (v) => SoundManager.MUSIC_VOLUME = v);
+        addSlider('SFX', SoundManager.SFX_VOLUME, (v) => (SoundManager.SFX_VOLUME = v));
+        addSlider('Music', SoundManager.MUSIC_VOLUME, (v) => (SoundManager.MUSIC_VOLUME = v));
 
         // Back button
-        UIUtils.createButton(content, 'Back', () => {
-            SoundManager.play('click', SoundPriority.HIGH);
-            this.renderMainMenu(menu);
-        }, { background: '#555', marginTop: '20px', width: '100%', padding: '10px', border: 'none' });
+        UIUtils.createButton(
+            content,
+            'Back',
+            () => {
+                SoundManager.play('click', SoundPriority.HIGH);
+                this.renderMainMenu(menu);
+            },
+            { background: '#555', marginTop: '20px', width: '100%', padding: '10px', border: 'none' },
+        );
 
         menu.appendChild(content);
     }

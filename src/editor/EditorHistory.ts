@@ -94,7 +94,7 @@ export class EditorHistory {
                 for (let i = 0; i < actions.length; i++) {
                     actions[i].redo();
                 }
-            }
+            },
         });
     }
 
@@ -114,13 +114,7 @@ export class EditorActions {
     /**
      * Create a tile change action
      */
-    static createTileAction(
-        grid: any[][],
-        col: number,
-        row: number,
-        oldType: number,
-        newType: number
-    ): IEditorAction {
+    static createTileAction(grid: any[][], col: number, row: number, oldType: number, newType: number): IEditorAction {
         return {
             type: 'tile',
             undo: () => {
@@ -128,20 +122,14 @@ export class EditorActions {
             },
             redo: () => {
                 grid[row][col].type = newType;
-            }
+            },
         };
     }
 
     /**
      * Create a fog change action
      */
-    static createFogAction(
-        fog: any,
-        col: number,
-        row: number,
-        oldDensity: number,
-        newDensity: number
-    ): IEditorAction {
+    static createFogAction(fog: any, col: number, row: number, oldDensity: number, newDensity: number): IEditorAction {
         return {
             type: 'fog',
             undo: () => {
@@ -149,7 +137,7 @@ export class EditorActions {
             },
             redo: () => {
                 fog.setFog(col, row, newDensity);
-            }
+            },
         };
     }
 
@@ -160,7 +148,7 @@ export class EditorActions {
         waypointMgr: any,
         actionType: 'addWaypoint' | 'setStart' | 'setEnd',
         position: { x: number; y: number },
-        oldState?: any
+        oldState?: any,
     ): IEditorAction {
         return {
             type: 'waypoint',
@@ -181,7 +169,7 @@ export class EditorActions {
                 } else if (actionType === 'setEnd') {
                     waypointMgr.setEnd(position);
                 }
-            }
+            },
         };
     }
 }

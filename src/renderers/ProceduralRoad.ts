@@ -4,7 +4,7 @@ import { VISUALS } from '../VisualConfig';
 /**
  * Процедурный рендеринг каменной дороги
  * Использует битмаскинг для плавного соединения плит
- * 
+ *
  * Основные характеристики:
  * - Светло-бежевый камень с вариациями
  * - Трещины (2-4 на плиту)
@@ -20,12 +20,7 @@ export class ProceduralRoad {
      * @param y Pixel Y (кратно TILE_SIZE)
      * @param bitmask Битмаска соседей 0-15 (NORTH|WEST|EAST|SOUTH)
      */
-    public static draw(
-        ctx: CanvasRenderingContext2D,
-        x: number,
-        y: number,
-        bitmask: number
-    ): void {
+    public static draw(ctx: CanvasRenderingContext2D, x: number, y: number, bitmask: number): void {
         const TS = CONFIG.TILE_SIZE;
         const col = Math.floor(x / TS);
         const row = Math.floor(y / TS);
@@ -46,21 +41,15 @@ export class ProceduralRoad {
     /**
      * Слой 1: Базовая текстура камня
      */
-    private static drawBaseTile(
-        ctx: CanvasRenderingContext2D,
-        x: number,
-        y: number,
-        size: number,
-        seed: number
-    ): void {
+    private static drawBaseTile(ctx: CanvasRenderingContext2D, x: number, y: number, size: number, seed: number): void {
         // Вариация яркости: ±10%
         const brightness = 0.9 + (seed % 20) * 0.01; // 0.9 - 1.09
 
         // Выбрать базовый оттенок
         const baseColors = [
-            VISUALS.ENVIRONMENT.PATH.STONE_BASE,   // #c5b8a1
-            VISUALS.ENVIRONMENT.PATH.STONE_LIGHT,  // #d4c5a9
-            VISUALS.ENVIRONMENT.PATH.STONE_DARK    // #b6a890
+            VISUALS.ENVIRONMENT.PATH.STONE_BASE, // #c5b8a1
+            VISUALS.ENVIRONMENT.PATH.STONE_LIGHT, // #d4c5a9
+            VISUALS.ENVIRONMENT.PATH.STONE_DARK, // #b6a890
         ];
         const colorIndex = seed % 3;
         let baseColor = baseColors[colorIndex];
@@ -84,7 +73,7 @@ export class ProceduralRoad {
         x: number,
         y: number,
         size: number,
-        seed: number
+        seed: number,
     ): void {
         const speckCount = 8 + (seed % 8); // 8-15 крапинок
 
@@ -110,7 +99,7 @@ export class ProceduralRoad {
         y: number,
         size: number,
         bitmask: number,
-        seed: number
+        seed: number,
     ): void {
         const NORTH = (bitmask & 1) !== 0;
         const WEST = (bitmask & 2) !== 0;
@@ -156,13 +145,7 @@ export class ProceduralRoad {
     /**
      * Слой 3: Детали (трещины, мох)
      */
-    private static drawDetails(
-        ctx: CanvasRenderingContext2D,
-        x: number,
-        y: number,
-        size: number,
-        seed: number
-    ): void {
+    private static drawDetails(ctx: CanvasRenderingContext2D, x: number, y: number, size: number, seed: number): void {
         // Трещины: 2-4 на плиту
         const crackCount = 2 + (seed % 3); // 2-4
 
@@ -174,7 +157,8 @@ export class ProceduralRoad {
         }
 
         // Мох (опционально, редко): 0-1 пятно
-        if (seed % 5 === 0) { // 20% шанс
+        if (seed % 5 === 0) {
+            // 20% шанс
             this.drawMoss(ctx, x, y, size, seed);
         }
     }
@@ -182,20 +166,14 @@ export class ProceduralRoad {
     /**
      * Рисует одну трещину
      */
-    private static drawCrack(
-        ctx: CanvasRenderingContext2D,
-        x: number,
-        y: number,
-        size: number,
-        seed: number
-    ): void {
+    private static drawCrack(ctx: CanvasRenderingContext2D, x: number, y: number, size: number, seed: number): void {
         // Стартовая точка (край плиты или центр)
         const startX = x + ((seed * 3) % size);
         const startY = y + ((seed * 7) % size);
 
         // Длина трещины: 20-40px
         const length = 20 + (seed % 21);
-        const angle = (seed % 360) * Math.PI / 180;
+        const angle = ((seed % 360) * Math.PI) / 180;
 
         // Конечная точка
         const endX = startX + Math.cos(angle) * length;
@@ -224,23 +202,29 @@ export class ProceduralRoad {
     /**
      * Рисует моховое пятно
      */
-    private static drawMoss(
-        ctx: CanvasRenderingContext2D,
-        x: number,
-        y: number,
-        size: number,
-        seed: number
-    ): void {
+    private static drawMoss(ctx: CanvasRenderingContext2D, x: number, y: number, size: number, seed: number): void {
         // Позиция: угол плиты
         const corner = seed % 4; // 0=NW, 1=NE, 2=SW, 3=SE
         let mossX = x;
         let mossY = y;
 
         switch (corner) {
-            case 0: mossX = x + 5; mossY = y + 5; break;         // NW
-            case 1: mossX = x + size - 10; mossY = y + 5; break; // NE
-            case 2: mossX = x + 5; mossY = y + size - 10; break; // SW
-            case 3: mossX = x + size - 10; mossY = y + size - 10; break; // SE
+            case 0:
+                mossX = x + 5;
+                mossY = y + 5;
+                break; // NW
+            case 1:
+                mossX = x + size - 10;
+                mossY = y + 5;
+                break; // NE
+            case 2:
+                mossX = x + 5;
+                mossY = y + size - 10;
+                break; // SW
+            case 3:
+                mossX = x + size - 10;
+                mossY = y + size - 10;
+                break; // SE
         }
 
         const mossSize = 3 + (seed % 4); // 3-6px

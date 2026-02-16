@@ -129,7 +129,7 @@ export class WaypointManager {
                 color = '#e91e63';
             } else {
                 // Waypoint
-                label = (idx).toString();
+                label = idx.toString();
                 color = '#9c27b0';
             }
 
@@ -142,7 +142,7 @@ export class WaypointManager {
         pos: { x: number; y: number },
         label: string,
         color: string,
-        index: number
+        index: number,
     ): void {
         const wpX = pos.x * CONFIG.TILE_SIZE + CONFIG.TILE_SIZE / 2;
         const wpY = pos.y * CONFIG.TILE_SIZE + CONFIG.TILE_SIZE / 2;
@@ -169,7 +169,7 @@ export class WaypointManager {
     private drawArrow(
         ctx: CanvasRenderingContext2D,
         from: { x: number; y: number },
-        to: { x: number; y: number }
+        to: { x: number; y: number },
     ): void {
         const fromX = from.x * CONFIG.TILE_SIZE + CONFIG.TILE_SIZE / 2;
         const fromY = from.y * CONFIG.TILE_SIZE + CONFIG.TILE_SIZE / 2;

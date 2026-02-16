@@ -19,7 +19,7 @@ export class ShopUI {
     private boundBuy: () => void;
     private boundRefresh: () => void;
     private boundMoneyChanged: (money: number) => void;
-    private unsubMoney: () => void = () => { };
+    private unsubMoney: () => void = () => {};
 
     constructor(scene: IGameScene) {
         this.scene = scene;

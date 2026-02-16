@@ -5,7 +5,7 @@
 export class PerformanceMonitor {
     private static enabled = false;
     private static frameCount = 0;
-    private static fpsTimer = performance.now();    // For FPS calculation (per second)
+    private static fpsTimer = performance.now(); // For FPS calculation (per second)
     private static lastFrameTime = performance.now(); // For frame delta (per frame)
     private static fps = 0;
     // PERF: Ring Buffer instead of array with shift() - O(1) vs O(n)
@@ -20,10 +20,10 @@ export class PerformanceMonitor {
     private static profileData: { timestamp: number; fps: number; entities: number }[] = [];
 
     // Advanced Metrics for Stutter Detection
-    private static worstFrameTime = 0;       // Max frame time in current session
-    private static spikeCount = 0;           // Frames > 33ms (below 30 FPS)
-    private static lastSpikeTime = 0;        // When last spike occurred
-    private static onePercentLowFps = 60;    // 1% low FPS (worst 1%)
+    private static worstFrameTime = 0; // Max frame time in current session
+    private static spikeCount = 0; // Frames > 33ms (below 30 FPS)
+    private static lastSpikeTime = 0; // When last spike occurred
+    private static onePercentLowFps = 60; // 1% low FPS (worst 1%)
 
     // Custom Timers & Counters (Per Frame)
     private static timers: Map<string, number> = new Map();
@@ -47,7 +47,8 @@ export class PerformanceMonitor {
 
         // Track worst frame time and spikes (for stutter detection)
         if (frameDelta > this.worstFrameTime) this.worstFrameTime = frameDelta;
-        if (frameDelta > 33.33) { // Below 30 FPS
+        if (frameDelta > 33.33) {
+            // Below 30 FPS
             this.spikeCount++;
             this.lastSpikeTime = now;
         }
@@ -152,7 +153,7 @@ export class PerformanceMonitor {
         this.profileData.push({
             timestamp: performance.now(),
             fps: this.fps,
-            entities: entityCount
+            entities: entityCount,
         });
     }
 
@@ -180,16 +181,19 @@ export class PerformanceMonitor {
      *    ├─ Pathfinding: 12.0ms (200 calls)
      *    ├─ Collision:    4.2ms (Checks: 4500)
      *    ├─ Entities:     2.1ms (Update: 350)
-     * 
+     *
      * GPU (Render):  3.5ms 🟢
      *    ├─ Main:         3.0ms
      */
-    public static draw(ctx: CanvasRenderingContext2D, stats: {
-        enemies: number;
-        towers: number;
-        projectiles: number;
-        effects: number;
-    }): void {
+    public static draw(
+        ctx: CanvasRenderingContext2D,
+        stats: {
+            enemies: number;
+            towers: number;
+            projectiles: number;
+            effects: number;
+        },
+    ): void {
         if (!this.enabled) return;
 
         const x = 10;
@@ -209,7 +213,7 @@ export class PerformanceMonitor {
         let currentY = y + lineHeight;
 
         // FPS Colors
-        const fpsColor = this.fps < 30 ? '#f00' : (this.fps < 50 ? '#ff0' : '#0f0');
+        const fpsColor = this.fps < 30 ? '#f00' : this.fps < 50 ? '#ff0' : '#0f0';
         const budgetColor = this.getAvgFrameTime() > 16.6 ? '#f00' : '#0f0';
 
         ctx.fillStyle = fpsColor;
@@ -289,9 +293,16 @@ export class PerformanceMonitor {
         ctx.restore();
     }
 
-    private static drawSubMetric(ctx: CanvasRenderingContext2D, x: number, y: number, timerName: string, countName: string | null, countLabel: string) {
+    private static drawSubMetric(
+        ctx: CanvasRenderingContext2D,
+        x: number,
+        y: number,
+        timerName: string,
+        countName: string | null,
+        countLabel: string,
+    ) {
         const time = this.timers.get(timerName) || 0;
-        const count = countName ? (this.metrics.get(countName) || 0) : null;
+        const count = countName ? this.metrics.get(countName) || 0 : null;
 
         ctx.fillStyle = '#ccc';
         let text = `   ├─ ${timerName}: ${time.toFixed(1)}ms`;
@@ -325,7 +336,7 @@ export class PerformanceMonitor {
             spikeCount: this.spikeCount,
             minFps: this.minFps,
             peakFps: this.peakFps,
-            memoryMB: mem ? mem.usedJSHeapSize / 1024 / 1024 : null
+            memoryMB: mem ? mem.usedJSHeapSize / 1024 / 1024 : null,
         };
     }
 
@@ -402,4 +413,3 @@ export class PerformanceMonitor {
         return this.metrics.get(label) || 0;
     }
 }
-

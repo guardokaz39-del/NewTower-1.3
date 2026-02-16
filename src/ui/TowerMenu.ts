@@ -10,9 +10,9 @@ export class TowerMenu {
 
     // Satellite positions (relative to center)
     private static readonly ANGLES = [
-        -Math.PI / 2,       // -90 deg (Top)
-        Math.PI / 6,        // 30 deg (Bottom Right)
-        Math.PI * 5 / 6     // 150 deg (Bottom Left)
+        -Math.PI / 2, // -90 deg (Top)
+        Math.PI / 6, // 30 deg (Bottom Right)
+        (Math.PI * 5) / 6, // 150 deg (Bottom Left)
     ];
 
     public static draw(ctx: CanvasRenderingContext2D, tower: Tower) {
@@ -38,13 +38,20 @@ export class TowerMenu {
         this.ANGLES.forEach((angle, index) => {
             const sx = tower.x + Math.cos(angle) * this.RADIUS;
             const sy = tower.y + Math.sin(angle) * this.RADIUS;
-            const slot = tower.slots.find(s => s.id === index);
+            const slot = tower.slots.find((s) => s.id === index);
 
             this.drawSatellite(ctx, sx, sy, slot, index, tower.selectedSlotId === index);
         });
     }
 
-    private static drawSatellite(ctx: CanvasRenderingContext2D, x: number, y: number, slot: SlotState | undefined, index: number, isSelected: boolean) {
+    private static drawSatellite(
+        ctx: CanvasRenderingContext2D,
+        x: number,
+        y: number,
+        slot: SlotState | undefined,
+        index: number,
+        isSelected: boolean,
+    ) {
         const r = this.SAT_SIZE;
 
         // Background
@@ -54,7 +61,7 @@ export class TowerMenu {
         ctx.fill();
 
         // Border
-        ctx.strokeStyle = isSelected ? '#0f0' : (slot?.isLocked ? '#666' : '#fff');
+        ctx.strokeStyle = isSelected ? '#0f0' : slot?.isLocked ? '#666' : '#fff';
         ctx.lineWidth = isSelected ? 3 : 2;
         ctx.stroke();
 
@@ -106,7 +113,11 @@ export class TowerMenu {
         ctx.stroke();
     }
 
-    public static getClickedAction(tower: Tower, clickX: number, clickY: number): { type: 'UNLOCK' | 'CLICK_SLOT', slotId: number } | null {
+    public static getClickedAction(
+        tower: Tower,
+        clickX: number,
+        clickY: number,
+    ): { type: 'UNLOCK' | 'CLICK_SLOT'; slotId: number } | null {
         for (let i = 0; i < this.ANGLES.length; i++) {
             const angle = this.ANGLES[i];
             const sx = tower.x + Math.cos(angle) * this.RADIUS;
@@ -120,7 +131,7 @@ export class TowerMenu {
             const HIT_SIZE = this.SAT_SIZE + 5;
 
             if (distSq <= HIT_SIZE * HIT_SIZE) {
-                const slot = tower.slots.find(s => s.id === i);
+                const slot = tower.slots.find((s) => s.id === i);
                 if (!slot) return null;
 
                 if (slot.isLocked) {
