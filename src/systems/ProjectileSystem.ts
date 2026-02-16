@@ -13,7 +13,7 @@ export class ProjectileSystem {
         return this.active;
     }
 
-    public spawn(x: number, y: number, target: { x: number, y: number }, stats: any): Projectile {
+    public spawn(x: number, y: number, target: { x: number; y: number }, stats: any): Projectile {
         // 1. Pop from pool or create new (O(1))
         const p = this.pool.pop() || new Projectile();
 
@@ -27,22 +27,27 @@ export class ProjectileSystem {
     }
 
     public createExplosion(x: number, y: number, radius: number, damage: number, friendlyFire: boolean = false) {
-        // DEPRECATED/LEGACY: 
-        // Logic usually handled by CollisionSystem triggers. 
-        // If this is still used for direct spawning (e.g. from debug or abilities), 
+        // DEPRECATED/LEGACY:
+        // Logic usually handled by CollisionSystem triggers.
+        // If this is still used for direct spawning (e.g. from debug or abilities),
         // we spawn a projectile that dies instantly.
 
-        const p = this.spawn(x, y, { x, y }, {
-            dmg: damage,
-            speed: 0,
-            color: '#76ff03',
-            effects: [],
-            pierce: 999,
-            projectileType: 'explosion',
-            explosionRadius: radius,
-            explosionDamage: damage,
-            explodeOnDeath: true
-        });
+        const p = this.spawn(
+            x,
+            y,
+            { x, y },
+            {
+                dmg: damage,
+                speed: 0,
+                color: '#76ff03',
+                effects: [],
+                pierce: 999,
+                projectileType: 'explosion',
+                explosionRadius: radius,
+                explosionDamage: damage,
+                explodeOnDeath: true,
+            },
+        );
 
         p.life = 0;
         (p as any).friendlyFire = friendlyFire;
@@ -85,7 +90,7 @@ export class ProjectileSystem {
                 vy: -p.vy * 0.2 + (Math.random() - 0.5) * 60,
                 life: 0.25 + Math.random() * 0.15, // ~15-25 frames
                 radius: 2 + Math.random() * 2,
-                color: Math.random() > 0.5 ? 'rgba(255, 100, 0, 0.5)' : 'rgba(100, 100, 100, 0.3)'
+                color: Math.random() > 0.5 ? 'rgba(255, 100, 0, 0.5)' : 'rgba(100, 100, 100, 0.3)',
             });
         }
         // Ice Trail (Snow/Sparkle)
@@ -98,7 +103,7 @@ export class ProjectileSystem {
                 vy: (Math.random() - 0.5) * 30,
                 life: 0.35, // 20 frames
                 radius: 1.5,
-                color: '#e1f5fe'
+                color: '#e1f5fe',
             });
         }
         // Level 3 Trail (Glow) - Generic for all high levels
@@ -111,7 +116,7 @@ export class ProjectileSystem {
                 vy: 0,
                 life: 0.16, // 10 frames
                 radius: 2,
-                color: p.color
+                color: p.color,
             });
         }
     }

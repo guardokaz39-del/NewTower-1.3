@@ -3,7 +3,7 @@ export enum LogLevel {
     INFO = 1,
     WARN = 2,
     ERROR = 3,
-    NONE = 99
+    NONE = 99,
 }
 
 export enum LogChannel {
@@ -12,7 +12,7 @@ export enum LogChannel {
     RENDER = 'RNDR',
     AUDIO = 'AUDIO',
     INPUT = 'INPT',
-    NETWORK = 'NET'
+    NETWORK = 'NET',
 }
 
 export interface LogEntry {
@@ -92,11 +92,11 @@ export class Logger {
         const signature = `${level}:${channel}:${msg}`;
 
         // Check for spam/throttling (same message repeated)
-        if (this.lastLogEntry && this.lastLogSignature === signature && (now - this.lastLogTime < this.throttleTimeMs)) {
+        if (this.lastLogEntry && this.lastLogSignature === signature && now - this.lastLogTime < this.throttleTimeMs) {
             this.lastLogEntry.count++;
             this.lastLogEntry.timestamp = now; // Update time to latest occurrence
             this.lastLogTime = now;
-            // Notify listeners about update (optional, usually listeners just append, so this might be tricky for UI 
+            // Notify listeners about update (optional, usually listeners just append, so this might be tricky for UI
             // - UI should re-render or handle updates. For now we rely on UI refreshing or ignoring updates to existing objects)
             return;
         }
@@ -107,7 +107,7 @@ export class Logger {
             channel,
             message: msg,
             data,
-            count: 1
+            count: 1,
         };
 
         // Add to history
@@ -125,7 +125,7 @@ export class Logger {
         this.printToConsole(entry);
 
         // Notify subscribers (The In-Game Console)
-        this.listeners.forEach(l => l(entry));
+        this.listeners.forEach((l) => l(entry));
     }
 
     private printToConsole(entry: LogEntry) {
@@ -152,11 +152,16 @@ export class Logger {
 
     private getLevelCSS(level: LogLevel): string {
         switch (level) {
-            case LogLevel.ERROR: return 'color: #ff4444; font-weight: bold;';
-            case LogLevel.WARN: return 'color: #ffbb33; font-weight: bold;';
-            case LogLevel.INFO: return 'color: #33b5e5; font-weight: bold;';
-            case LogLevel.VERBOSE: return 'color: #999;';
-            default: return 'color: #fff;';
+            case LogLevel.ERROR:
+                return 'color: #ff4444; font-weight: bold;';
+            case LogLevel.WARN:
+                return 'color: #ffbb33; font-weight: bold;';
+            case LogLevel.INFO:
+                return 'color: #33b5e5; font-weight: bold;';
+            case LogLevel.VERBOSE:
+                return 'color: #999;';
+            default:
+                return 'color: #fff;';
         }
     }
 }

@@ -33,13 +33,13 @@ interface IAtmosphereConfig {
 }
 
 interface CloudShadow {
-    x: number;        // world X coordinate
-    y: number;        // world Y coordinate  
-    width: number;    // fixed width
-    height: number;   // fixed height
-    speed: number;    // individual speed multiplier (0.8 - 1.2)
-    vx: number;       // velocity X (calculated from direction)
-    vy: number;       // velocity Y (calculated from direction)
+    x: number; // world X coordinate
+    y: number; // world Y coordinate
+    width: number; // fixed width
+    height: number; // fixed height
+    speed: number; // individual speed multiplier (0.8 - 1.2)
+    vx: number; // velocity X (calculated from direction)
+    vy: number; // velocity Y (calculated from direction)
 }
 
 export class AtmosphereSystem {
@@ -82,7 +82,7 @@ export class AtmosphereSystem {
             starCount: 50,
             starOpacity: 0.8,
 
-            ...config // Override with provided config
+            ...config, // Override with provided config
         };
 
         this.initializeCloudShadows();
@@ -133,14 +133,14 @@ export class AtmosphereSystem {
         for (let i = 0; i < this.config.starCount; i++) {
             this.starPositions.push({
                 x: Math.random(),
-                y: Math.random() * 0.6 // Stars in upper 60% of screen
+                y: Math.random() * 0.6, // Stars in upper 60% of screen
             });
         }
     }
 
     public update(deltaTime: number): void {
         // Update cloud positions in world space
-        this.clouds.forEach(cloud => {
+        this.clouds.forEach((cloud) => {
             cloud.x += cloud.vx * deltaTime;
             cloud.y += cloud.vy * deltaTime;
 
@@ -187,7 +187,7 @@ export class AtmosphereSystem {
             dayIntensity = 1;
         } else if (time < 0.7) {
             // Dusk
-            dayIntensity = 1 - ((time - 0.5) / 0.2); // 1 to 0
+            dayIntensity = 1 - (time - 0.5) / 0.2; // 1 to 0
             nightIntensity = (time - 0.5) / 0.2; // 0 to 1
         } else {
             // Night
@@ -218,11 +218,7 @@ export class AtmosphereSystem {
         for (let i = 0; i < this.config.sunRayCount; i++) {
             const spacing = width / (this.config.sunRayCount + 1);
             const startX = spacing * (i + 1);
-            const gradient = ctx.createLinearGradient(
-                startX, 0,
-                startX + Math.cos(rayAngleRad) * height,
-                height
-            );
+            const gradient = ctx.createLinearGradient(startX, 0, startX + Math.cos(rayAngleRad) * height, height);
             gradient.addColorStop(0, 'rgba(255, 255, 200, 0.3)');
             gradient.addColorStop(0.5, 'rgba(255, 255, 200, 0.1)');
             gradient.addColorStop(1, 'rgba(255, 255, 200, 0)');
@@ -240,17 +236,14 @@ export class AtmosphereSystem {
     private drawCloudShadows(ctx: CanvasRenderingContext2D, intensity: number): void {
         ctx.save();
         // Base opacity for clouds
-        // At night, maybe slightly less opaque? Or darker? 
+        // At night, maybe slightly less opaque? Or darker?
         // For now constant opacity from config
         ctx.globalAlpha = this.config.cloudShadowOpacity * intensity;
 
-        this.clouds.forEach(cloud => {
+        this.clouds.forEach((cloud) => {
             // Create gradient for soft edges
-            const gradient = ctx.createRadialGradient(
-                cloud.x, cloud.y, 0,
-                cloud.x, cloud.y, cloud.width * 0.6
-            );
-            gradient.addColorStop(0, 'rgba(0, 0, 0, 0.2)');   // Reduced from 0.4
+            const gradient = ctx.createRadialGradient(cloud.x, cloud.y, 0, cloud.x, cloud.y, cloud.width * 0.6);
+            gradient.addColorStop(0, 'rgba(0, 0, 0, 0.2)'); // Reduced from 0.4
             gradient.addColorStop(0.5, 'rgba(0, 0, 0, 0.1)'); // Reduced from 0.2
             gradient.addColorStop(1, 'rgba(0, 0, 0, 0)');
 
@@ -258,13 +251,7 @@ export class AtmosphereSystem {
 
             // Draw organic cloud shape (multiple overlapping ellipses)
             ctx.beginPath();
-            ctx.ellipse(
-                cloud.x,
-                cloud.y,
-                cloud.width * 0.5,
-                cloud.height * 0.5,
-                0, 0, Math.PI * 2
-            );
+            ctx.ellipse(cloud.x, cloud.y, cloud.width * 0.5, cloud.height * 0.5, 0, 0, Math.PI * 2);
             ctx.fill();
 
             // Add secondary ellipse for organic shape
@@ -274,7 +261,9 @@ export class AtmosphereSystem {
                 cloud.y - cloud.height * 0.15,
                 cloud.width * 0.35,
                 cloud.height * 0.4,
-                Math.PI * 0.3, 0, Math.PI * 2
+                Math.PI * 0.3,
+                0,
+                Math.PI * 2,
             );
             ctx.fill();
 
@@ -285,7 +274,9 @@ export class AtmosphereSystem {
                 cloud.y + cloud.height * 0.1,
                 cloud.width * 0.3,
                 cloud.height * 0.35,
-                -Math.PI * 0.25, 0, Math.PI * 2
+                -Math.PI * 0.25,
+                0,
+                Math.PI * 2,
             );
             ctx.fill();
         });
@@ -309,7 +300,7 @@ export class AtmosphereSystem {
             ctx.globalAlpha = this.config.starOpacity * intensity;
             ctx.fillStyle = '#ffffff';
 
-            this.starPositions.forEach(star => {
+            this.starPositions.forEach((star) => {
                 const x = star.x * width;
                 const y = star.y * height;
                 const radius = 0.5 + Math.random();
@@ -341,10 +332,12 @@ export class AtmosphereSystem {
         this.config = { ...this.config, ...newConfig };
 
         // Re-initialize if needed
-        if (newConfig.cloudShadowCount !== undefined ||
+        if (
+            newConfig.cloudShadowCount !== undefined ||
             newConfig.cloudShadowDirection !== undefined ||
             newConfig.cloudShadowMinSize !== undefined ||
-            newConfig.cloudShadowMaxSize !== undefined) {
+            newConfig.cloudShadowMaxSize !== undefined
+        ) {
             this.clouds = [];
             this.initializeCloudShadows();
         }

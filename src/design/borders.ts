@@ -10,7 +10,7 @@ export const UI_BORDERS = {
         md: '8px',
         lg: '12px',
         xl: '16px',
-        full: '9999px'
+        full: '9999px',
     },
 
     width: {
@@ -18,12 +18,12 @@ export const UI_BORDERS = {
         thin: '1px',
         normal: '2px',
         thick: '3px',
-        bold: '4px'
+        bold: '4px',
     },
 
     style: {
         solid: 'solid',
         dashed: 'dashed',
-        dotted: 'dotted'
-    }
+        dotted: 'dotted',
+    },
 } as const;

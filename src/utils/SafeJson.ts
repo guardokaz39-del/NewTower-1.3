@@ -26,7 +26,7 @@ export class SafeJson {
             }
 
             // Handle depth manually if needed, but WeakSet handles recursion loops.
-            // For true depth limiting, we'd need a recursive custom serializer, 
+            // For true depth limiting, we'd need a recursive custom serializer,
             // but JSON.stringify compliant replacer is harder to limit by depth directly.
             // So we rely on a custom recursive function instead of standard JSON.stringify if we want strict depth.
 
@@ -64,7 +64,7 @@ export class SafeJson {
 
         // Arrays
         if (Array.isArray(obj)) {
-            return obj.map(item => SafeJson.sanitize(item, depth - 1, visited));
+            return obj.map((item) => SafeJson.sanitize(item, depth - 1, visited));
         }
 
         // Objects

@@ -19,10 +19,10 @@ export class GameHUD {
     private boundForge: () => void;
 
     // Subscription Unsubscribers
-    private unsubMoney: () => void = () => { };
-    private unsubLives: () => void = () => { };
-    private unsubWaveStart: () => void = () => { };
-    private unsubWaveEnd: () => void = () => { };
+    private unsubMoney: () => void = () => {};
+    private unsubLives: () => void = () => {};
+    private unsubWaveStart: () => void = () => {};
+    private unsubWaveEnd: () => void = () => {};
 
     constructor(scene: IGameScene) {
         this.scene = scene;
@@ -59,9 +59,7 @@ export class GameHUD {
 
         // Determine cost based on card level
         const card = this.scene.forge.forgeSlots[0];
-        const forgeCost = card && card.level >= 2
-            ? CONFIG.ECONOMY.FORGE_COST_LVL2
-            : CONFIG.ECONOMY.FORGE_COST_LVL1;
+        const forgeCost = card && card.level >= 2 ? CONFIG.ECONOMY.FORGE_COST_LVL2 : CONFIG.ECONOMY.FORGE_COST_LVL1;
 
         if (this.scene.money >= forgeCost) {
             this.scene.forge.tryForge();

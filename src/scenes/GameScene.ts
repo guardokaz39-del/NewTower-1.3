@@ -72,20 +72,48 @@ export class GameScene extends BaseScene implements IGameScene {
     public lighting: LightingSystem;
 
     // Systems provided by Session (IGameScene interface)
-    public get gameState() { return this.session.gameState; }
-    public get entityManager() { return this.session.entityManager; }
-    public get waveManager() { return this.session.waveManager; }
-    public get projectileSystem() { return this.session.projectileSystem; }
-    public get collision() { return this.session.collision; }
-    public get metrics() { return this.session.metrics; }
-    public get weaponSystem() { return this.session.weaponSystem; }
-    public get cardSys() { return this.session.cardSys; }
-    public get forge() { return this.session.forge; }
-    public get inspector() { return this.session.inspector; }
-    public get bestiary() { return this.session.bestiary; }
-    public get notifications() { return this.session.notifications; }
-    public get acidSystem() { return this.session.acidSystem; }
-    public get commanderSystem() { return this.session.commanderSystem; }
+    public get gameState() {
+        return this.session.gameState;
+    }
+    public get entityManager() {
+        return this.session.entityManager;
+    }
+    public get waveManager() {
+        return this.session.waveManager;
+    }
+    public get projectileSystem() {
+        return this.session.projectileSystem;
+    }
+    public get collision() {
+        return this.session.collision;
+    }
+    public get metrics() {
+        return this.session.metrics;
+    }
+    public get weaponSystem() {
+        return this.session.weaponSystem;
+    }
+    public get cardSys() {
+        return this.session.cardSys;
+    }
+    public get forge() {
+        return this.session.forge;
+    }
+    public get inspector() {
+        return this.session.inspector;
+    }
+    public get bestiary() {
+        return this.session.bestiary;
+    }
+    public get notifications() {
+        return this.session.notifications;
+    }
+    public get acidSystem() {
+        return this.session.acidSystem;
+    }
+    public get commanderSystem() {
+        return this.session.commanderSystem;
+    }
 
     // UI (Scene specific)
     public ui: UIManager;
@@ -102,30 +130,51 @@ export class GameScene extends BaseScene implements IGameScene {
     public gameController: GameController;
 
     // IGameScene compatibility properties
-    public get wave(): number { return this.session.gameState.wave; }
-    public set wave(value: number) { this.session.gameState.wave = value; }
+    public get wave(): number {
+        return this.session.gameState.wave;
+    }
+    public set wave(value: number) {
+        this.session.gameState.wave = value;
+    }
 
-    public get money(): number { return this.session.gameState.money; }
+    public get money(): number {
+        return this.session.gameState.money;
+    }
 
-    public get lives(): number { return this.session.gameState.lives; }
+    public get lives(): number {
+        return this.session.gameState.lives;
+    }
 
-    public get paused(): boolean { return this.session.gameState.paused; }
+    public get paused(): boolean {
+        return this.session.gameState.paused;
+    }
 
-    public get selectedTower(): Tower | null { return this.session.gameState.selectedTower; }
-    public set selectedTower(value: Tower | null) { this.session.gameState.selectTower(value); }
+    public get selectedTower(): Tower | null {
+        return this.session.gameState.selectedTower;
+    }
+    public set selectedTower(value: Tower | null) {
+        this.session.gameState.selectTower(value);
+    }
 
-    public get enemies() { return this.session.gameState.enemies; }
-    public get towers() { return this.session.gameState.towers; }
-    public get projectiles() { return this.session.projectileSystem.projectiles; }
+    public get enemies() {
+        return this.session.gameState.enemies;
+    }
+    public get towers() {
+        return this.session.gameState.towers;
+    }
+    public get projectiles() {
+        return this.session.projectileSystem.projectiles;
+    }
 
-    public get enemyPool() { return this.session.gameState.enemyPool; }
+    public get enemyPool() {
+        return this.session.gameState.enemyPool;
+    }
 
     // Persist Safe Save State
     private lastSavedStats = { money: 0, kills: 0, waves: 0 };
 
     // Event Subscriptions
     private unsubs: (() => void)[] = [];
-
 
     // Ambient cycle
     private dayTime: number = 0;
@@ -151,14 +200,7 @@ export class GameScene extends BaseScene implements IGameScene {
         this.input = game.input;
 
         // Initialize Game Session (Logic / Simulation)
-        this.session = new GameSession(
-            game,
-            this,
-            this.map,
-            this.mapData,
-            this.effects,
-            this.startingCards
-        );
+        this.session = new GameSession(game, this, this.map, this.mapData, this.effects, this.startingCards);
 
         // Initialize UI (depends on Scene/Session)
         this.ui = new UIManager(this);
@@ -182,100 +224,110 @@ export class GameScene extends BaseScene implements IGameScene {
         );
 
         // Listen for Global Events
-        this.unsubs.push(EventBus.getInstance().on(Events.ENEMY_DIED, (data: any) => {
-            const enemy = data.enemy as Enemy;
-            if (enemy && enemy.typeId === 'sapper_rat') {
-                this.triggerExplosion(enemy.x, enemy.y, 45, 200, true); // Visual + Logic (Damage)
-            }
-        }));
+        this.unsubs.push(
+            EventBus.getInstance().on(Events.ENEMY_DIED, (data: any) => {
+                const enemy = data.enemy as Enemy;
+                if (enemy && enemy.typeId === 'sapper_rat') {
+                    this.triggerExplosion(enemy.x, enemy.y, 45, 200, true); // Visual + Logic (Damage)
+                }
+            }),
+        );
 
         // Magma King Split Logic
-        this.unsubs.push(EventBus.getInstance().on(Events.ENEMY_SPLIT, (data: any) => {
-            const enemy = data.enemy as Enemy;
-            if (enemy && enemy.typeId === 'magma_king') {
-                const decoy = this.entityManager.spawnEnemy('MAGMA_STATUE', this.map.waypoints);
-                if (decoy) {
-                    decoy.x = enemy.x;
-                    decoy.y = enemy.y;
-                    decoy.pathIndex = enemy.pathIndex;
+        this.unsubs.push(
+            EventBus.getInstance().on(Events.ENEMY_SPLIT, (data: any) => {
+                const enemy = data.enemy as Enemy;
+                if (enemy && enemy.typeId === 'magma_king') {
+                    const decoy = this.entityManager.spawnEnemy('MAGMA_STATUE', this.map.waypoints);
+                    if (decoy) {
+                        decoy.x = enemy.x;
+                        decoy.y = enemy.y;
+                        decoy.pathIndex = enemy.pathIndex;
 
-                    this.effects.add({
-                        type: 'explosion',
-                        x: enemy.x,
-                        y: enemy.y,
-                        radius: 40,
-                        life: 0.3,
-                        color: '#b0bec5'
-                    });
+                        this.effects.add({
+                            type: 'explosion',
+                            x: enemy.x,
+                            y: enemy.y,
+                            radius: 40,
+                            life: 0.3,
+                            color: '#b0bec5',
+                        });
 
-                    this.showFloatingText('DECOY!', enemy.x, enemy.y - 30, '#b0bec5');
+                        this.showFloatingText('DECOY!', enemy.x, enemy.y - 30, '#b0bec5');
+                    }
                 }
-            }
-        }));
+            }),
+        );
 
         // Flesh Colossus Death-Spawn Logic
-        this.unsubs.push(EventBus.getInstance().on(Events.ENEMY_DEATH_SPAWN, (data: any) => {
-            const parent = data.enemy as Enemy;
-            const spawns: string[] = data.spawns;
+        this.unsubs.push(
+            EventBus.getInstance().on(Events.ENEMY_DEATH_SPAWN, (data: any) => {
+                const parent = data.enemy as Enemy;
+                const spawns: string[] = data.spawns;
 
-            if (!parent || !spawns || spawns.length === 0) return;
+                if (!parent || !spawns || spawns.length === 0) return;
 
-            this.effects.add({
-                type: 'explosion',
-                x: parent.x,
-                y: parent.y,
-                radius: 55,
-                life: 0.5,
-                color: '#8b0000'
-            });
-
-            for (let i = 0; i < 10; i++) {
-                const angle = (i / 10) * Math.PI * 2 + Math.random() * 0.3;
-                const speed = 120 + Math.random() * 80;
                 this.effects.add({
-                    type: 'debris',
-                    x: parent.x + (Math.random() - 0.5) * 20,
-                    y: parent.y + (Math.random() - 0.5) * 20,
-                    vx: Math.cos(angle) * speed,
-                    vy: Math.sin(angle) * speed - 100,
-                    life: 0.5 + Math.random() * 0.3,
-                    size: 5 + Math.random() * 7,
-                    color: Math.random() > 0.5 ? '#6d2c2c' : '#8d4545',
-                    gravity: 450,
-                    rotation: Math.random() * Math.PI * 2,
-                    vRot: (Math.random() - 0.5) * 12
+                    type: 'explosion',
+                    x: parent.x,
+                    y: parent.y,
+                    radius: 55,
+                    life: 0.5,
+                    color: '#8b0000',
                 });
-            }
 
-            for (let i = 0; i < spawns.length; i++) {
-                const typeKey = spawns[i];
-                const child = this.entityManager.spawnEnemy(typeKey.toUpperCase(), this.map.waypoints);
-                if (child) {
-                    child.pathIndex = parent.pathIndex;
-                    const angle = (i / spawns.length) * Math.PI * 2 + Math.random() * 0.3;
-                    const offset = 25 + Math.random() * 15;
-                    child.x = parent.x + Math.cos(angle) * offset;
-                    child.y = parent.y + Math.sin(angle) * offset;
+                for (let i = 0; i < 10; i++) {
+                    const angle = (i / 10) * Math.PI * 2 + Math.random() * 0.3;
+                    const speed = 120 + Math.random() * 80;
+                    this.effects.add({
+                        type: 'debris',
+                        x: parent.x + (Math.random() - 0.5) * 20,
+                        y: parent.y + (Math.random() - 0.5) * 20,
+                        vx: Math.cos(angle) * speed,
+                        vy: Math.sin(angle) * speed - 100,
+                        life: 0.5 + Math.random() * 0.3,
+                        size: 5 + Math.random() * 7,
+                        color: Math.random() > 0.5 ? '#6d2c2c' : '#8d4545',
+                        gravity: 450,
+                        rotation: Math.random() * Math.PI * 2,
+                        vRot: (Math.random() - 0.5) * 12,
+                    });
                 }
-            }
 
-            this.showFloatingText('BURST!', parent.x, parent.y - 40, '#ff5252');
-            SoundManager.play('explosion');
-            this.triggerShake(0.35, 7);
-        }));
+                for (let i = 0; i < spawns.length; i++) {
+                    const typeKey = spawns[i];
+                    const child = this.entityManager.spawnEnemy(typeKey.toUpperCase(), this.map.waypoints);
+                    if (child) {
+                        child.pathIndex = parent.pathIndex;
+                        const angle = (i / spawns.length) * Math.PI * 2 + Math.random() * 0.3;
+                        const offset = 25 + Math.random() * 15;
+                        child.x = parent.x + Math.cos(angle) * offset;
+                        child.y = parent.y + Math.sin(angle) * offset;
+                    }
+                }
+
+                this.showFloatingText('BURST!', parent.x, parent.y - 40, '#ff5252');
+                SoundManager.play('explosion');
+                this.triggerShake(0.35, 7);
+            }),
+        );
 
         // === SAFE SAVE CADENCE ===
         // 1. Wave Completed
-        this.unsubs.push(EventBus.getInstance().on(Events.WAVE_COMPLETED, () => {
-            this.saveProgress();
-        }));
+        this.unsubs.push(
+            EventBus.getInstance().on(Events.WAVE_COMPLETED, () => {
+                this.saveProgress();
+            }),
+        );
 
         // 2. Card Installed (or just dropped effectively)
-        this.unsubs.push(EventBus.getInstance().on(Events.CARD_DROPPED, (data: any) => {
-            // Only save if actionId is present (implies successful drop logic initiated)
-            // or just save anyway, cheap operation with deltas
-            this.saveProgress();
-        }));
+        this.unsubs.push(
+            EventBus.getInstance().on(Events.CARD_DROPPED, (data: any) => {
+                // Only save if actionId is present (implies successful drop logic initiated)
+                // or just save anyway, cheap operation with deltas
+                this.saveProgress();
+            }),
+        );
     }
 
     private saveProgress() {
@@ -287,7 +339,7 @@ export class GameScene extends BaseScene implements IGameScene {
             money: current.money - this.lastSavedStats.money,
             kills: current.kills - this.lastSavedStats.kills,
             waves: current.waves - this.lastSavedStats.waves,
-            maxWave: current.waves // Always pass current max
+            maxWave: current.waves, // Always pass current max
         };
 
         if (delta.money > 0 || delta.kills > 0 || delta.waves > 0) {
@@ -318,7 +370,7 @@ export class GameScene extends BaseScene implements IGameScene {
         if (this.session) this.session.destroy();
 
         // 4. Global Event Cleanup
-        this.unsubs.forEach(u => u());
+        this.unsubs.forEach((u) => u());
         this.unsubs = [];
 
         const ui = document.getElementById('ui-layer');
@@ -348,7 +400,7 @@ export class GameScene extends BaseScene implements IGameScene {
         this.gameState.frames++;
 
         // Time scale support (1x or 2x speed)
-        const loops = (this.gameState.timeScale >= 2) ? 2 : 1;
+        const loops = this.gameState.timeScale >= 2 ? 2 : 1;
 
         // Day/Night Cycle (Simple Sine Wave)
         // Cycle duration: approx 60 seconds (3600 frames)
@@ -363,7 +415,7 @@ export class GameScene extends BaseScene implements IGameScene {
 
         // Update DayTime
         // Warning: this relies on loops count. We should probably use dt.
-        // But for now keeping loops based 
+        // But for now keeping loops based
         this.dayTime += 0.0005 * loops * speedMultiplier;
 
         // Update DayNightCycle system
@@ -371,13 +423,13 @@ export class GameScene extends BaseScene implements IGameScene {
         // Actually, if we loop 2 times with dt, we advance 2 * dt time. Correct.
 
         // Oscillate between 0.5 (Darkest evening) and 0.95 (Brightest day)
-        // Math.sin goes -1 to 1. 
+        // Math.sin goes -1 to 1.
         // We want range [0.5, 0.95]. Center is 0.725, Amplitude is 0.225
-        const brightness = 0.75 + currentSin * 0.20;
+        const brightness = 0.75 + currentSin * 0.2;
         this.lighting.ambientLight = brightness;
 
         // delta frames is NOT used anymore for logic, everything uses dt (seconds)
-        // const delta = dt * 60; 
+        // const delta = dt * 60;
 
         for (let l = 0; l < loops; l++) {
             this.dayNightCycle.update(dt);
@@ -414,7 +466,7 @@ export class GameScene extends BaseScene implements IGameScene {
                 this.gameState.enemies,
                 this.projectileSystem,
                 dt,
-                this.effects
+                this.effects,
             );
             PerformanceMonitor.endTimer('Entities');
 
@@ -499,7 +551,6 @@ export class GameScene extends BaseScene implements IGameScene {
         }
         this.drawSelectedTowerRange(ctx);
 
-
         // Draw targeting mode tooltip for hovered tower
         this.drawTargetingModeTooltip(ctx);
 
@@ -511,8 +562,7 @@ export class GameScene extends BaseScene implements IGameScene {
         for (let i = 0; i < this.gameState.enemies.length; i++) {
             const e = this.gameState.enemies[i];
             // Culling: Skip if off-screen
-            if (e.x < -cullMargin || e.x > viewW + cullMargin ||
-                e.y < -cullMargin || e.y > viewH + cullMargin) {
+            if (e.x < -cullMargin || e.x > viewW + cullMargin || e.y < -cullMargin || e.y > viewH + cullMargin) {
                 continue;
             }
             e.draw(ctx);
@@ -588,13 +638,7 @@ export class GameScene extends BaseScene implements IGameScene {
             ctx.fillStyle = 'rgba(0, 255, 255, 0.1)';
             ctx.lineWidth = 2;
             ctx.beginPath();
-            ctx.arc(
-                this.gameState.selectedTower.x,
-                this.gameState.selectedTower.y,
-                stats.range,
-                0,
-                Math.PI * 2
-            );
+            ctx.arc(this.gameState.selectedTower.x, this.gameState.selectedTower.y, stats.range, 0, Math.PI * 2);
             ctx.fill();
             ctx.stroke();
         }

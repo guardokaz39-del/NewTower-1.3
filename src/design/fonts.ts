@@ -6,7 +6,7 @@
 export const UI_FONTS = {
     family: {
         primary: 'Segoe UI, sans-serif',
-        mono: 'Consolas, monospace'
+        mono: 'Consolas, monospace',
     },
 
     size: {
@@ -17,12 +17,12 @@ export const UI_FONTS = {
         xl: '20px',
         xxl: '24px',
         huge: '42px',
-        massive: '60px'
+        massive: '60px',
     },
 
     weight: {
         normal: '400',
         medium: '500',
-        bold: '700'
-    }
+        bold: '700',
+    },
 } as const;

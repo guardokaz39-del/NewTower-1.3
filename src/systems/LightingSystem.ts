@@ -50,7 +50,7 @@ export class LightingSystem {
             y: y / this.scale,
             radius: radius / this.scale,
             color,
-            intensity
+            intensity,
         });
     }
 

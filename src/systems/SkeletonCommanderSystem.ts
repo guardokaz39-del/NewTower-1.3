@@ -5,18 +5,20 @@ import { getEnemyType } from '../Config';
 export class SkeletonCommanderSystem {
     private ctx: CanvasRenderingContext2D;
     private listenersSetup = false;
-    private unsubDied: () => void = () => { };
+    private unsubDied: () => void = () => {};
 
     // Visual Effects List
     private buffEffects: Array<{
-        startX: number, startY: number,
-        target: Enemy, // Reference to living target
-        currX: number, currY: number,
-        life: number,
-        maxLife: number
+        startX: number;
+        startY: number;
+        target: Enemy; // Reference to living target
+        currX: number;
+        currY: number;
+        life: number;
+        maxLife: number;
     }> = [];
 
-    private recentDeaths: Array<{ x: number, y: number, typeId: string }> = [];
+    private recentDeaths: Array<{ x: number; y: number; typeId: string }> = [];
 
     constructor(ctx: CanvasRenderingContext2D) {
         this.ctx = ctx;
@@ -40,9 +42,8 @@ export class SkeletonCommanderSystem {
     public update(dt: number, enemies: Enemy[]) {
         // Process recent deaths
         if (this.recentDeaths.length > 0) {
-
             // Find Active Commanders
-            const commanders = enemies.filter(e => {
+            const commanders = enemies.filter((e) => {
                 if (!e.isAlive() || e.finished) return false;
                 const conf = getEnemyType(e.typeId.toUpperCase()) || getEnemyType(e.typeId);
                 return conf && conf.archetype === 'SKELETON_COMMANDER';
@@ -53,7 +54,8 @@ export class SkeletonCommanderSystem {
                     const deadConf = getEnemyType(death.typeId.toUpperCase()) || getEnemyType(death.typeId);
 
                     // Allow Buff from SKELETON or COMMANDER chains
-                    const isSkeleton = deadConf && (deadConf.archetype === 'SKELETON' || deadConf.archetype === 'SKELETON_COMMANDER');
+                    const isSkeleton =
+                        deadConf && (deadConf.archetype === 'SKELETON' || deadConf.archetype === 'SKELETON_COMMANDER');
 
                     if (isSkeleton) {
                         // Find CLOSEST Commander within range
@@ -78,7 +80,7 @@ export class SkeletonCommanderSystem {
         }
 
         // Update Effects
-        this.buffEffects.forEach(fx => {
+        this.buffEffects.forEach((fx) => {
             fx.life -= dt;
 
             // Update target pos
@@ -86,7 +88,7 @@ export class SkeletonCommanderSystem {
             const ty = fx.target.y;
 
             // Move towards target
-            const t = 1.0 - (fx.life / fx.maxLife); // 0 to 1
+            const t = 1.0 - fx.life / fx.maxLife; // 0 to 1
             // Ease out cubic
             const ease = 1 - Math.pow(1 - t, 3);
 
@@ -94,10 +96,10 @@ export class SkeletonCommanderSystem {
             fx.currY = fx.startY + (ty - fx.startY) * ease;
 
             // If extremely close, trigger impact?
-            // We do impact logic in update OR draw. 
+            // We do impact logic in update OR draw.
             // Logic: Healing happens on impact? Or instantly?
             // User asked: "Soul flies to commander". implies delayed effect.
-            // But for gameplay responsiveness, instant heal is safer. 
+            // But for gameplay responsiveness, instant heal is safer.
             // However, let's make heal happen when particle arrives for "correctness".
         });
 
@@ -114,16 +116,18 @@ export class SkeletonCommanderSystem {
             }
         }
 
-        this.buffEffects = this.buffEffects.filter(fx => fx.life > 0 && fx.target.isAlive() && !fx.target.finished);
+        this.buffEffects = this.buffEffects.filter((fx) => fx.life > 0 && fx.target.isAlive() && !fx.target.finished);
     }
 
     private spawnSoulEffect(target: Enemy, startX: number, startY: number) {
         this.buffEffects.push({
-            startX: startX, startY: startY,
+            startX: startX,
+            startY: startY,
             target: target,
-            currX: startX, currY: startY,
+            currX: startX,
+            currY: startY,
             life: 0.6, // Faster flight
-            maxLife: 0.6
+            maxLife: 0.6,
         });
     }
 

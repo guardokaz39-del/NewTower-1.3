@@ -24,5 +24,5 @@ export const UI = {
     TRANSITIONS: UI_TRANSITIONS,
     BORDERS: UI_BORDERS,
     SHADOWS: UI_SHADOWS,
-    FONTS: UI_FONTS
+    FONTS: UI_FONTS,
 } as const;

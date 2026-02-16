@@ -20,18 +20,18 @@ export class EnemyRenderer {
     // Registry of specific renderers (Singleton/Stateless instances)
     private static defaultRenderer: UnitRenderer = new DefaultUnitRenderer();
     private static renderers: Record<string, UnitRenderer> = {
-        'SKELETON': new SkeletonUnitRenderer(),
-        'WOLF': new DefaultUnitRenderer(),
-        'TROLL': new TrollUnitRenderer(),
-        'SPIDER': new SpiderUnitRenderer(),
-        'HELLHOUND': new HellhoundUnitRenderer(),
-        'ORC': new OrcUnitRenderer(),
-        'WRAITH': new WraithUnitRenderer(),
-        'GOBLIN': new GoblinUnitRenderer(),
-        'SKELETON_COMMANDER': new SkeletonCommanderUnitRenderer(),
-        'RAT': new RatUnitRenderer(),
-        'MAGMA': new MagmaUnitRenderer(),
-        'FLESH': new FleshUnitRenderer(),
+        SKELETON: new SkeletonUnitRenderer(),
+        WOLF: new DefaultUnitRenderer(),
+        TROLL: new TrollUnitRenderer(),
+        SPIDER: new SpiderUnitRenderer(),
+        HELLHOUND: new HellhoundUnitRenderer(),
+        ORC: new OrcUnitRenderer(),
+        WRAITH: new WraithUnitRenderer(),
+        GOBLIN: new GoblinUnitRenderer(),
+        SKELETON_COMMANDER: new SkeletonCommanderUnitRenderer(),
+        RAT: new RatUnitRenderer(),
+        MAGMA: new MagmaUnitRenderer(),
+        FLESH: new FleshUnitRenderer(),
     };
 
     static drawSprite(ctx: CanvasRenderingContext2D, enemy: Enemy) {
@@ -44,14 +44,14 @@ export class EnemyRenderer {
         const props = typeConf.props || [];
 
         ctx.save();
-        ctx.translate((enemy.x | 0), (enemy.y | 0));
+        ctx.translate(enemy.x | 0, enemy.y | 0);
 
         // PERF: Use cached moveAngle from enemy.move()
         const moveAngle = enemy.moveAngle || 0;
 
         // 2. Breathing (pulsation) - PERF: use performance.now() instead of Date.now()
         // FIXED: enemy.id is number now, so we use modulo for variation
-        const breathePhase = (performance.now() * 0.001) + ((enemy.id % 100) * 0.5);
+        const breathePhase = performance.now() * 0.001 + (enemy.id % 100) * 0.5;
         const breatheScale = 1.0 + Math.sin(breathePhase) * 0.03;
         ctx.scale(breatheScale, breatheScale);
 
@@ -104,7 +104,7 @@ export class EnemyRenderer {
         ctx.fillStyle = color;
         ctx.globalAlpha = 0.3;
 
-        const rimSize = (48 * scale) * 1.2;
+        const rimSize = 48 * scale * 1.2;
         ctx.beginPath();
         ctx.arc(0, 0, rimSize / 2, 0, Math.PI * 2);
         ctx.fill();
@@ -144,7 +144,7 @@ export class EnemyRenderer {
         if (hasSlow) {
             const time = performance.now() * 0.003;
             for (let i = 0; i < 3; i++) {
-                const angle = time + (i * Math.PI * 2 / 3);
+                const angle = time + (i * Math.PI * 2) / 3;
                 const orbX = Math.cos(angle) * 20;
                 const orbY = Math.sin(angle) * 20;
                 ctx.fillStyle = '#4fc3f7';
@@ -164,11 +164,11 @@ export class EnemyRenderer {
             const now = Date.now(); // PERF: call once, not per particle
             for (let i = 0; i < 3; i++) {
                 // Deterministic offset based on ID to desync particles
-                const offset = (enemy.id * 10) + i * 100;
+                const offset = enemy.id * 10 + i * 100;
                 const progress = ((now + offset) % 600) / 600; // 0..1 loop every 600ms
 
                 // Rising motion with slight wiggle
-                const pY = 10 - (progress * 30); // Start low, rise up
+                const pY = 10 - progress * 30; // Start low, rise up
                 const pX = Math.sin(progress * 10 + enemy.id) * 5;
 
                 const alpha = 1 - progress; // Fade out

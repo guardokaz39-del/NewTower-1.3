@@ -5,12 +5,12 @@
 
 export const UI_COLORS = {
     // Primary palette
-    primary: '#00ffff',      // Cyan - для акцентов, выбора
-    secondary: '#ff6b6b',    // Coral Red
-    success: '#4caf50',      // Green
-    warning: '#ff9800',      // Orange
-    danger: '#f44336',       // Red
-    info: '#2196f3',         // Blue
+    primary: '#00ffff', // Cyan - для акцентов, выбора
+    secondary: '#ff6b6b', // Coral Red
+    success: '#4caf50', // Green
+    warning: '#ff9800', // Orange
+    danger: '#f44336', // Red
+    info: '#2196f3', // Blue
 
     // Glass-morphism effects
     glass: {
@@ -19,7 +19,7 @@ export const UI_COLORS = {
         bgDark: 'rgba(20, 20, 30, 0.95)',
         border: 'rgba(255, 255, 255, 0.1)',
         borderHover: 'rgba(255, 255, 255, 0.2)',
-        shadow: '0 8px 32px rgba(0, 0, 0, 0.3)'
+        shadow: '0 8px 32px rgba(0, 0, 0, 0.3)',
     },
 
     // Text colors
@@ -27,7 +27,7 @@ export const UI_COLORS = {
         primary: '#ffffff',
         secondary: '#b0b0b0',
         disabled: '#666666',
-        hint: '#888888'
+        hint: '#888888',
     },
 
     // Neutral palette (для кнопок, фонов)
@@ -35,7 +35,7 @@ export const UI_COLORS = {
         dark: '#222',
         medium: '#333',
         light: '#555',
-        lighter: '#777'
+        lighter: '#777',
     },
 
     // Overlays

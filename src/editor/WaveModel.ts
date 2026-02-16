@@ -43,12 +43,14 @@ export class WaveModel {
 
     public addWave() {
         this.waves.push({
-            enemies: [{
-                type: 'GRUNT',
-                count: 5,
-                pattern: 'normal',
-                spawnRate: 'medium' // Default for new waves
-            }]
+            enemies: [
+                {
+                    type: 'GRUNT',
+                    count: 5,
+                    pattern: 'normal',
+                    spawnRate: 'medium', // Default for new waves
+                },
+            ],
         });
         this.notify();
     }
@@ -67,7 +69,7 @@ export class WaveModel {
                 type: 'GRUNT',
                 count: 1,
                 pattern: 'normal',
-                spawnRate: 'medium'
+                spawnRate: 'medium',
             });
             this.notify();
         }
@@ -122,11 +124,11 @@ export class WaveModel {
     }
 
     public unsubscribe(listener: ChangeListener) {
-        this.listeners = this.listeners.filter(l => l !== listener);
+        this.listeners = this.listeners.filter((l) => l !== listener);
     }
 
     private notify() {
-        this.listeners.forEach(l => l());
+        this.listeners.forEach((l) => l());
     }
 
     public destroy() {

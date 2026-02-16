@@ -3,14 +3,13 @@ import { EnemyRegistry } from './EnemyRegistry';
 import { WaveManager } from '../WaveManager';
 
 export class ThreatService {
-
     /**
      * Multipliers for different spawn patterns.
      */
     private static PATTERN_MULTIPLIERS: Record<SpawnPattern, number> = {
-        'normal': 1.0,
-        'random': 1.1, // Uncertainty factor
-        'swarm': 1.5   // Burst density factor
+        normal: 1.0,
+        random: 1.1, // Uncertainty factor
+        swarm: 1.5, // Burst density factor
     };
 
     /**
@@ -44,7 +43,7 @@ export class ThreatService {
         density = Math.max(0.8, Math.min(density, 2.0));
 
         // 4. Final Calculation
-        return (powerPerUnit * group.count) * patternMult * density;
+        return powerPerUnit * group.count * patternMult * density;
     }
 
     /**

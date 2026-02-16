@@ -34,10 +34,10 @@ export class PerformanceProfiler {
         if (!this.enabled) return;
 
         this.frameCount++;
-        this.isActiveFrame = (this.frameCount % this.SAMPLE_RATE === 0);
+        this.isActiveFrame = this.frameCount % this.SAMPLE_RATE === 0;
 
         if (this.isActiveFrame) {
-            // Clear maps without allocating new ones if possible, 
+            // Clear maps without allocating new ones if possible,
             // but Map.clear() is efficient enough.
             this.durations.clear();
             this.counts.clear();
@@ -67,7 +67,7 @@ export class PerformanceProfiler {
     public static getFrameData(): Record<string, number> {
         // Return 0s if not active frame, or return cached last frame data?
         // For simplicity, we return the current map as object.
-        // In a strict zero-alloc system we wouldn't return an object, 
+        // In a strict zero-alloc system we wouldn't return an object,
         // but for reporting we need to serialize eventually.
         const result: Record<string, number> = {};
 

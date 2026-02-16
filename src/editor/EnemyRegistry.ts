@@ -18,14 +18,14 @@ export class EnemyRegistry {
      * @deprecated Use getAllEntries for keys
      */
     public static getAllTypes(): IEnemyTypeConfig[] {
-        return Object.values(ENEMY_TYPES).filter(e => !e.isHidden);
+        return Object.values(ENEMY_TYPES).filter((e) => !e.isHidden);
     }
 
     /**
      * Get enemy types visible in editor (excludes isHidden)
      */
     public static getVisibleForEditor(): IEnemyTypeConfig[] {
-        return Object.values(ENEMY_TYPES).filter(e => !e.isHidden);
+        return Object.values(ENEMY_TYPES).filter((e) => !e.isHidden);
     }
 
     /**
@@ -33,7 +33,7 @@ export class EnemyRegistry {
      */
     public static getType(id: string): IEnemyTypeConfig | undefined {
         const key = id.toUpperCase();
-        return ENEMY_TYPES[key] || Object.values(ENEMY_TYPES).find(t => t.id === id);
+        return ENEMY_TYPES[key] || Object.values(ENEMY_TYPES).find((t) => t.id === id);
     }
 
     /**

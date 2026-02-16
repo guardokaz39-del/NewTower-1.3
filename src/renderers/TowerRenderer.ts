@@ -67,8 +67,13 @@ export class TowerRenderer {
         ctx.globalAlpha = 1.0;
     }
 
-
-    private static drawBuildingSprite(ctx: CanvasRenderingContext2D, tower: Tower, drawX: number, drawY: number, size: number) {
+    private static drawBuildingSprite(
+        ctx: CanvasRenderingContext2D,
+        tower: Tower,
+        drawX: number,
+        drawY: number,
+        size: number,
+    ) {
         // ... existing building sprite logic ...
         // Enhanced building animation - base emerges from below with opacity
         const pct = tower.buildProgress / tower.maxBuildProgress;
@@ -110,7 +115,13 @@ export class TowerRenderer {
         ctx.restore();
     }
 
-    private static drawBuildingUI(ctx: CanvasRenderingContext2D, tower: Tower, drawX: number, drawY: number, size: number) {
+    private static drawBuildingUI(
+        ctx: CanvasRenderingContext2D,
+        tower: Tower,
+        drawX: number,
+        drawY: number,
+        size: number,
+    ) {
         // ... existing building UI logic ...
         // Progress bar
         const pct = tower.buildProgress / tower.maxBuildProgress;
@@ -143,9 +154,7 @@ export class TowerRenderer {
         const renderer = getTurretRenderer(mainCard?.type.id || 'default');
 
         // Progressive scaling based on HIGHEST card level
-        const cardLevel = tower.cards.length > 0
-            ? Math.max(...tower.cards.map(c => c.level))
-            : 1;
+        const cardLevel = tower.cards.length > 0 ? Math.max(...tower.cards.map((c) => c.level)) : 1;
 
         const turretName = renderer.getTurretAsset(cardLevel);
 
@@ -156,9 +165,9 @@ export class TowerRenderer {
             ctx.translate(tower.x, tower.y);
 
             // Apply rotation
-            // For Minigun, we might have additional barrel rotation? 
+            // For Minigun, we might have additional barrel rotation?
             // Usually minigun barrels spin AROUND the aim axis.
-            // But this is top-down 2D. 
+            // But this is top-down 2D.
             // So 'barrelRotation' might effectively just be 'angle' if we want the whole gun to spin?
             // No, minigun barrels spin around the central axis.
             // Visually in 2D top down, this might look like the sprite switching frames OR
@@ -166,7 +175,7 @@ export class TowerRenderer {
             // For now, standard rotation towards target:
             ctx.rotate(tower.angle);
 
-            const scaleMultiplier = 1.0 + ((cardLevel - 1) * 0.15);
+            const scaleMultiplier = 1.0 + (cardLevel - 1) * 0.15;
             ctx.scale(scaleMultiplier, scaleMultiplier);
 
             // Apply Barrel Recoil (Kickback)
@@ -246,10 +255,11 @@ export class TowerRenderer {
                 break;
             case 'multi': // Hexagon (Split)
                 for (let i = 0; i < 6; i++) {
-                    const angle = i * Math.PI / 3;
+                    const angle = (i * Math.PI) / 3;
                     const vx = cx + Math.cos(angle) * 4;
                     const vy = cy + Math.sin(angle) * 4;
-                    if (i === 0) ctx.moveTo(vx, vy); else ctx.lineTo(vx, vy);
+                    if (i === 0) ctx.moveTo(vx, vy);
+                    else ctx.lineTo(vx, vy);
                 }
                 ctx.closePath();
                 break;
@@ -272,9 +282,16 @@ export class TowerRenderer {
                 // Determine position
                 let offX = 0;
                 let offY = 0;
-                if (index === 1) { offX = -5; offY = 12; }
-                else if (index === 2) { offX = -5; offY = -12; }
-                else { offX = -12; offY = 0; }
+                if (index === 1) {
+                    offX = -5;
+                    offY = 12;
+                } else if (index === 2) {
+                    offX = -5;
+                    offY = -12;
+                } else {
+                    offX = -12;
+                    offY = 0;
+                }
 
                 // PERF: Use cached image
                 const img = this.getModuleImage(card.type.id, card.type.color);
@@ -311,7 +328,7 @@ export class TowerRenderer {
 
                 // Draw rotating arc segments
                 for (let i = 0; i < 3; i++) {
-                    const angle = rotation + (i * Math.PI * 2 / 3);
+                    const angle = rotation + (i * Math.PI * 2) / 3;
                     ctx.beginPath();
                     ctx.arc(0, 0, 28, angle, angle + Math.PI / 3);
                     ctx.stroke();
@@ -373,8 +390,8 @@ export class TowerRenderer {
         } else {
             // Check if Cooling (No target, spinupTime > 0)
             // Ideally we'd pass a "isCooling" flag, but we can infer it if heat is decreasing.
-            // However, TowerRenderer is static. 
-            // Let's use blue tint if heat is not full and likely cooling? 
+            // However, TowerRenderer is static.
+            // Let's use blue tint if heat is not full and likely cooling?
             // Actually, we don't know if it's cooling just by state here.
             // But we can check if it has a target in Tower? No.
             // Let's just keep the Red/Green gradient but maybe add a blue border if cooling?

@@ -4,7 +4,7 @@ import { Enemy } from '../Enemy';
 
 export class SpriteBaker {
     private static readonly FRAMES = 32; // Higher framerate for smoothness (32 frames)
-    private static readonly SIZE = 96;   // 1.5x Tile Size (64) -> 96 for extra detail/weapons
+    private static readonly SIZE = 96; // 1.5x Tile Size (64) -> 96 for extra detail/weapons
 
     /**
      * Bakes the walk cycle for a specific renderer.
@@ -28,7 +28,7 @@ export class SpriteBaker {
             // Add other necessary properties as mocks if renderers crash
         } as any;
 
-        const facings = renderer.getBakeFacings ? renderer.getBakeFacings() : ['SIDE'] as const;
+        const facings = renderer.getBakeFacings ? renderer.getBakeFacings() : (['SIDE'] as const);
 
         for (const facing of facings) {
             for (let i = 0; i < this.FRAMES; i++) {
@@ -47,17 +47,22 @@ export class SpriteBaker {
                 // Normalized time (0.0 -> 1.0)
                 const t = i / this.FRAMES;
 
-                AssetCache.get(frameKey, (ctx, w, h) => {
-                    ctx.translate(w / 2, h / 2);
+                AssetCache.get(
+                    frameKey,
+                    (ctx, w, h) => {
+                        ctx.translate(w / 2, h / 2);
 
-                    // Invoke renderer
-                    if (renderer.drawFrameDirectional) {
-                        renderer.drawFrameDirectional(ctx, mockEnemy, t, facing);
-                    } else if (renderer.drawFrame) {
-                        // Fallback to standard drawFrame (usually SIDE)
-                        renderer.drawFrame(ctx, mockEnemy, t);
-                    }
-                }, this.SIZE, this.SIZE);
+                        // Invoke renderer
+                        if (renderer.drawFrameDirectional) {
+                            renderer.drawFrameDirectional(ctx, mockEnemy, t, facing);
+                        } else if (renderer.drawFrame) {
+                            // Fallback to standard drawFrame (usually SIDE)
+                            renderer.drawFrame(ctx, mockEnemy, t);
+                        }
+                    },
+                    this.SIZE,
+                    this.SIZE,
+                );
 
                 // [NEW] Generate White Silhouette for Hit Flash (Pre-baked)
                 const sprite = AssetCache.peek(frameKey);
@@ -65,15 +70,20 @@ export class SpriteBaker {
                     const silhouetteKey = frameKey + '_white';
                     // Only bake if not exists (or implement a force-bake/peek check inside)
                     // AssetCache.get checks existence, so we just provide the factory.
-                    AssetCache.get(silhouetteKey, (ctxS, w, h) => {
-                        // Draw the original sprite
-                        ctxS.drawImage(sprite, 0, 0);
+                    AssetCache.get(
+                        silhouetteKey,
+                        (ctxS, w, h) => {
+                            // Draw the original sprite
+                            ctxS.drawImage(sprite, 0, 0);
 
-                        // Composite white on top, keeping alpha
-                        ctxS.globalCompositeOperation = 'source-in';
-                        ctxS.fillStyle = '#ffffff';
-                        ctxS.fillRect(0, 0, w, h);
-                    }, this.SIZE, this.SIZE);
+                            // Composite white on top, keeping alpha
+                            ctxS.globalCompositeOperation = 'source-in';
+                            ctxS.fillStyle = '#ffffff';
+                            ctxS.fillRect(0, 0, w, h);
+                        },
+                        this.SIZE,
+                        this.SIZE,
+                    );
                 }
             }
         }

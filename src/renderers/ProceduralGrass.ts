@@ -4,12 +4,12 @@ import { VISUALS } from '../VisualConfig';
 /**
  * Процедурный рендеринг живой травы
  * Добавляет отдельные травинки, камешки и мелкие детали поверх базового слоя
- * 
+ *
  * Основные характеристики:
  * - Травинки: 12-18 на тайл, высота 4-8px, наклон ±15°
  * - Камешки: 1-3 на тайл (60% тайлов)
  * - Цветочки: 0-1 на тайл (5% шанс)
- * 
+ *
  * Используется для КАЖДОГО варианта grass_0...grass_3
  */
 export class ProceduralGrass {
@@ -21,13 +21,7 @@ export class ProceduralGrass {
      * @param size Размер тайла (64px)
      * @param seed Детерминированный seed для вариаций
      */
-    public static draw(
-        ctx: CanvasRenderingContext2D,
-        x: number,
-        y: number,
-        size: number,
-        seed: number
-    ): void {
+    public static draw(ctx: CanvasRenderingContext2D, x: number, y: number, size: number, seed: number): void {
         // 1. Травинки (основной визуальный элемент)
         this.drawGrassBlades(ctx, x, y, size, seed);
 
@@ -46,7 +40,7 @@ export class ProceduralGrass {
         x: number,
         y: number,
         size: number,
-        seed: number
+        seed: number,
     ): void {
         // Количество травинок: 12-18
         const bladeCount = 12 + (seed % 7); // 12-18
@@ -64,7 +58,7 @@ export class ProceduralGrass {
 
             // Наклон: ±15°
             const angleVariation = ((seed + i * 7) % 30) - 15; // -15 to +15
-            const angle = angleVariation * Math.PI / 180;
+            const angle = (angleVariation * Math.PI) / 180;
 
             // Рисуем травинку
             ctx.save();
@@ -83,13 +77,7 @@ export class ProceduralGrass {
     /**
      * Слой 2: Мелкие камешки
      */
-    private static drawPebbles(
-        ctx: CanvasRenderingContext2D,
-        x: number,
-        y: number,
-        size: number,
-        seed: number
-    ): void {
+    private static drawPebbles(ctx: CanvasRenderingContext2D, x: number, y: number, size: number, seed: number): void {
         // Не на всех тайлах есть камешки (60% шанс)
         if (seed % 5 === 0 || seed % 5 === 1) {
             return; // Нет камешков на этом тайле
@@ -120,7 +108,7 @@ export class ProceduralGrass {
         x: number,
         y: number,
         size: number,
-        seed: number
+        seed: number,
     ): void {
         // Очень редко: 5% шанс
         if (seed % 20 !== 0) {

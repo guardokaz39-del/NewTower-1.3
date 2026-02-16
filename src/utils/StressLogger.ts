@@ -52,7 +52,7 @@ export class StressLogger {
             avgCollision: 0,
             avgDrawParticles: 0,
             memoryStart: mem,
-            memoryEnd: 0
+            memoryEnd: 0,
         };
 
         this.frameCount = 0;
@@ -84,12 +84,12 @@ export class StressLogger {
         // Check if data is not empty (it returns empty object on skipped frames)
         if (Object.keys(data).length > 0) {
             this.samplesCount++;
-            this.totalLogic += (data['Logic'] || 0);
-            this.totalRender += (data['Render'] || 0);
-            this.totalPath += (data['Pathfinding'] || 0);
-            this.totalCollision += (data['Collision'] || 0);
+            this.totalLogic += data['Logic'] || 0;
+            this.totalRender += data['Render'] || 0;
+            this.totalPath += data['Pathfinding'] || 0;
+            this.totalCollision += data['Collision'] || 0;
             // Assuming 'Render' includes particles, but if we have specific 'DrawParticles' label:
-            this.totalParticles += (data['DrawParticles'] || 0);
+            this.totalParticles += data['DrawParticles'] || 0;
         }
     }
 
@@ -129,7 +129,7 @@ export class StressLogger {
         md += `| Phase | Avg FPS | Min FPS | Entities | Logic (ms) | Path (ms) | Col (ms) | CPU Render (ms) | Overhead/GPU (ms) | Mem (MB) |\n`;
         md += `|-------|---------|---------|----------|------------|-----------|----------|-----------------|-------------------|----------|\n`;
 
-        this.phases.forEach(p => {
+        this.phases.forEach((p) => {
             const memStart = (p.memoryStart / 1024 / 1024).toFixed(0);
             const memEnd = (p.memoryEnd / 1024 / 1024).toFixed(0);
             const memDelta = p.memoryEnd - p.memoryStart;
@@ -145,7 +145,7 @@ export class StressLogger {
 
         md += `\n## 🚨 Analysis\n`;
         // Simple heuristic analysis
-        this.phases.forEach(p => {
+        this.phases.forEach((p) => {
             if (p.avgFps < 30) {
                 md += `- **${p.phaseName}**: Low FPS (${p.avgFps.toFixed(0)}). `;
                 if (p.avgLogic > p.avgRender) {
@@ -163,11 +163,15 @@ export class StressLogger {
     }
 
     public static generateJson(): string {
-        return JSON.stringify({
-            date: new Date().toISOString(),
-            phases: this.phases,
-            userAgent: navigator.userAgent
-        }, null, 2);
+        return JSON.stringify(
+            {
+                date: new Date().toISOString(),
+                phases: this.phases,
+                userAgent: navigator.userAgent,
+            },
+            null,
+            2,
+        );
     }
 
     public static reset() {

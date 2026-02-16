@@ -70,7 +70,7 @@ export class TargetingSystem {
             // --- SCORING LOGIC ---
             // Normalize scores so that "Higher = Better"
             let score = 0;
-            const isCurrent = (e === currentTarget);
+            const isCurrent = e === currentTarget;
 
             switch (mode) {
                 case 'closest':
@@ -133,7 +133,8 @@ export class TargetingSystem {
         }
 
         // 2. Sub-tile Precision (Float)
-        if (gridDist !== -1 && gridDist !== 99999) { // -1 is unreachable in new FlowField
+        if (gridDist !== -1 && gridDist !== 99999) {
+            // -1 is unreachable in new FlowField
             // Use helper to get vector (handles array access transparently)
             // We reuse a static small buffer for vector retrieval to avoid allocation?
             // Actually getVector writes to an 'out' object. Let's create a temp static one.
@@ -156,15 +157,15 @@ export class TargetingSystem {
                 const dy = e.y - cellCenterY;
 
                 // Project position onto flow vector
-                const progress = (dx * vx + dy * vy);
+                const progress = dx * vx + dy * vy;
 
                 // Refined Distance
-                return (gridDist * cellSize) - progress;
+                return gridDist * cellSize - progress;
             }
         }
 
-        return (gridDist * cellSize);
+        return gridDist * cellSize;
     }
 
-    private static tempVec: { x: number, y: number } | null = null;
+    private static tempVec: { x: number; y: number } | null = null;
 }
