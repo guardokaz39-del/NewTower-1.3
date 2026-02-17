@@ -30,12 +30,22 @@ import { GameController } from './GameController';
 enum TestPhase {
     IDLE,
     WARMUP, // 0-10s
-    PATHING, // 10-25s
-    PHYSICS, // 25-40s
-    RENDER, // 40-55s
+    PATHING, // 10-25s (Pathfinding crunch)
+    PHYSICS, // 25-40s (Physics crunch)
+    RENDER, // 40-55s (Render stress)
     RAMP_UP, // Dynamic
     FINISHED,
 }
+
+const PHASE_LABELS: Record<TestPhase, string> = {
+    [TestPhase.IDLE]: 'IDLE',
+    [TestPhase.WARMUP]: 'WARMUP',
+    [TestPhase.PATHING]: 'PATHFINDING_CRUNCH',
+    [TestPhase.PHYSICS]: 'PHYSICS_CRUNCH',
+    [TestPhase.RENDER]: 'RENDER_STRESS',
+    [TestPhase.RAMP_UP]: 'RAMP_UP',
+    [TestPhase.FINISHED]: 'FINISHED',
+};
 
 export class StressTestScene extends BaseScene implements IGameScene {
     public game: Game;
@@ -238,7 +248,7 @@ export class StressTestScene extends BaseScene implements IGameScene {
         this.phase = TestPhase.WARMUP;
         this.timer = 0;
         StressLogger.reset();
-        StressLogger.startPhase('WARMUP');
+        StressLogger.startPhase(PHASE_LABELS[TestPhase.WARMUP]);
         PerformanceProfiler.enable();
 
         // Initial FlowField
@@ -333,7 +343,7 @@ export class StressTestScene extends BaseScene implements IGameScene {
                 if (this.timer > 10) {
                     this.phase = TestPhase.PATHING;
                     this.lastWallToggle = this.timer;
-                    StressLogger.startPhase('CPU_CRUNCH');
+                    StressLogger.startPhase(PHASE_LABELS[TestPhase.PATHING]);
                     this.clearEntities();
                 } else {
                     // Spawn 50 enemies over 10s (approx 5 per sec)
@@ -346,7 +356,7 @@ export class StressTestScene extends BaseScene implements IGameScene {
             case TestPhase.PATHING: // 10-25s (15s duration)
                 if (this.timer > 25) {
                     this.phase = TestPhase.PHYSICS;
-                    StressLogger.startPhase('PHYSICS_CRUNCH');
+                    StressLogger.startPhase(PHASE_LABELS[TestPhase.PHYSICS]);
                     this.clearEntities();
 
                     // CLEANUP: Reset map walls from Pathing phase
@@ -377,7 +387,7 @@ export class StressTestScene extends BaseScene implements IGameScene {
             case TestPhase.PHYSICS: // 25-40s (15s duration)
                 if (this.timer > 40) {
                     this.phase = TestPhase.RENDER;
-                    StressLogger.startPhase('RENDER_STRESS');
+                    StressLogger.startPhase(PHASE_LABELS[TestPhase.RENDER]);
                     this.clearEntities();
                 } else {
                     // Maintain 500 enemies
@@ -390,7 +400,7 @@ export class StressTestScene extends BaseScene implements IGameScene {
             case TestPhase.RENDER: // 40-55s (15s duration)
                 if (this.timer > 55) {
                     this.phase = TestPhase.RAMP_UP;
-                    StressLogger.startPhase('RAMP_UP');
+                    StressLogger.startPhase(PHASE_LABELS[TestPhase.RAMP_UP]);
                     this.clearEntities();
                     this.lastRampUp = this.timer;
                     this.lowFpsFrames = 0;
@@ -589,7 +599,7 @@ export class StressTestScene extends BaseScene implements IGameScene {
         if (!this.uiOverlay) return;
         if (this.phase === TestPhase.FINISHED) return; // Static report
 
-        const phaseName = TestPhase[this.phase];
+        const phaseName = PHASE_LABELS[this.phase] || TestPhase[this.phase];
         const entities = this.gameState.enemies.length;
         const particles = this.effects.activeEffects.length;
 

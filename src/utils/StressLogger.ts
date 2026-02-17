@@ -22,6 +22,8 @@ export interface StressPhaseStats {
 export class StressLogger {
     private static phases: StressPhaseStats[] = [];
     private static currentPhase: StressPhaseStats | null = null;
+    private static phaseStartTs = 0;
+    private static phaseEndTs = 0;
 
     // Accumulators for current phase
     private static frameCount = 0;
@@ -54,6 +56,9 @@ export class StressLogger {
             memoryStart: mem,
             memoryEnd: 0,
         };
+
+        this.phaseStartTs = performance.now();
+        this.phaseEndTs = this.phaseStartTs;
 
         this.frameCount = 0;
         this.totalFps = 0;
@@ -96,6 +101,9 @@ export class StressLogger {
     public static finishPhase() {
         if (!this.currentPhase) return;
 
+        this.phaseEndTs = performance.now();
+        this.currentPhase.duration = Math.max(0, (this.phaseEndTs - this.phaseStartTs) / 1000);
+
         const mem = (performance as any).memory ? (performance as any).memory.usedJSHeapSize : 0;
         this.currentPhase.memoryEnd = mem;
 
@@ -126,8 +134,8 @@ export class StressLogger {
         md += `Date: ${new Date().toLocaleString()}\n\n`;
 
         md += `## 🔬 Phase Breakdown\n`;
-        md += `| Phase | Avg FPS | Min FPS | Entities | Logic (ms) | Path (ms) | Col (ms) | CPU Render (ms) | Overhead/GPU (ms) | Mem (MB) |\n`;
-        md += `|-------|---------|---------|----------|------------|-----------|----------|-----------------|-------------------|----------|\n`;
+        md += `| Phase | Duration (s) | Avg FPS | Min FPS | Entities | Logic (ms) | Path (ms) | Col (ms) | CPU Render (ms) | Overhead/GPU (ms) | Mem (MB) |\n`;
+        md += `|-------|--------------|---------|---------|----------|------------|-----------|----------|-----------------|-------------------|----------|\n`;
 
         this.phases.forEach((p) => {
             const memStart = (p.memoryStart / 1024 / 1024).toFixed(0);
@@ -140,7 +148,7 @@ export class StressLogger {
             const measured = p.avgLogic + p.avgRender; // Render is already CPU Render
             const overhead = Math.max(0, frameTime - measured);
 
-            md += `| ${p.phaseName} | ${p.avgFps.toFixed(0)} | ${p.minFps.toFixed(0)} | ${p.maxEntities} | ${p.avgLogic.toFixed(2)} | ${p.avgPathfinding.toFixed(2)} | ${p.avgCollision.toFixed(2)} | ${p.avgRender.toFixed(2)} | ${overhead.toFixed(2)} | ${memStr} |\n`;
+            md += `| ${p.phaseName} | ${p.duration.toFixed(2)} | ${p.avgFps.toFixed(0)} | ${p.minFps.toFixed(0)} | ${p.maxEntities} | ${p.avgLogic.toFixed(2)} | ${p.avgPathfinding.toFixed(2)} | ${p.avgCollision.toFixed(2)} | ${p.avgRender.toFixed(2)} | ${overhead.toFixed(2)} | ${memStr} |\n`;
         });
 
         md += `\n## 🚨 Analysis\n`;
@@ -177,5 +185,7 @@ export class StressLogger {
     public static reset() {
         this.phases = [];
         this.currentPhase = null;
+        this.phaseStartTs = 0;
+        this.phaseEndTs = 0;
     }
 }
