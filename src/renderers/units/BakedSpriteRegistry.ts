@@ -56,4 +56,8 @@ export class BakedSpriteRegistry {
 
         return undefined;
     }
+
+    public static hasType(typeId: string): boolean {
+        return this.frames.has(typeId) || this.dir3Frames.has(typeId);
+    }
 }

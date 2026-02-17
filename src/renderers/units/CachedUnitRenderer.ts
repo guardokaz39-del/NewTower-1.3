@@ -4,6 +4,7 @@ import { FrameClock } from '../../utils/FrameClock';
 import { PerformanceProfiler } from '../../utils/PerformanceProfiler';
 import { BakedSpriteRegistry } from './BakedSpriteRegistry';
 import type { Enemy } from '../../Enemy';
+import { normalizeUnitTypeId } from './unitTypeIdNormalization';
 
 export type SpriteOrientationMode = 'ROTATE' | 'FLIP' | 'DIR3';
 export type SpriteFacing = 'SIDE' | 'UP' | 'DOWN';
@@ -14,6 +15,8 @@ export type SpriteFacing = 'SIDE' | 'UP' | 'DOWN';
  * Falls back to abstract `drawFrame` (procedural) if sprite is missing.
  */
 export abstract class CachedUnitRenderer implements UnitRenderer {
+    private static readonly MAX_DEBUG_LOGS_PER_TYPE = 3;
+    private static missingRegistryLogCountByType: Map<string, number> = new Map();
 
     // Multiplier for walk cycle speed.
     // Orc: 0.1, Goblin: 0.25, etc.
@@ -63,11 +66,23 @@ export abstract class CachedUnitRenderer implements UnitRenderer {
 
         // Determine facing for key generation (needed for DIR3)
         const facing = this.getFacing(rotation);
-        const legacyKey = this.getSpriteKey(enemy.typeId, frameIdx, facing);
-        let sprite: HTMLCanvasElement | HTMLImageElement | undefined = BakedSpriteRegistry.get(enemy.typeId, facing, frameIdx);
+        const runtimeTypeId = enemy.typeId;
+        const baseTypeId = normalizeUnitTypeId(runtimeTypeId, enemy);
+        const expectedKey = this.getSpriteKey(baseTypeId, frameIdx, facing);
+        const runtimeKey = this.getSpriteKey(runtimeTypeId, frameIdx, facing);
+
+        let sprite: HTMLCanvasElement | HTMLImageElement | undefined = BakedSpriteRegistry.get(baseTypeId, facing, frameIdx);
+
+        if (!sprite && baseTypeId !== runtimeTypeId) {
+            sprite = BakedSpriteRegistry.get(runtimeTypeId, facing, frameIdx);
+        }
 
         if (!sprite) {
-            sprite = Assets.get(legacyKey);
+            this.logMissingBakedFrame(runtimeTypeId, facing, frameIdx, expectedKey, baseTypeId);
+        }
+
+        if (!sprite) {
+            sprite = Assets.get(runtimeKey);
             if ((globalThis as any).ENABLE_STRESS_PROFILING === true || (import.meta as any).env?.DEV) {
                 PerformanceProfiler.inc('unitSpriteFallback');
             }
@@ -149,6 +164,26 @@ export abstract class CachedUnitRenderer implements UnitRenderer {
         if (this.orientationMode !== 'DIR3') return `unit_${enemyTypeId}_walk_${frameIdx}`;
         // DIR3 uses directional keys
         return `unit_${enemyTypeId}_${facing.toLowerCase()}_walk_${frameIdx}`;
+    }
+
+    private logMissingBakedFrame(runtimeTypeId: string, facing: SpriteFacing, frameIdx: number, expectedKey: string, normalizedTypeId: string): void {
+        const isDebugEnabled = (globalThis as any).ENABLE_STRESS_PROFILING === true || (import.meta as any).env?.DEV;
+        if (!isDebugEnabled) return;
+
+        PerformanceProfiler.inc('unitSpriteMissing');
+        PerformanceProfiler.inc(`unitSpriteMissingByType:${runtimeTypeId}`);
+
+        const loggedCount = CachedUnitRenderer.missingRegistryLogCountByType.get(runtimeTypeId) || 0;
+        if (loggedCount >= CachedUnitRenderer.MAX_DEBUG_LOGS_PER_TYPE) return;
+
+        CachedUnitRenderer.missingRegistryLogCountByType.set(runtimeTypeId, loggedCount + 1);
+        console.warn('[CachedUnitRenderer] Missing baked registry frame', {
+            typeId: runtimeTypeId,
+            normalizedTypeId,
+            facing,
+            frameIdx,
+            expectedKey,
+        });
     }
 
     /**
