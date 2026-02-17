@@ -10,13 +10,28 @@ export interface StressPhaseStats {
     // Avg timings per frame
     avgLogic: number;
     avgRender: number;
+    avgRenderUnitsMs: number;
+    avgRenderProjectilesMs: number;
+    avgRenderParticlesMs: number;
+    avgRenderTilesOrBackgroundMs: number;
+    avgRenderUiMs: number;
+    avgRenderDebugMs: number;
     avgPathfinding: number;
     avgCollision: number;
     avgDrawParticles: number;
+    avgDrawCalls: number;
+    avgVisibleEntities: number;
+    avgParticlesRendered: number;
 
     // Memory
     memoryStart: number;
     memoryEnd: number;
+}
+
+export interface StressFrameCounters {
+    drawCalls: number;
+    visibleEntities: number;
+    particlesRendered: number;
 }
 
 export class StressLogger {
@@ -35,6 +50,15 @@ export class StressLogger {
     private static totalPath = 0;
     private static totalCollision = 0;
     private static totalParticles = 0;
+    private static totalRenderUnits = 0;
+    private static totalRenderProjectiles = 0;
+    private static totalRenderParticles = 0;
+    private static totalRenderTilesOrBackground = 0;
+    private static totalRenderUi = 0;
+    private static totalRenderDebug = 0;
+    private static totalDrawCalls = 0;
+    private static totalVisibleEntities = 0;
+    private static totalParticlesRendered = 0;
     private static samplesCount = 0; // Distinct from frameCount because of sampling
 
     public static startPhase(name: string) {
@@ -50,9 +74,18 @@ export class StressLogger {
             maxEntities: 0,
             avgLogic: 0,
             avgRender: 0,
+            avgRenderUnitsMs: 0,
+            avgRenderProjectilesMs: 0,
+            avgRenderParticlesMs: 0,
+            avgRenderTilesOrBackgroundMs: 0,
+            avgRenderUiMs: 0,
+            avgRenderDebugMs: 0,
             avgPathfinding: 0,
             avgCollision: 0,
             avgDrawParticles: 0,
+            avgDrawCalls: 0,
+            avgVisibleEntities: 0,
+            avgParticlesRendered: 0,
             memoryStart: mem,
             memoryEnd: 0,
         };
@@ -68,12 +101,21 @@ export class StressLogger {
         this.totalPath = 0;
         this.totalCollision = 0;
         this.totalParticles = 0;
+        this.totalRenderUnits = 0;
+        this.totalRenderProjectiles = 0;
+        this.totalRenderParticles = 0;
+        this.totalRenderTilesOrBackground = 0;
+        this.totalRenderUi = 0;
+        this.totalRenderDebug = 0;
+        this.totalDrawCalls = 0;
+        this.totalVisibleEntities = 0;
+        this.totalParticlesRendered = 0;
         this.samplesCount = 0;
 
         console.log(`[StressTest] Starting Phase: ${name}`);
     }
 
-    public static logFrame(dt: number, currentFps: number, entityCount: number) {
+    public static logFrame(dt: number, currentFps: number, entityCount: number, counters?: StressFrameCounters) {
         if (!this.currentPhase) return;
 
         this.frameCount++;
@@ -82,6 +124,12 @@ export class StressLogger {
 
         if (entityCount > this.currentPhase.maxEntities) {
             this.currentPhase.maxEntities = entityCount;
+        }
+
+        if (counters) {
+            this.totalDrawCalls += counters.drawCalls;
+            this.totalVisibleEntities += counters.visibleEntities;
+            this.totalParticlesRendered += counters.particlesRendered;
         }
 
         // Get Profiler Data
@@ -95,6 +143,12 @@ export class StressLogger {
             this.totalCollision += data['Collision'] || 0;
             // Assuming 'Render' includes particles, but if we have specific 'DrawParticles' label:
             this.totalParticles += data['DrawParticles'] || 0;
+            this.totalRenderUnits += data['RenderUnits'] || 0;
+            this.totalRenderProjectiles += data['RenderProjectiles'] || 0;
+            this.totalRenderParticles += data['RenderParticles'] || 0;
+            this.totalRenderTilesOrBackground += data['RenderTilesOrBackground'] || 0;
+            this.totalRenderUi += data['RenderUi'] || 0;
+            this.totalRenderDebug += data['RenderDebug'] || 0;
         }
     }
 
@@ -122,6 +176,17 @@ export class StressLogger {
         this.currentPhase.avgPathfinding = this.totalPath / div;
         this.currentPhase.avgCollision = this.totalCollision / div;
         this.currentPhase.avgDrawParticles = this.totalParticles / div;
+        this.currentPhase.avgRenderUnitsMs = this.totalRenderUnits / div;
+        this.currentPhase.avgRenderProjectilesMs = this.totalRenderProjectiles / div;
+        this.currentPhase.avgRenderParticlesMs = this.totalRenderParticles / div;
+        this.currentPhase.avgRenderTilesOrBackgroundMs = this.totalRenderTilesOrBackground / div;
+        this.currentPhase.avgRenderUiMs = this.totalRenderUi / div;
+        this.currentPhase.avgRenderDebugMs = this.totalRenderDebug / div;
+
+        const frameDiv = this.frameCount > 0 ? this.frameCount : 1;
+        this.currentPhase.avgDrawCalls = this.totalDrawCalls / frameDiv;
+        this.currentPhase.avgVisibleEntities = this.totalVisibleEntities / frameDiv;
+        this.currentPhase.avgParticlesRendered = this.totalParticlesRendered / frameDiv;
 
         this.phases.push(this.currentPhase);
         this.currentPhase = null;
@@ -149,6 +214,14 @@ export class StressLogger {
             const overhead = Math.max(0, frameTime - measured);
 
             md += `| ${p.phaseName} | ${p.duration.toFixed(2)} | ${p.avgFps.toFixed(0)} | ${p.minFps.toFixed(0)} | ${p.maxEntities} | ${p.avgLogic.toFixed(2)} | ${p.avgPathfinding.toFixed(2)} | ${p.avgCollision.toFixed(2)} | ${p.avgRender.toFixed(2)} | ${overhead.toFixed(2)} | ${memStr} |\n`;
+        });
+
+        md += `\n## 🎨 Render breakdown\n`;
+        md += `| Phase | Units (ms) | Projectiles (ms) | Particles (ms) | Tiles/BG (ms) | UI (ms) | Debug (ms) | Draw Calls | Visible Entities | Particles Rendered |\n`;
+        md += `|-------|------------|------------------|----------------|---------------|---------|------------|------------|------------------|--------------------|\n`;
+
+        this.phases.forEach((p) => {
+            md += `| ${p.phaseName} | ${p.avgRenderUnitsMs.toFixed(2)} | ${p.avgRenderProjectilesMs.toFixed(2)} | ${p.avgRenderParticlesMs.toFixed(2)} | ${p.avgRenderTilesOrBackgroundMs.toFixed(2)} | ${p.avgRenderUiMs.toFixed(2)} | ${p.avgRenderDebugMs.toFixed(2)} | ${p.avgDrawCalls.toFixed(0)} | ${p.avgVisibleEntities.toFixed(0)} | ${p.avgParticlesRendered.toFixed(0)} |\n`;
         });
 
         md += `\n## 🚨 Analysis\n`;

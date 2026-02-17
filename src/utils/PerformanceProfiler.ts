@@ -4,6 +4,9 @@
  */
 export class PerformanceProfiler {
     private static enabled = false;
+    private static readonly forceEnableViaFlag =
+        (globalThis as any).ENABLE_STRESS_PROFILING === true ||
+        ((import.meta as any).env?.VITE_ENABLE_STRESS_PROFILING === 'true');
     private static startTimes = new Map<string, number>();
     private static durations = new Map<string, number>();
     private static counts = new Map<string, number>();
@@ -13,7 +16,10 @@ export class PerformanceProfiler {
     private static frameCount = 0;
     private static isActiveFrame = false;
 
-    public static enable() {
+    public static enable(forceForStressTest: boolean = false) {
+        if (!forceForStressTest && !this.forceEnableViaFlag) {
+            return;
+        }
         this.enabled = true;
         this.reset();
     }
