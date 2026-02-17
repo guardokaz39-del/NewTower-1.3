@@ -63,6 +63,12 @@ export class StressLogger {
     private static totalUnitSpriteFallback = 0;
     private static samplesCount = 0; // Distinct from frameCount because of sampling
 
+    private static safeAverage(sum: number, count: number): number {
+        if (count === 0) return 0;
+        const value = sum / count;
+        return Number.isNaN(value) ? 0 : value;
+    }
+
     public static startPhase(name: string) {
         this.finishPhase(); // Finish previous if exists
 
@@ -175,24 +181,22 @@ export class StressLogger {
         this.currentPhase.minFps = this.fpsSamples[lowIndex] || 0;
 
         // Timing Averages
-        const div = this.samplesCount > 0 ? this.samplesCount : 1;
-        this.currentPhase.avgLogic = this.totalLogic / div;
-        this.currentPhase.avgRender = this.totalRender / div;
-        this.currentPhase.avgPathfinding = this.totalPath / div;
-        this.currentPhase.avgCollision = this.totalCollision / div;
-        this.currentPhase.avgDrawParticles = this.totalParticles / div;
-        this.currentPhase.avgRenderUnitsMs = this.totalRenderUnits / div;
-        this.currentPhase.avgRenderProjectilesMs = this.totalRenderProjectiles / div;
-        this.currentPhase.avgRenderParticlesMs = this.totalRenderParticles / div;
-        this.currentPhase.avgRenderTilesOrBackgroundMs = this.totalRenderTilesOrBackground / div;
-        this.currentPhase.avgRenderUiMs = this.totalRenderUi / div;
-        this.currentPhase.avgRenderDebugMs = this.totalRenderDebug / div;
+        this.currentPhase.avgLogic = this.safeAverage(this.totalLogic, this.samplesCount);
+        this.currentPhase.avgRender = this.safeAverage(this.totalRender, this.samplesCount);
+        this.currentPhase.avgPathfinding = this.safeAverage(this.totalPath, this.samplesCount);
+        this.currentPhase.avgCollision = this.safeAverage(this.totalCollision, this.samplesCount);
+        this.currentPhase.avgDrawParticles = this.safeAverage(this.totalParticles, this.samplesCount);
+        this.currentPhase.avgRenderUnitsMs = this.safeAverage(this.totalRenderUnits, this.samplesCount);
+        this.currentPhase.avgRenderProjectilesMs = this.safeAverage(this.totalRenderProjectiles, this.samplesCount);
+        this.currentPhase.avgRenderParticlesMs = this.safeAverage(this.totalRenderParticles, this.samplesCount);
+        this.currentPhase.avgRenderTilesOrBackgroundMs = this.safeAverage(this.totalRenderTilesOrBackground, this.samplesCount);
+        this.currentPhase.avgRenderUiMs = this.safeAverage(this.totalRenderUi, this.samplesCount);
+        this.currentPhase.avgRenderDebugMs = this.safeAverage(this.totalRenderDebug, this.samplesCount);
 
-        const frameDiv = this.frameCount > 0 ? this.frameCount : 1;
-        this.currentPhase.avgDrawCalls = this.totalDrawCalls / frameDiv;
-        this.currentPhase.avgVisibleEntities = this.totalVisibleEntities / frameDiv;
-        this.currentPhase.avgParticlesRendered = this.totalParticlesRendered / frameDiv;
-        this.currentPhase.avgUnitSpriteFallback = this.totalUnitSpriteFallback / div;
+        this.currentPhase.avgDrawCalls = this.safeAverage(this.totalDrawCalls, this.frameCount);
+        this.currentPhase.avgVisibleEntities = this.safeAverage(this.totalVisibleEntities, this.frameCount);
+        this.currentPhase.avgParticlesRendered = this.safeAverage(this.totalParticlesRendered, this.frameCount);
+        this.currentPhase.avgUnitSpriteFallback = this.safeAverage(this.totalUnitSpriteFallback, this.samplesCount);
 
         this.phases.push(this.currentPhase);
         this.currentPhase = null;

@@ -13,12 +13,6 @@ export class AssetCache {
         height: number,
     ): HTMLCanvasElement {
         if (!this.cache.has(key)) {
-            // Simple Cache Cap (Phase 5.C Lite)
-            // If cache grows too large, clear it completely to prevent memory leaks
-            if (this.cache.size > 512) {
-                this.cache.clear();
-            }
-
             const canvas = document.createElement('canvas');
             canvas.width = width;
             canvas.height = height;
