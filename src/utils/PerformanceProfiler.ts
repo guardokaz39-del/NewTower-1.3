@@ -65,9 +65,6 @@ export class PerformanceProfiler {
         const duration = performance.now() - startTime;
         const currentTotal = this.durations.get(label) || 0;
         this.durations.set(label, currentTotal + duration);
-
-        const currentCount = this.counts.get(label) || 0;
-        this.counts.set(label, currentCount + 1);
     }
 
 
