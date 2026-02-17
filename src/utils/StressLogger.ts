@@ -23,6 +23,8 @@ export interface StressPhaseStats {
     avgVisibleEntities: number;
     avgParticlesRendered: number;
     avgUnitSpriteFallback: number;
+    avgUnitSpriteMissing: number;
+    missingBakedFramesByType: Record<string, number>;
 
     // Memory
     memoryStart: number;
@@ -61,6 +63,8 @@ export class StressLogger {
     private static totalVisibleEntities = 0;
     private static totalParticlesRendered = 0;
     private static totalUnitSpriteFallback = 0;
+    private static totalUnitSpriteMissing = 0;
+    private static totalMissingBakedFramesByType: Map<string, number> = new Map();
     private static samplesCount = 0; // Distinct from frameCount because of sampling
 
     private static safeAverage(sum: number, count: number): number {
@@ -95,6 +99,8 @@ export class StressLogger {
             avgVisibleEntities: 0,
             avgParticlesRendered: 0,
             avgUnitSpriteFallback: 0,
+            avgUnitSpriteMissing: 0,
+            missingBakedFramesByType: {},
             memoryStart: mem,
             memoryEnd: 0,
         };
@@ -120,6 +126,8 @@ export class StressLogger {
         this.totalVisibleEntities = 0;
         this.totalParticlesRendered = 0;
         this.totalUnitSpriteFallback = 0;
+        this.totalUnitSpriteMissing = 0;
+        this.totalMissingBakedFramesByType.clear();
         this.samplesCount = 0;
 
         console.log(`[StressTest] Starting Phase: ${name}`);
@@ -160,6 +168,13 @@ export class StressLogger {
             this.totalRenderUi += data['RenderUi'] || 0;
             this.totalRenderDebug += data['RenderDebug'] || 0;
             this.totalUnitSpriteFallback += data['unitSpriteFallback'] || 0;
+            this.totalUnitSpriteMissing += data['unitSpriteMissing'] || 0;
+            Object.entries(data).forEach(([key, value]) => {
+                if (!key.startsWith('unitSpriteMissingByType:')) return;
+                const typeId = key.substring('unitSpriteMissingByType:'.length);
+                const current = this.totalMissingBakedFramesByType.get(typeId) || 0;
+                this.totalMissingBakedFramesByType.set(typeId, current + value);
+            });
         }
     }
 
@@ -197,6 +212,8 @@ export class StressLogger {
         this.currentPhase.avgVisibleEntities = this.safeAverage(this.totalVisibleEntities, this.frameCount);
         this.currentPhase.avgParticlesRendered = this.safeAverage(this.totalParticlesRendered, this.frameCount);
         this.currentPhase.avgUnitSpriteFallback = this.safeAverage(this.totalUnitSpriteFallback, this.samplesCount);
+        this.currentPhase.avgUnitSpriteMissing = this.safeAverage(this.totalUnitSpriteMissing, this.samplesCount);
+        this.currentPhase.missingBakedFramesByType = Object.fromEntries(this.totalMissingBakedFramesByType.entries());
 
         this.phases.push(this.currentPhase);
         this.currentPhase = null;
@@ -227,11 +244,21 @@ export class StressLogger {
         });
 
         md += `\n## 🎨 Render breakdown\n`;
-        md += `| Phase | Units (ms) | Projectiles (ms) | Particles (ms) | Tiles/BG (ms) | UI (ms) | Debug (ms) | Draw Calls | Visible Entities | Particles Rendered | unitSpriteFallback |\n`;
-        md += `|-------|------------|------------------|----------------|---------------|---------|------------|------------|------------------|--------------------|--------------------|\n`;
+        md += `| Phase | Units (ms) | Projectiles (ms) | Particles (ms) | Tiles/BG (ms) | UI (ms) | Debug (ms) | Draw Calls | Visible Entities | Particles Rendered | unitSpriteFallback | unitSpriteMissing |\n`;
+        md += `|-------|------------|------------------|----------------|---------------|---------|------------|------------|------------------|--------------------|--------------------|-------------------|\n`;
 
         this.phases.forEach((p) => {
-            md += `| ${p.phaseName} | ${p.avgRenderUnitsMs.toFixed(2)} | ${p.avgRenderProjectilesMs.toFixed(2)} | ${p.avgRenderParticlesMs.toFixed(2)} | ${p.avgRenderTilesOrBackgroundMs.toFixed(2)} | ${p.avgRenderUiMs.toFixed(2)} | ${p.avgRenderDebugMs.toFixed(2)} | ${p.avgDrawCalls.toFixed(0)} | ${p.avgVisibleEntities.toFixed(0)} | ${p.avgParticlesRendered.toFixed(0)} | ${p.avgUnitSpriteFallback.toFixed(2)} |\n`;
+            md += `| ${p.phaseName} | ${p.avgRenderUnitsMs.toFixed(2)} | ${p.avgRenderProjectilesMs.toFixed(2)} | ${p.avgRenderParticlesMs.toFixed(2)} | ${p.avgRenderTilesOrBackgroundMs.toFixed(2)} | ${p.avgRenderUiMs.toFixed(2)} | ${p.avgRenderDebugMs.toFixed(2)} | ${p.avgDrawCalls.toFixed(0)} | ${p.avgVisibleEntities.toFixed(0)} | ${p.avgParticlesRendered.toFixed(0)} | ${p.avgUnitSpriteFallback.toFixed(2)} | ${p.avgUnitSpriteMissing.toFixed(2)} |\n`;
+        });
+
+        md += `\n## 🧩 Missing baked frames by type\n`;
+        this.phases.forEach((p) => {
+            const entries = Object.entries(p.missingBakedFramesByType);
+            if (entries.length === 0) return;
+            md += `- **${p.phaseName}**\n`;
+            entries.sort((a, b) => b[1] - a[1]).forEach(([typeId, count]) => {
+                md += `  - ${typeId}: ${count}\n`;
+            });
         });
 
         md += `\n## 🚨 Analysis\n`;
