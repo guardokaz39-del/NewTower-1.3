@@ -70,6 +70,14 @@ export class PerformanceProfiler {
         this.counts.set(label, currentCount + 1);
     }
 
+
+    public static inc(label: string, value: number = 1) {
+        if (!this.enabled || !this.isActiveFrame) return;
+
+        const current = this.counts.get(label) || 0;
+        this.counts.set(label, current + value);
+    }
+
     public static getFrameData(): Record<string, number> {
         // Return 0s if not active frame, or return cached last frame data?
         // For simplicity, we return the current map as object.
@@ -82,6 +90,9 @@ export class PerformanceProfiler {
 
         this.durations.forEach((val, key) => {
             result[key] = val;
+        });
+        this.counts.forEach((val, key) => {
+            result[key] = (result[key] || 0) + val;
         });
         return result;
     }

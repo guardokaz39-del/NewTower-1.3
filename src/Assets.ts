@@ -13,6 +13,7 @@ import { RatUnitRenderer } from './renderers/units/RatUnitRenderer';
 import { HellhoundUnitRenderer } from './renderers/units/HellhoundUnitRenderer';
 import { MagmaUnitRenderer } from './renderers/units/MagmaUnitRenderer';
 import { FleshUnitRenderer } from './renderers/units/FleshUnitRenderer';
+import { BakedSpriteRegistry } from './renderers/units/BakedSpriteRegistry';
 
 export class Assets {
     // Хранилище изображений
@@ -1935,41 +1936,53 @@ export class Assets {
         try {
             // 1. Orc
             SpriteBaker.bakeWalkCycle('orc', new OrcUnitRenderer());
+            BakedSpriteRegistry.registerSide('orc');
             console.log('✓ Baked walk cycle for "orc"');
 
             // 2. Skeleton
             SpriteBaker.bakeWalkCycle('skeleton', new SkeletonUnitRenderer());
+            BakedSpriteRegistry.registerSide('skeleton');
             console.log('✓ Baked walk cycle for "skeleton"');
 
             // 3. Goblin
             SpriteBaker.bakeWalkCycle('goblin', new GoblinUnitRenderer());
+            BakedSpriteRegistry.registerSide('goblin');
             console.log('✓ Baked walk cycle for "goblin"');
 
             // 4. Spider
             SpriteBaker.bakeWalkCycle('spider', new SpiderUnitRenderer());
+            BakedSpriteRegistry.registerSide('spider');
             console.log('✓ Baked walk cycle for "spider"');
 
             // 5. Troll
             SpriteBaker.bakeWalkCycle('troll', new TrollUnitRenderer());
+            BakedSpriteRegistry.registerSide('troll');
             console.log('✓ Baked walk cycle for "troll"');
 
             // 6. Rat
             SpriteBaker.bakeWalkCycle('rat', new RatUnitRenderer());
+            BakedSpriteRegistry.registerSide('rat');
             SpriteBaker.bakeWalkCycle('sapper_rat', new RatUnitRenderer());
+            BakedSpriteRegistry.registerSide('sapper_rat');
             console.log('✓ Baked walk cycle for "rat" & "sapper_rat"');
 
             // 7. Hellhound
             SpriteBaker.bakeWalkCycle('hellhound', new HellhoundUnitRenderer());
+            BakedSpriteRegistry.registerSide('hellhound');
             SpriteBaker.bakeWalkCycle('scout', new HellhoundUnitRenderer());
+            BakedSpriteRegistry.registerSide('scout');
             console.log('✓ Baked walk cycle for "hellhound" & "scout"');
 
             // 8. Magma (King & Statue)
             SpriteBaker.bakeWalkCycle('magma_king', new MagmaUnitRenderer());
+            BakedSpriteRegistry.registerSide('magma_king');
             SpriteBaker.bakeWalkCycle('magma_statue', new MagmaUnitRenderer());
+            BakedSpriteRegistry.registerSide('magma_statue');
             console.log('✓ Baked walk cycle for "magma_king" & "magma_statue"');
 
             // 9. Flesh Colossus
             SpriteBaker.bakeWalkCycle('flesh_colossus', new FleshUnitRenderer());
+            BakedSpriteRegistry.registerDir3('flesh_colossus');
             console.log('✓ Baked walk cycle for "flesh_colossus"');
 
             // TODO: Add more enemies here as their renderers are updated

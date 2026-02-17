@@ -9,6 +9,7 @@ import { CardSelectionUI } from './CardSelectionUI';
 import { loadSessionData, saveSessionData } from './Utils';
 import { Enemy } from './Enemy';
 import { PerformanceMonitor } from './utils/PerformanceMonitor';
+import { FrameClock } from './utils/FrameClock';
 
 export class Game {
     public canvas: HTMLCanvasElement;
@@ -191,6 +192,7 @@ export class Game {
 
     private loop(timestamp: number) {
         PerformanceMonitor.beginFrame();
+        FrameClock.nowSec = timestamp * 0.001;
 
         // 1. Вычисляем дельту (в секундах)
         const dt = (timestamp - this.lastTime) / 1000;

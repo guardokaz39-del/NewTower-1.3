@@ -1,5 +1,8 @@
 import { UnitRenderer } from './UnitRenderer';
 import { Assets } from '../../Assets';
+import { FrameClock } from '../../utils/FrameClock';
+import { PerformanceProfiler } from '../../utils/PerformanceProfiler';
+import { BakedSpriteRegistry } from './BakedSpriteRegistry';
 import type { Enemy } from '../../Enemy';
 
 export type SpriteOrientationMode = 'ROTATE' | 'FLIP' | 'DIR3';
@@ -48,7 +51,7 @@ export abstract class CachedUnitRenderer implements UnitRenderer {
      * Standard draw method called by EnemyRenderer.
      */
     public drawBody(ctx: CanvasRenderingContext2D, enemy: Enemy, scale: number, rotation: number): void {
-        const time = Date.now() * 0.001;
+        const time = FrameClock.nowSec;
         const walkCycle = time * (enemy.baseSpeed * this.walkCycleMultiplier);
 
         // Calculate normalized time t (0..1) for the cycle
@@ -60,8 +63,15 @@ export abstract class CachedUnitRenderer implements UnitRenderer {
 
         // Determine facing for key generation (needed for DIR3)
         const facing = this.getFacing(rotation);
-        const frameKey = this.getSpriteKey(enemy.typeId, frameIdx, facing);
-        const sprite = Assets.get(frameKey);
+        const legacyKey = this.getSpriteKey(enemy.typeId, frameIdx, facing);
+        let sprite: HTMLCanvasElement | HTMLImageElement | undefined = BakedSpriteRegistry.get(enemy.typeId, facing, frameIdx);
+
+        if (!sprite) {
+            sprite = Assets.get(legacyKey);
+            if ((globalThis as any).ENABLE_STRESS_PROFILING === true || (import.meta as any).env?.DEV) {
+                PerformanceProfiler.inc('unitSpriteFallback');
+            }
+        }
 
         if (sprite) {
             ctx.save();

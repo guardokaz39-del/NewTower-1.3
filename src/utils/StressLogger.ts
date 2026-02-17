@@ -22,6 +22,7 @@ export interface StressPhaseStats {
     avgDrawCalls: number;
     avgVisibleEntities: number;
     avgParticlesRendered: number;
+    avgUnitSpriteFallback: number;
 
     // Memory
     memoryStart: number;
@@ -59,6 +60,7 @@ export class StressLogger {
     private static totalDrawCalls = 0;
     private static totalVisibleEntities = 0;
     private static totalParticlesRendered = 0;
+    private static totalUnitSpriteFallback = 0;
     private static samplesCount = 0; // Distinct from frameCount because of sampling
 
     public static startPhase(name: string) {
@@ -86,6 +88,7 @@ export class StressLogger {
             avgDrawCalls: 0,
             avgVisibleEntities: 0,
             avgParticlesRendered: 0,
+            avgUnitSpriteFallback: 0,
             memoryStart: mem,
             memoryEnd: 0,
         };
@@ -110,6 +113,7 @@ export class StressLogger {
         this.totalDrawCalls = 0;
         this.totalVisibleEntities = 0;
         this.totalParticlesRendered = 0;
+        this.totalUnitSpriteFallback = 0;
         this.samplesCount = 0;
 
         console.log(`[StressTest] Starting Phase: ${name}`);
@@ -149,6 +153,7 @@ export class StressLogger {
             this.totalRenderTilesOrBackground += data['RenderTilesOrBackground'] || 0;
             this.totalRenderUi += data['RenderUi'] || 0;
             this.totalRenderDebug += data['RenderDebug'] || 0;
+            this.totalUnitSpriteFallback += data['unitSpriteFallback'] || 0;
         }
     }
 
@@ -187,6 +192,7 @@ export class StressLogger {
         this.currentPhase.avgDrawCalls = this.totalDrawCalls / frameDiv;
         this.currentPhase.avgVisibleEntities = this.totalVisibleEntities / frameDiv;
         this.currentPhase.avgParticlesRendered = this.totalParticlesRendered / frameDiv;
+        this.currentPhase.avgUnitSpriteFallback = this.totalUnitSpriteFallback / div;
 
         this.phases.push(this.currentPhase);
         this.currentPhase = null;
@@ -217,11 +223,11 @@ export class StressLogger {
         });
 
         md += `\n## 🎨 Render breakdown\n`;
-        md += `| Phase | Units (ms) | Projectiles (ms) | Particles (ms) | Tiles/BG (ms) | UI (ms) | Debug (ms) | Draw Calls | Visible Entities | Particles Rendered |\n`;
-        md += `|-------|------------|------------------|----------------|---------------|---------|------------|------------|------------------|--------------------|\n`;
+        md += `| Phase | Units (ms) | Projectiles (ms) | Particles (ms) | Tiles/BG (ms) | UI (ms) | Debug (ms) | Draw Calls | Visible Entities | Particles Rendered | unitSpriteFallback |\n`;
+        md += `|-------|------------|------------------|----------------|---------------|---------|------------|------------|------------------|--------------------|--------------------|\n`;
 
         this.phases.forEach((p) => {
-            md += `| ${p.phaseName} | ${p.avgRenderUnitsMs.toFixed(2)} | ${p.avgRenderProjectilesMs.toFixed(2)} | ${p.avgRenderParticlesMs.toFixed(2)} | ${p.avgRenderTilesOrBackgroundMs.toFixed(2)} | ${p.avgRenderUiMs.toFixed(2)} | ${p.avgRenderDebugMs.toFixed(2)} | ${p.avgDrawCalls.toFixed(0)} | ${p.avgVisibleEntities.toFixed(0)} | ${p.avgParticlesRendered.toFixed(0)} |\n`;
+            md += `| ${p.phaseName} | ${p.avgRenderUnitsMs.toFixed(2)} | ${p.avgRenderProjectilesMs.toFixed(2)} | ${p.avgRenderParticlesMs.toFixed(2)} | ${p.avgRenderTilesOrBackgroundMs.toFixed(2)} | ${p.avgRenderUiMs.toFixed(2)} | ${p.avgRenderDebugMs.toFixed(2)} | ${p.avgDrawCalls.toFixed(0)} | ${p.avgVisibleEntities.toFixed(0)} | ${p.avgParticlesRendered.toFixed(0)} | ${p.avgUnitSpriteFallback.toFixed(2)} |\n`;
         });
 
         md += `\n## 🚨 Analysis\n`;
