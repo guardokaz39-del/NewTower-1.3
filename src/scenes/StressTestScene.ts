@@ -249,7 +249,7 @@ export class StressTestScene extends BaseScene implements IGameScene {
         this.timer = 0;
         StressLogger.reset();
         StressLogger.startPhase(PHASE_LABELS[TestPhase.WARMUP]);
-        PerformanceProfiler.enable();
+        PerformanceProfiler.enable(true);
 
         // Initial FlowField
         this.map.requestFlowFieldUpdate();
@@ -336,6 +336,8 @@ export class StressTestScene extends BaseScene implements IGameScene {
 
     // Ramp Up Stability Counter
     private lowFpsFrames = 0;
+    private readonly renderParticleTargets = [200, 300, 400, 500, 600];
+    private readonly renderParticleStepSeconds = 3;
 
     private updatePhase(dt: number, currentFps: number) {
         switch (this.phase) {
@@ -405,21 +407,29 @@ export class StressTestScene extends BaseScene implements IGameScene {
                     this.lastRampUp = this.timer;
                     this.lowFpsFrames = 0;
                 } else {
-                    // Spawn Particles continuously
-                    // We want to force Draw Calls
-                    PerformanceProfiler.start('Logic'); // Creating them is logic
-                    for (let i = 0; i < 30; i++) {
-                        // Increased to 30 to ensure load
-                        this.effects.add({
-                            type: 'particle',
-                            x: this.rng.rangeFloat(0, this.game.width),
-                            y: this.rng.rangeFloat(0, this.game.height),
-                            life: 0.8,
-                            color: this.rng.chance(0.5) ? '#fff' : '#ff0000',
-                            size: 4,
-                        });
+                    // Gradual particle ramp: 200 -> 300 -> ... until end of phase
+                    const renderPhaseTime = Math.max(0, this.timer - 40);
+                    const bucket = Math.min(
+                        this.renderParticleTargets.length - 1,
+                        Math.floor(renderPhaseTime / this.renderParticleStepSeconds),
+                    );
+                    const targetParticles = this.renderParticleTargets[bucket];
+                    const missingParticles = Math.max(0, targetParticles - this.effects.activeEffects.length);
+
+                    if (missingParticles > 0) {
+                        PerformanceProfiler.start('Logic'); // Creating them is logic
+                        for (let i = 0; i < missingParticles; i++) {
+                            this.effects.add({
+                                type: 'particle',
+                                x: this.rng.rangeFloat(0, this.game.width),
+                                y: this.rng.rangeFloat(0, this.game.height),
+                                life: 0.8,
+                                color: this.rng.chance(0.5) ? '#fff' : '#ff0000',
+                                size: 4,
+                            });
+                        }
+                        PerformanceProfiler.end('Logic');
                     }
-                    PerformanceProfiler.end('Logic');
                 }
                 break;
 
@@ -541,39 +551,57 @@ export class StressTestScene extends BaseScene implements IGameScene {
     public draw(ctx: CanvasRenderingContext2D) {
         PerformanceProfiler.start('Render');
 
+        let drawCalls = 0;
+        const visibleEntities =
+            this.gameState.enemies.length +
+            this.gameState.towers.length +
+            this.projectileSystem.projectiles.length;
+        const particlesRendered = this.effects.activeEffects.length;
+
+        PerformanceProfiler.start('RenderTilesOrBackground');
         ctx.fillStyle = '#222';
         ctx.fillRect(0, 0, this.game.width, this.game.height);
+        drawCalls++;
+        PerformanceProfiler.end('RenderTilesOrBackground');
 
-        // Draw Map (Simplified)
-        // this.map.draw(ctx); // Can use real map draw
-
-        // Draw Enemies
-        // Batch draw if possible? No, standard draw for stress test
+        PerformanceProfiler.start('RenderUnits');
         for (const e of this.gameState.enemies) {
             e.draw(ctx);
+            drawCalls++;
         }
 
-        // Draw Towers
         for (const t of this.gameState.towers) {
             t.draw(ctx);
+            drawCalls++;
         }
+        PerformanceProfiler.end('RenderUnits');
 
-        // Draw Projectiles
+        PerformanceProfiler.start('RenderProjectiles');
         this.projectileSystem.draw(ctx);
+        drawCalls += this.projectileSystem.projectiles.length;
+        PerformanceProfiler.end('RenderProjectiles');
 
-        // Draw Particles (This is the heavy part for Render Stress)
-        PerformanceProfiler.start('DrawParticles'); // Sub-metric
+        PerformanceProfiler.start('RenderParticles');
+        PerformanceProfiler.start('DrawParticles'); // Backward-compatible metric
         this.effects.draw();
         PerformanceProfiler.end('DrawParticles');
+        drawCalls += particlesRendered;
+        PerformanceProfiler.end('RenderParticles');
+
+        // Explicitly record optional buckets for reports (UI/debug are not drawn in scene canvas)
+        PerformanceProfiler.start('RenderUi');
+        PerformanceProfiler.end('RenderUi');
+        PerformanceProfiler.start('RenderDebug');
+        PerformanceProfiler.end('RenderDebug');
 
         PerformanceProfiler.end('Render');
 
-        // Log to StressLogger at END of frame (after Render)
-        const totalEntities =
-            this.gameState.enemies.length +
-            this.projectileSystem.projectiles.length +
-            this.effects.activeEffects.length;
-        StressLogger.logFrame(this.lastDt, this.lastFps, totalEntities);
+        const totalEntities = visibleEntities + particlesRendered;
+        StressLogger.logFrame(this.lastDt, this.lastFps, totalEntities, {
+            drawCalls,
+            visibleEntities,
+            particlesRendered,
+        });
     }
 
     private createOverlay() {
