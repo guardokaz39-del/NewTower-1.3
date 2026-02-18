@@ -88,6 +88,12 @@ export class WaveManager {
 
             // Peek at next enemy
             const nextEntry = this.spawnQueue[0];
+            const maxActiveEnemies = CONFIG.ENEMY.MAX_ACTIVE_ENEMIES ?? Number.POSITIVE_INFINITY;
+
+            if (this.scene.enemies.length >= maxActiveEnemies) {
+                // Spawn deferred while active enemy cap is reached.
+                return;
+            }
 
             if (this.spawnTimer >= nextEntry.interval) {
                 // Time to spawn!

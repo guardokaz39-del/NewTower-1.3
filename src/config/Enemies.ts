@@ -3,6 +3,7 @@ import { IEnemyTypeConfig } from '../types';
 export const ENEMY_CONFIG = {
     BASE_HP: 25,
     HP_GROWTH: 1.2,
+    MAX_ACTIVE_ENEMIES: 150,
 };
 
 export const ENEMY_TYPES: Record<string, IEnemyTypeConfig> = {
