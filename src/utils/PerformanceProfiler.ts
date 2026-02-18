@@ -6,7 +6,15 @@ export class PerformanceProfiler {
     private static enabled = false;
     private static readonly forceEnableViaFlag =
         (globalThis as any).ENABLE_STRESS_PROFILING === true ||
-        ((import.meta as any).env?.VITE_ENABLE_STRESS_PROFILING === 'true');
+        PerformanceProfiler.readViteEnvFlag() === 'true';
+
+    private static readViteEnvFlag(): string | undefined {
+        try {
+            return Function('return import.meta.env?.VITE_ENABLE_STRESS_PROFILING')();
+        } catch {
+            return undefined;
+        }
+    }
     private static startTimes = new Map<string, number>();
     private static durations = new Map<string, number>();
     private static counts = new Map<string, number>();
