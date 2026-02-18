@@ -18,6 +18,15 @@ export abstract class CachedUnitRenderer implements UnitRenderer {
     private static readonly MAX_DEBUG_LOGS_PER_TYPE = 3;
     private static missingRegistryLogCountByType: Map<string, number> = new Map();
 
+    private static isDebugEnabled(): boolean {
+        if ((globalThis as any).ENABLE_STRESS_PROFILING === true) return true;
+        try {
+            return Boolean(Function('return import.meta.env?.DEV')());
+        } catch {
+            return false;
+        }
+    }
+
     // Multiplier for walk cycle speed.
     // Orc: 0.1, Goblin: 0.25, etc.
     // Default: 0.15
@@ -83,7 +92,7 @@ export abstract class CachedUnitRenderer implements UnitRenderer {
 
         if (!sprite) {
             sprite = Assets.get(runtimeKey);
-            if ((globalThis as any).ENABLE_STRESS_PROFILING === true || (import.meta as any).env?.DEV) {
+            if (CachedUnitRenderer.isDebugEnabled()) {
                 PerformanceProfiler.inc('unitSpriteFallback');
             }
         }
@@ -167,7 +176,7 @@ export abstract class CachedUnitRenderer implements UnitRenderer {
     }
 
     private logMissingBakedFrame(runtimeTypeId: string, facing: SpriteFacing, frameIdx: number, expectedKey: string, normalizedTypeId: string): void {
-        const isDebugEnabled = (globalThis as any).ENABLE_STRESS_PROFILING === true || (import.meta as any).env?.DEV;
+        const isDebugEnabled = CachedUnitRenderer.isDebugEnabled();
         if (!isDebugEnabled) return;
 
         PerformanceProfiler.inc('unitSpriteMissing');

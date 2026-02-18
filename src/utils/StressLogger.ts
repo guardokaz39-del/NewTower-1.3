@@ -285,7 +285,7 @@ export class StressLogger {
             {
                 date: new Date().toISOString(),
                 phases: this.phases,
-                userAgent: navigator.userAgent,
+                userAgent: globalThis.navigator?.userAgent || 'unknown',
             },
             null,
             2,
