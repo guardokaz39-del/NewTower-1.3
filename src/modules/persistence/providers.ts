@@ -13,6 +13,14 @@ function getBrowserKey(namespace: string): string {
     return `NEWTOWER_${namespace.toUpperCase()}`;
 }
 
+function buildStorageUrl(namespace: string, id?: string): string {
+    const ns = encodeURIComponent(namespace);
+    if (id === undefined) {
+        return `/api/storage/${ns}`;
+    }
+    return `/api/storage/${ns}/${encodeURIComponent(id)}`;
+}
+
 export class BrowserStorageProvider implements IStorageProvider {
     public async list(namespace: string): Promise<SaveMeta[]> {
         const bucket = this.getNamespaceBucket(namespace);
@@ -100,13 +108,13 @@ export class BrowserStorageProvider implements IStorageProvider {
 
 export class FileStorageProvider implements IStorageProvider {
     public async list(namespace: string): Promise<SaveMeta[]> {
-        const response = await fetch(`/api/storage/${encodeURIComponent(namespace)}`);
+        const response = await fetch(buildStorageUrl(namespace));
         if (!response.ok) return [];
         return (await response.json()) as SaveMeta[];
     }
 
     public async load<T>(namespace: string, id: string): Promise<T | null> {
-        const response = await fetch(`/api/storage/${encodeURIComponent(namespace)}/${encodeURIComponent(id)}`);
+        const response = await fetch(buildStorageUrl(namespace, id));
         if (response.status === 404) return null;
         if (!response.ok) return null;
 
@@ -121,7 +129,7 @@ export class FileStorageProvider implements IStorageProvider {
     }
 
     public async save<T>(namespace: string, id: string, data: T): Promise<boolean> {
-        const response = await fetch(`/api/storage/${encodeURIComponent(namespace)}/${encodeURIComponent(id)}`, {
+        const response = await fetch(buildStorageUrl(namespace, id), {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -137,7 +145,7 @@ export class FileStorageProvider implements IStorageProvider {
     }
 
     public async delete(namespace: string, id: string): Promise<boolean> {
-        const response = await fetch(`/api/storage/${encodeURIComponent(namespace)}/${encodeURIComponent(id)}`, {
+        const response = await fetch(buildStorageUrl(namespace, id), {
             method: 'DELETE',
         });
         return response.ok;

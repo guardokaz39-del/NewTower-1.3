@@ -2,6 +2,7 @@ import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import type { Plugin, ViteDevServer } from 'vite';
+import { fromStorageFileName, toStorageFileName } from '../src/modules/persistence/fileIdCodec';
 
 const SAVE_ROOT = path.resolve(process.cwd(), 'saves');
 
@@ -14,6 +15,14 @@ function isSafeSegment(value: string): boolean {
         value.includes('..') ||
         lower.includes('%2e')
     );
+}
+
+function decodeUrlSegment(value: string): string | null {
+    try {
+        return decodeURIComponent(value);
+    } catch {
+        return null;
+    }
 }
 
 function readRequestBody(req: IncomingMessage): Promise<string> {
@@ -41,9 +50,13 @@ function sendJson(res: ServerResponse, statusCode: number, data: unknown): void 
 
 function parseRoute(urlPath: string): { namespace?: string; id?: string } {
     const parts = urlPath.split('/').filter(Boolean);
+
+    const namespace = parts[2] ? decodeUrlSegment(parts[2]) : undefined;
+    const id = parts[3] ? decodeUrlSegment(parts[3]) : undefined;
+
     return {
-        namespace: parts[2],
-        id: parts[3],
+        namespace: namespace ?? undefined,
+        id: id ?? undefined,
     };
 }
 
@@ -74,12 +87,13 @@ async function createStorageMiddleware(req: IncomingMessage, res: ServerResponse
             const stat = await fs.stat(filePath);
             const raw = JSON.parse(await fs.readFile(filePath, 'utf-8'));
             return {
-                id: file.replace(/\.json$/, ''),
+                id: fromStorageFileName(file),
                 namespace,
                 updatedAt: raw.updatedAt ?? stat.mtime.toISOString(),
                 schemaVersion: raw.schemaVersion ?? 1,
             };
         }));
+        items.sort((a, b) => a.id.localeCompare(b.id));
         sendJson(res, 200, items);
         return true;
     }
@@ -89,7 +103,7 @@ async function createStorageMiddleware(req: IncomingMessage, res: ServerResponse
         return true;
     }
 
-    const filePath = path.join(SAVE_ROOT, namespace, `${id}.json`);
+    const filePath = path.join(SAVE_ROOT, namespace, toStorageFileName(id));
 
     if (req.method === 'GET') {
         try {
@@ -147,7 +161,7 @@ export function saveBridgePlugin(): Plugin {
                 const parts = rel.split(path.sep);
                 if (parts.length < 2) return;
                 const ns = parts[0];
-                const id = parts[1].replace(/\.json$/, '');
+                const id = fromStorageFileName(parts[1]);
                 server.ws.send({ type: 'custom', event: 'saves:changed', data: { ns, id } });
             });
         },
