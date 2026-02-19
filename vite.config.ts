@@ -1,5 +1,6 @@
 import { defineConfig } from 'vite';
 import checker from 'vite-plugin-checker';
+import { saveBridgePlugin } from './vite.plugins/saveBridge';
 
 export default defineConfig({
     root: './',
@@ -11,6 +12,7 @@ export default defineConfig({
     },
     plugins: [
         checker({ typescript: true }), // Type check on build/dev
+        saveBridgePlugin(),
     ],
     server: {
         open: true, // Open browser on start

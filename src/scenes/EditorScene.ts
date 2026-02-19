@@ -3,7 +3,7 @@ import { Game } from '../Game';
 import { MapManager } from '../Map';
 import { CONFIG } from '../Config';
 import { IMapData, IMapObject, migrateMapData } from '../MapData';
-import { serializeMap, saveMapToStorage, getSavedMaps, deleteMapFromStorage } from '../Utils';
+import { serializeMap } from '../Utils';
 import { UIUtils } from '../UIUtils';
 import { Pathfinder } from '../Pathfinder';
 import { WaveEditor } from '../WaveEditor';
@@ -11,6 +11,8 @@ import { FogSystem } from '../FogSystem';
 import { EditorToolbar, EditorMode } from '../editor/EditorToolbar';
 import { WaypointManager } from '../editor/WaypointManager';
 import { EditorHistory, EditorActions } from '../editor/EditorHistory';
+import { StorageManager } from '../modules/persistence/StorageManager';
+import { MAP_SAVES_NAMESPACE, SaveMeta } from '../modules/persistence/types';
 
 export class EditorScene extends BaseScene {
     private game: Game;
@@ -28,6 +30,8 @@ export class EditorScene extends BaseScene {
     private mapsPanel!: HTMLElement;
     private mapsPanelExpanded: boolean = false;
     private currentMapName: string = '';
+    private mapsMeta: SaveMeta[] = [];
+    private storage = StorageManager.getInstance();
 
     // Track previous mouse state for click detection (not hold)
     private prevMouseDown: boolean = false;
@@ -74,6 +78,9 @@ export class EditorScene extends BaseScene {
 
         // Setup hotkeys with automatic cleanup
         this.on(document, 'keydown', (e: Event) => this.handleGlobalKey(e as KeyboardEvent));
+
+        void this.storage.initialize().then(() => this.refreshMapsPanel());
+        this.setupSaveHotReload();
     }
 
     protected onExitImpl() {
@@ -367,7 +374,7 @@ export class EditorScene extends BaseScene {
         );
     }
 
-    private saveMap(waves: any[]) {
+    private async saveMap(waves: any[]) {
         // [FIX] Ensure map waves are updated before serialization
         this.map.waves = waves;
 
@@ -393,10 +400,10 @@ export class EditorScene extends BaseScene {
         const name = prompt('Enter map name:', this.currentMapName || 'MyMap');
         if (!name) return;
 
-        if (saveMapToStorage(name, data)) {
+        if (await this.storage.saveMap(name, data)) {
             this.currentMapName = name; // Update current name
             alert(`Map "${name}" saved successfully!`);
-            this.refreshMapsPanel(); // Refresh UI
+            await this.refreshMapsPanel(); // Refresh UI
         } else {
             alert('Failed to save map (Storage full?)');
         }
@@ -444,6 +451,11 @@ export class EditorScene extends BaseScene {
         );
 
         addBtn('⚙️ WAVES & SAVE', () => this.openWaveConfig(), '#ff9800');
+        addBtn('⇪ Import browser saves', async () => {
+            const imported = await this.storage.importBrowserMaps();
+            alert(`Imported ${imported} map(s) from browser storage`);
+            await this.refreshMapsPanel();
+        }, '#607d8b');
         addBtn('🚪 MENU', () => this.game.toMenu(), '#d32f2f');
 
         document.body.appendChild(this.controlsContainer);
@@ -491,8 +503,8 @@ export class EditorScene extends BaseScene {
         this.refreshMapsPanel();
     }
 
-    private refreshMapsPanel() {
-        const maps = getSavedMaps();
+    private async refreshMapsPanel() {
+        this.mapsMeta = await this.storage.listMaps();
 
         // Clear current content except header
         while (this.mapsPanel.children.length > 1) {
@@ -508,9 +520,7 @@ export class EditorScene extends BaseScene {
 
         if (!this.mapsPanelExpanded) return;
 
-        const mapNames = Object.keys(maps);
-
-        if (mapNames.length === 0) {
+        if (this.mapsMeta.length === 0) {
             const empty = document.createElement('div');
             empty.style.color = '#888';
             empty.style.padding = '10px';
@@ -519,7 +529,7 @@ export class EditorScene extends BaseScene {
             return;
         }
 
-        mapNames.forEach((name) => {
+        this.mapsMeta.forEach((meta) => {
             const item = document.createElement('div');
             Object.assign(item.style, {
                 background: '#222',
@@ -534,7 +544,7 @@ export class EditorScene extends BaseScene {
             const nameSpan = document.createElement('span');
             nameSpan.style.color = '#fff';
             nameSpan.style.flex = '1';
-            nameSpan.innerText = name;
+            nameSpan.innerText = meta.id;
 
             const btnContainer = document.createElement('div');
             btnContainer.style.display = 'flex';
@@ -551,7 +561,7 @@ export class EditorScene extends BaseScene {
                 cursor: 'pointer',
                 fontSize: '12px',
             });
-            loadBtn.onclick = () => this.loadMap(name, maps[name]);
+            loadBtn.onclick = () => void this.loadMap(meta.id);
 
             const delBtn = document.createElement('button');
             delBtn.innerText = '🗑️';
@@ -564,7 +574,7 @@ export class EditorScene extends BaseScene {
                 cursor: 'pointer',
                 fontSize: '12px',
             });
-            delBtn.onclick = () => this.deleteMap(name);
+            delBtn.onclick = () => void this.deleteMap(meta.id);
 
             btnContainer.appendChild(loadBtn);
             btnContainer.appendChild(delBtn);
@@ -575,12 +585,18 @@ export class EditorScene extends BaseScene {
         });
     }
 
-    private loadMap(name: string, data: any) {
+    private async loadMap(name: string) {
         if (!confirm(`Load map "${name}"? Current work will be lost.`)) return;
+
+        const rawMap = await this.storage.loadMap(name);
+        if (!rawMap) {
+            alert(`Failed to load map "${name}".`);
+            return;
+        }
 
         let mapData: IMapData;
         try {
-            mapData = migrateMapData(data);
+            mapData = migrateMapData(rawMap);
         } catch (e) {
             alert(`Failed to load map "${name}": ${(e as Error).message}`);
             return;
@@ -597,29 +613,40 @@ export class EditorScene extends BaseScene {
         // Load waypoints into WaypointManager
         this.waypointMgr.clearAll();
         if (mapData.waypoints && mapData.waypoints.length > 0) {
-            // First point is always Start
             this.waypointMgr.setStart(mapData.waypoints[0]);
-
-            // Last point is always End (if more than 1)
             if (mapData.waypoints.length > 1) {
                 this.waypointMgr.setEnd(mapData.waypoints[mapData.waypoints.length - 1]);
             }
-
-            // Middle points are waypoints
             for (let i = 1; i < mapData.waypoints.length - 1; i++) {
                 this.waypointMgr.addWaypoint(mapData.waypoints[i]);
             }
         }
 
-        // Render loaded fog
         this.fog.update(0);
     }
 
-    private deleteMap(name: string) {
+    private async deleteMap(name: string) {
         if (!confirm(`Delete map "${name}"? This cannot be undone.`)) return;
 
-        deleteMapFromStorage(name);
-        this.refreshMapsPanel();
+        await this.storage.deleteMap(name);
+        await this.refreshMapsPanel();
+    }
+
+    private setupSaveHotReload(): void {
+        if (!import.meta.hot) return;
+
+        import.meta.hot.on('saves:changed', async (payload: { ns: string; id: string }) => {
+            if (payload.ns !== MAP_SAVES_NAMESPACE) return;
+            await this.refreshMapsPanel();
+            if (payload.id === this.currentMapName) {
+                const latest = await this.storage.loadMap(payload.id);
+                if (latest) {
+                    this.map = new MapManager(latest);
+                    this.fog = new FogSystem(latest);
+                    this.fog.update(0);
+                }
+            }
+        });
     }
 
     private handleGlobalKey(e: KeyboardEvent) {
