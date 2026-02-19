@@ -13,7 +13,6 @@ import { WaypointManager } from '../editor/WaypointManager';
 import { EditorHistory, EditorActions } from '../editor/EditorHistory';
 import { StorageManager } from '../modules/persistence/StorageManager';
 import { MAP_SAVES_NAMESPACE, SaveMeta } from '../modules/persistence/types';
-import { buildFullPathFromControlPoints } from '../editor/path/buildFullPathFromControlPoints';
 
 export class EditorScene extends BaseScene {
     private game: Game;
@@ -38,6 +37,8 @@ export class EditorScene extends BaseScene {
     private prevMouseDown: boolean = false;
     private lastClickedTile: { col: number; row: number } | null = null;
     private needsPrerender: boolean = true;
+    private routeWarningEl!: HTMLElement;
+    private routeWarningMessage: string | null = null;
 
     constructor(game: Game) {
         super();
@@ -396,27 +397,19 @@ export class EditorScene extends BaseScene {
         }
 
         const controlPoints = this.waypointMgr.getFullPath();
-        const builtPath = buildFullPathFromControlPoints(this.map.grid, controlPoints, Pathfinder.findPath);
-        if (builtPath.ok === false) {
-            alert(`Cannot save map — ${builtPath.error}`);
-            return;
-        }
-
-        this.map.waypointsMode = 'FULLPATH';
-        this.map.waypoints = builtPath.path;
-
-        // Validate before save
-        Pathfinder.invalidateCache(); // Ensure fresh BFS
-        const errors = this.map.validatePath();
-        if (errors.length > 0) {
-            const reasons = errors.map((e) => `  (${e.x},${e.y}): ${e.reason}`).join('\n');
-            alert(`Cannot save map — path validation failed:\n${reasons}`);
-            return;
+        const routeResult = this.map.setRouteControlPoints(controlPoints);
+        if (routeResult.ok === false) {
+            this.setRouteWarning(routeResult.error);
+            console.warn(`[EditorScene] Route invalid: ${routeResult.error}`);
+        } else {
+            this.setRouteWarning(null);
         }
 
         const data = serializeMap(this.map);
         data.fogData = this.fog.getFogData();
         data.manualPath = this.waypointMgr.isValid(); // Using waypoint manager
+        data.route = { controlPoints };
+        data.waypoints = [];
 
         const name = prompt('Enter map name:', this.currentMapName || 'MyMap');
         if (!name) return;
@@ -467,12 +460,22 @@ export class EditorScene extends BaseScene {
             '🗑️ Clear Path',
             () => {
                 this.waypointMgr.clearAll();
+                this.setRouteWarning(null);
                 this.markPrerenderDirty();
             },
             '#e91e63',
         );
 
         addBtn('⚙️ WAVES & SAVE', () => this.openWaveConfig(), '#ff9800');
+        this.routeWarningEl = document.createElement('div');
+        Object.assign(this.routeWarningEl.style, {
+            color: '#ff5252',
+            fontSize: '12px',
+            fontWeight: 'bold',
+            display: 'none',
+            maxWidth: '220px',
+        });
+        this.controlsContainer.appendChild(this.routeWarningEl);
         addBtn('⇪ Import browser saves', async () => {
             const imported = await this.storage.importBrowserMaps();
             alert(`Imported ${imported} map(s) from browser storage`);
@@ -634,15 +637,18 @@ export class EditorScene extends BaseScene {
 
         // Load waypoints into WaypointManager
         this.waypointMgr.clearAll();
-        if (mapData.waypoints && mapData.waypoints.length > 0) {
-            this.waypointMgr.setStart(mapData.waypoints[0]);
-            if (mapData.waypoints.length > 1) {
-                this.waypointMgr.setEnd(mapData.waypoints[mapData.waypoints.length - 1]);
+        const controlPoints = mapData.route?.controlPoints ?? mapData.waypoints;
+        if (controlPoints && controlPoints.length > 0) {
+            this.waypointMgr.setStart(controlPoints[0]);
+            if (controlPoints.length > 1) {
+                this.waypointMgr.setEnd(controlPoints[controlPoints.length - 1]);
             }
-            for (let i = 1; i < mapData.waypoints.length - 1; i++) {
-                this.waypointMgr.addWaypoint(mapData.waypoints[i]);
+            for (let i = 1; i < controlPoints.length - 1; i++) {
+                this.waypointMgr.addWaypoint(controlPoints[i]);
             }
         }
+
+        this.setRouteWarning(null);
 
         this.fog.update(0);
         this.markPrerenderDirty();
@@ -738,5 +744,21 @@ export class EditorScene extends BaseScene {
 
     private isPaintMode(mode: EditorMode): boolean {
         return mode === 'paint_road' || mode === 'paint_grass' || mode === 'eraser' || mode === 'paint_fog';
+    }
+
+    private setRouteWarning(message: string | null): void {
+        this.routeWarningMessage = message;
+        if (!this.routeWarningEl) {
+            return;
+        }
+
+        if (!message) {
+            this.routeWarningEl.style.display = 'none';
+            this.routeWarningEl.innerText = '';
+            return;
+        }
+
+        this.routeWarningEl.style.display = 'block';
+        this.routeWarningEl.innerText = `Route invalid: ${message}`;
     }
 }
