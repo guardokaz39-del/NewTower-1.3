@@ -33,7 +33,10 @@ export const mapSaveDataSchema = z.object({
     width: z.number(),
     height: z.number(),
     tiles: z.array(z.array(z.number())),
-    waypoints: z.array(waypointSchema),
+    waypoints: z.array(waypointSchema).optional(),
+    route: z.object({
+        controlPoints: z.array(waypointSchema),
+    }).optional(),
     objects: z.array(mapObjectSchema),
     waves: z.array(waveConfigSchema).optional(),
     startingMoney: z.number().optional(),

@@ -102,12 +102,15 @@ export function serializeMap(map: MapManager): IMapData {
         width: map.cols,
         height: map.rows,
         tiles: simpleTiles,
-        waypoints: map.waypoints.map((wp) => ({ x: wp.x, y: wp.y })),
+        waypoints: [],
+        route: {
+            controlPoints: map.getRouteControlPoints(),
+        },
         objects: map.objects || [], // Include objects from map
         waves: map.waves && map.waves.length > 0 ? map.waves : generateDefaultWaves(15),
         startingMoney: CONFIG.PLAYER.START_MONEY,
         startingLives: CONFIG.PLAYER.START_LIVES,
-        waypointsMode: map.waypointsMode,
+        waypointsMode: 'ENDPOINTS',
         schemaVersion: MAP_SCHEMA_VERSION,
     };
 }

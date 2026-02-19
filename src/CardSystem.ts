@@ -24,7 +24,7 @@ export class CardSystem {
 
     constructor(scene: IGameScene, startingCards: string[] = ['FIRE', 'ICE', 'SNIPER']) {
         this.scene = scene;
-        this.handContainer = document.getElementById('hand')!;
+        this.handContainer = this.ensureHandContainer();
 
         this.ghostEl = document.getElementById('drag-ghost')!;
         this.ghostEl.style.pointerEvents = 'none';
@@ -124,6 +124,7 @@ export class CardSystem {
     }
 
     public render() {
+        this.handContainer = this.ensureHandContainer();
         this.handContainer.innerHTML = '';
         this.hand.forEach((card) => {
             const el = CardSystem.createCardElement(card);
@@ -131,6 +132,19 @@ export class CardSystem {
             if (card.isDragging) el.classList.add('dragging-placeholder');
             this.handContainer.appendChild(el);
         });
+    }
+
+    private ensureHandContainer(): HTMLElement {
+        const existing = document.getElementById('hand');
+        if (existing) {
+            return existing;
+        }
+
+        const container = document.createElement('div');
+        container.id = 'hand';
+        const uiRoot = document.getElementById('ui-root') ?? document.body;
+        uiRoot.appendChild(container);
+        return container;
     }
 
     public static createCardElement(card: ICard): HTMLElement {

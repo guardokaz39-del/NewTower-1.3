@@ -5,6 +5,7 @@ import { Pathfinder } from './Pathfinder';
 import { FlowField } from './FlowField';
 import { LightingSystem } from './systems/LightingSystem';
 import { ObjectRenderer, ObjectType } from './ObjectRenderer';
+import { detectLegacyWaypointType } from './modules/persistence/legacyWaypoints';
 
 export interface PathError {
     x: number;
@@ -21,6 +22,8 @@ export class MapManager {
     public tiles: number[][] = [];
     public waypoints: { x: number; y: number }[] = [];
     public waypointsMode: WaypointsMode = 'ENDPOINTS'; // Default
+    private routeControlPoints: { x: number; y: number }[] = [];
+    private routeFullPath: { x: number; y: number }[] = [];
 
     public waves: IWaveConfig[] = [];
     public lighting?: LightingSystem;
@@ -43,20 +46,10 @@ export class MapManager {
         this.waves = (data.waves as IWaveConfig[]) || [];
         this.objects = data.objects || []; // Load objects
 
-        // Default or Derived Waypoints Mode
-        if (data.waypointsMode) {
-            this.waypointsMode = data.waypointsMode;
-        } else {
-            // Migration Logic: Implicit Mode
-            if (!data.waypoints || data.waypoints.length <= 2) {
-                this.waypointsMode = 'ENDPOINTS';
-            } else {
-                this.waypointsMode = 'FULLPATH';
-            }
-        }
-
-        // Copy waypoints initially
-        this.waypoints = data.waypoints || [];
+        this.waypointsMode = data.waypointsMode ?? 'ENDPOINTS';
+        this.waypoints = [];
+        this.routeControlPoints = [];
+        this.routeFullPath = [];
 
         // Build grid object for runtime usage
         this.grid = [];
@@ -72,30 +65,12 @@ export class MapManager {
             this.grid.push(row);
         }
 
-        // STRICT LOADER CONTRACT
-        if (this.waypointsMode === 'ENDPOINTS') {
-            // RASTER IS CANONICAL
-            // We expect strictly 2 waypoints (Start/End) or at least 2.
-            // If < 2, we can't do anything (Editor should prevent saving this state).
-            if (this.waypoints.length >= 2) {
-                const start = this.waypoints[0];
-                const end = this.waypoints[this.waypoints.length - 1];
-
-                // Clear cache because mapping just loaded/changed
-                Pathfinder.invalidateCache();
-
-                const fullPath = Pathfinder.findPath(this.grid, start, end);
-                if (fullPath.length > 0) {
-                    this.waypoints = fullPath;
-                } else {
-                    console.error('[MapManager] Failed to derive path from endpoints!', start, end);
-                    // Critical Error in Dev, might want to fallback or show UI error
-                }
+        const controlPoints = this.resolveRouteControlPoints(data);
+        if (controlPoints.length >= 2) {
+            const routeResult = this.setRouteControlPoints(controlPoints);
+            if (routeResult.ok === false) {
+                console.warn('[MapManager] Failed to build route during load:', routeResult.error);
             }
-        } else {
-            // FULLPATH: VECTOR IS CANONICAL
-            // We leave this.waypoints AS IS.
-            // Validation happens separately.
         }
 
         // Initialize or Resize FlowField (Reuse buffers)
@@ -137,8 +112,8 @@ export class MapManager {
      */
     private updateFlowField() {
         let target = { x: 0, y: 0 };
-        if (this.waypoints.length > 0) {
-            target = this.waypoints[this.waypoints.length - 1];
+        if (this.routeFullPath.length > 0) {
+            target = this.routeFullPath[this.routeFullPath.length - 1];
         }
 
         // Mark pathfinder cache invalid if we are updating flow (likely means tiles changed)
@@ -147,6 +122,77 @@ export class MapManager {
 
         this.flowField.generate(this.grid, target);
         console.log('[MapManager] FlowField Regenerated. Version:', this.flowField.version);
+    }
+
+    public setRouteControlPoints(points: { x: number; y: number }[]): { ok: true } | { ok: false; error: string } {
+        if (points.length < 2) {
+            return { ok: false, error: 'Route requires at least 2 control points' };
+        }
+
+        for (let i = 0; i < points.length; i++) {
+            const point = points[i];
+            if (point.x < 0 || point.x >= this.cols || point.y < 0 || point.y >= this.rows) {
+                return { ok: false, error: `Control point out of bounds: (${point.x},${point.y})` };
+            }
+            if (i > 0 && point.x === points[i - 1].x && point.y === points[i - 1].y) {
+                return { ok: false, error: `Duplicate consecutive control points: (${point.x},${point.y})` };
+            }
+        }
+
+        const stitchedPath: { x: number; y: number }[] = [];
+        for (let i = 0; i < points.length - 1; i++) {
+            const from = points[i];
+            const to = points[i + 1];
+            const segment = this.findRouteSegment(from, to);
+            if (segment.length === 0) {
+                return { ok: false, error: `No path between (${from.x},${from.y}) and (${to.x},${to.y})` };
+            }
+
+            if (i === 0) {
+                stitchedPath.push(...segment);
+            } else {
+                stitchedPath.push(...segment.slice(1));
+            }
+        }
+
+        this.routeControlPoints = points.map((point) => ({ x: point.x, y: point.y }));
+        this.routeFullPath = stitchedPath;
+        this.waypoints = stitchedPath;
+        this.waypointsMode = 'FULLPATH';
+        this.requestFlowFieldUpdate();
+        this.updateFlowField();
+        this.isFlowFieldDirty = false;
+        return { ok: true };
+    }
+
+    public getRouteControlPoints(): { x: number; y: number }[] {
+        return this.routeControlPoints.map((point) => ({ x: point.x, y: point.y }));
+    }
+
+    public getRouteFullPath(): { x: number; y: number }[] {
+        return this.routeFullPath.map((point) => ({ x: point.x, y: point.y }));
+    }
+
+    private findRouteSegment(from: { x: number; y: number }, to: { x: number; y: number }): { x: number; y: number }[] {
+        Pathfinder.invalidateCache();
+        return Pathfinder.findPath(this.grid, from, to);
+    }
+
+    private resolveRouteControlPoints(data: IMapData): { x: number; y: number }[] {
+        if (data.route?.controlPoints && data.route.controlPoints.length > 0) {
+            return data.route.controlPoints;
+        }
+
+        if (!data.waypoints || data.waypoints.length < 2) {
+            return [];
+        }
+
+        const legacyType = detectLegacyWaypointType(data.waypoints);
+        if (legacyType === 'LEGACY_CONTROL_POINTS') {
+            return data.waypoints;
+        }
+
+        return [data.waypoints[0], data.waypoints[data.waypoints.length - 1]];
     }
 
     public prerender() {

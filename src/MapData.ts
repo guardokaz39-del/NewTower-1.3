@@ -46,12 +46,17 @@ export interface Cell {
     decor?: string | null;
 }
 
+export interface IRouteData {
+    controlPoints: { x: number; y: number }[];
+}
+
 // Полная структура файла сохранения
 export interface IMapData {
     width: number;
     height: number;
     tiles: number[][]; // 0=Grass, 1=Path, 2=Decor
     waypoints: { x: number; y: number }[];
+    route?: IRouteData;
     objects: IMapObject[];
 
     // Новые поля (сценарий)
@@ -113,6 +118,9 @@ export function migrateMapData(raw: unknown): IMapData {
         height: typeof data.height === 'number' ? data.height : height,
         tiles,
         waypoints: Array.isArray(data.waypoints) ? data.waypoints : [],
+        route: (data.route && typeof data.route === 'object' && Array.isArray((data.route as IRouteData).controlPoints))
+            ? { controlPoints: (data.route as IRouteData).controlPoints }
+            : undefined,
         objects: Array.isArray(data.objects) ? (data.objects as IMapObject[]) : [],
         waves: Array.isArray(data.waves) ? (data.waves as IWaveConfig[]) : [],
         startingMoney: typeof data.startingMoney === 'number' ? data.startingMoney : 100,
