@@ -13,6 +13,7 @@ import { WaypointManager } from '../editor/WaypointManager';
 import { EditorHistory, EditorActions } from '../editor/EditorHistory';
 import { StorageManager } from '../modules/persistence/StorageManager';
 import { MAP_SAVES_NAMESPACE, SaveMeta } from '../modules/persistence/types';
+import { buildFullPathFromControlPoints } from '../editor/path/buildFullPathFromControlPoints';
 
 export class EditorScene extends BaseScene {
     private game: Game;
@@ -36,6 +37,7 @@ export class EditorScene extends BaseScene {
     // Track previous mouse state for click detection (not hold)
     private prevMouseDown: boolean = false;
     private lastClickedTile: { col: number; row: number } | null = null;
+    private needsPrerender: boolean = true;
 
     constructor(game: Game) {
         super();
@@ -75,6 +77,7 @@ export class EditorScene extends BaseScene {
 
         // Initial fog render
         this.fog.update(0);
+        this.markPrerenderDirty();
 
         // Setup hotkeys with automatic cleanup
         this.on(document, 'keydown', (e: Event) => this.handleGlobalKey(e as KeyboardEvent));
@@ -124,11 +127,14 @@ export class EditorScene extends BaseScene {
                 this.lastClickedTile.row !== input.hoverRow;
 
             if (isDifferentTile) {
-                this.handleInput(input.hoverCol, input.hoverRow);
+                const changed = this.handleInput(input.hoverCol, input.hoverRow);
                 this.lastClickedTile = { col: input.hoverCol, row: input.hoverRow };
 
-                // Trigger fog re-render after data change (static, no animation)
-                this.fog.update(0);
+                if (changed) {
+                    this.markPrerenderDirty();
+                    // Trigger fog re-render after data change (static, no animation)
+                    this.fog.update(0);
+                }
             }
         }
 
@@ -146,11 +152,12 @@ export class EditorScene extends BaseScene {
         }
     }
 
-    private handleInput(col: number, row: number) {
-        if (col >= this.map.cols || row >= this.map.rows) return;
+    private handleInput(col: number, row: number): boolean {
+        if (col >= this.map.cols || row >= this.map.rows) return false;
 
         const oldTileType = this.map.grid[row][col].type;
         const oldFogDensity = this.fog.getFog(col, row);
+        let changed = false;
 
         if (this.mode === 'paint_road') {
             console.log('[EditorScene] paint_road mode active, tile type:', oldTileType, '→ 1');
@@ -160,6 +167,7 @@ export class EditorScene extends BaseScene {
                 this.map.grid[row][col].decor = null;
                 Pathfinder.invalidateCache();
                 console.log('[EditorScene] Road painted at', col, row);
+                changed = true;
             } else {
                 console.log('[EditorScene] Tile already road, skipping');
             }
@@ -168,6 +176,7 @@ export class EditorScene extends BaseScene {
                 this.history.pushInCompound(EditorActions.createTileAction(this.map.grid, col, row, oldTileType, 0));
                 this.map.grid[row][col].type = 0;
                 Pathfinder.invalidateCache();
+                changed = true;
             }
         } else if (this.mode === 'eraser') {
             // FEATURE: Eraser - reset to grass, remove fog, and remove objects
@@ -185,11 +194,13 @@ export class EditorScene extends BaseScene {
                     this.map.grid[row][col].type = 0;
                     this.map.grid[row][col].decor = null;
                     Pathfinder.invalidateCache();
+                    changed = true;
                 }
                 // Удаление тумана
                 if (oldFogDensity !== 0) {
                     this.history.pushInCompound(EditorActions.createFogAction(this.fog, col, row, oldFogDensity, 0));
                     this.fog.setFog(col, row, 0);
+                    changed = true;
                 }
                 // Удаление объектов (все объекты, перекрывающие этот тайл)
                 if (hasObject) {
@@ -198,6 +209,7 @@ export class EditorScene extends BaseScene {
                         const overlaps = col >= obj.x && col < obj.x + size && row >= obj.y && row < obj.y + size;
                         return !overlaps;
                     });
+                    changed = true;
                 }
             }
         } else if (this.mode === 'set_start') {
@@ -211,6 +223,7 @@ export class EditorScene extends BaseScene {
             );
             this.waypointMgr.setStart({ x: col, y: row });
             this.map.grid[row][col].type = 1;
+            changed = true;
         } else if (this.mode === 'set_end') {
             const oldState = {
                 start: this.waypointMgr.getStart(),
@@ -222,6 +235,7 @@ export class EditorScene extends BaseScene {
             );
             this.waypointMgr.setEnd({ x: col, y: row });
             this.map.grid[row][col].type = 1;
+            changed = true;
         } else if (this.mode === 'place_waypoint') {
             if (this.waypointMgr.canAddWaypoint()) {
                 const oldState = {
@@ -233,6 +247,7 @@ export class EditorScene extends BaseScene {
                     EditorActions.createWaypointAction(this.waypointMgr, 'addWaypoint', { x: col, y: row }, oldState),
                 );
                 this.waypointMgr.addWaypoint({ x: col, y: row });
+                changed = true;
             }
         } else if (this.mode === 'paint_fog') {
             // Cycle fog density: 0 → 1 → 2 → 3 → 4 → 5 → 0
@@ -242,29 +257,32 @@ export class EditorScene extends BaseScene {
                 this.history.pushInCompound(
                     EditorActions.createFogAction(this.fog, col, row, oldFogDensity, newFogDensity),
                 );
+                changed = true;
             }
         } else if (this.mode === 'place_stone') {
-            this.placeObject(col, row, 'stone', 1);
+            changed = this.placeObject(col, row, 'stone', 1);
         } else if (this.mode === 'place_rock') {
             // Скалы - рандомный размер 2-3 тайла
             const size = Math.random() > 0.5 ? 3 : 2;
-            this.placeObject(col, row, 'rock', size);
+            changed = this.placeObject(col, row, 'rock', size);
         } else if (this.mode === 'place_tree') {
-            this.placeObject(col, row, 'tree', 1);
+            changed = this.placeObject(col, row, 'tree', 1);
         } else if (this.mode === 'place_wheat') {
-            this.placeObject(col, row, 'wheat', 1);
+            changed = this.placeObject(col, row, 'wheat', 1);
         } else if (this.mode === 'place_flowers') {
-            this.placeObject(col, row, 'flowers', 1);
+            changed = this.placeObject(col, row, 'flowers', 1);
         }
+
+        return changed;
     }
 
     /**
      * Place an object on the map
      */
-    private placeObject(col: number, row: number, type: string, size: number): void {
+    private placeObject(col: number, row: number, type: string, size: number): boolean {
         // Проверка границ для больших объектов
         if (col + size > this.map.cols || row + size > this.map.rows) {
-            return; // Выходит за границы
+            return false; // Выходит за границы
         }
 
         // Удалить существующие объекты в этой области
@@ -289,21 +307,18 @@ export class EditorScene extends BaseScene {
             size: size > 1 ? size : undefined,
         };
         this.map.objects.push(newObj);
+        return true;
     }
 
     public draw(ctx: CanvasRenderingContext2D) {
         ctx.fillStyle = '#222';
         ctx.fillRect(0, 0, this.game.width, this.game.height);
 
-        for (let y = 0; y < this.map.rows; y++) {
-            for (let x = 0; x < this.map.cols; x++) {
-                this.map.tiles[y][x] = this.map.grid[y][x].type;
-            }
+        if (this.needsPrerender) {
+            this.syncTilesFromGrid();
+            this.map.prerender();
+            this.needsPrerender = false;
         }
-
-        // CRITICAL FIX: Regenerate prerendered cache after tile changes
-        // The Map.draw() uses a cached canvas that must be updated when tiles change
-        this.map.prerender();
 
         // We do NOT overwrite map.waypoints here every frame anymore.
         // It prevents saving them correctly.
@@ -351,10 +366,7 @@ export class EditorScene extends BaseScene {
     }
 
     private openWaveConfig() {
-        // Use WaypointManager's full path
-        if (this.waypointMgr.isValid()) {
-            this.map.waypoints = this.waypointMgr.getFullPath();
-        } else {
+        if (!this.waypointMgr.isValid()) {
             alert('Set Start and End points first!');
             return;
         }
@@ -378,11 +390,20 @@ export class EditorScene extends BaseScene {
         // [FIX] Ensure map waves are updated before serialization
         this.map.waves = waves;
 
-        // Sync waypoints for validation
-        if (this.waypointMgr.isValid()) {
-            this.map.waypoints = this.waypointMgr.getFullPath();
-            this.map.waypointsMode = 'FULLPATH';
+        if (!this.waypointMgr.isValid()) {
+            alert('Set Start and End points first!');
+            return;
         }
+
+        const controlPoints = this.waypointMgr.getFullPath();
+        const builtPath = buildFullPathFromControlPoints(this.map.grid, controlPoints, Pathfinder.findPath);
+        if (builtPath.ok === false) {
+            alert(`Cannot save map — ${builtPath.error}`);
+            return;
+        }
+
+        this.map.waypointsMode = 'FULLPATH';
+        this.map.waypoints = builtPath.path;
 
         // Validate before save
         Pathfinder.invalidateCache(); // Ensure fresh BFS
@@ -446,6 +467,7 @@ export class EditorScene extends BaseScene {
             '🗑️ Clear Path',
             () => {
                 this.waypointMgr.clearAll();
+                this.markPrerenderDirty();
             },
             '#e91e63',
         );
@@ -623,6 +645,7 @@ export class EditorScene extends BaseScene {
         }
 
         this.fog.update(0);
+        this.markPrerenderDirty();
     }
 
     private async deleteMap(name: string) {
@@ -644,6 +667,7 @@ export class EditorScene extends BaseScene {
                     this.map = new MapManager(latest);
                     this.fog = new FogSystem(latest);
                     this.fog.update(0);
+                    this.markPrerenderDirty();
                 }
             }
         });
@@ -660,6 +684,7 @@ export class EditorScene extends BaseScene {
             e.preventDefault();
             if (this.history.undo()) {
                 this.fog.update(0); // Re-render fog after undo
+                this.markPrerenderDirty();
             }
             return; // Fixed: was return; in original? Yes
         }
@@ -669,6 +694,7 @@ export class EditorScene extends BaseScene {
             e.preventDefault();
             if (this.history.redo()) {
                 this.fog.update(0); // Re-render fog after redo
+                this.markPrerenderDirty();
             }
             return;
         }
@@ -694,6 +720,19 @@ export class EditorScene extends BaseScene {
             const categoryIndex = parseInt(e.key) - 1;
             this.toolbar.selectCategory(categoryIndex);
             return;
+        }
+    }
+
+
+    private markPrerenderDirty(): void {
+        this.needsPrerender = true;
+    }
+
+    private syncTilesFromGrid(): void {
+        for (let y = 0; y < this.map.rows; y++) {
+            for (let x = 0; x < this.map.cols; x++) {
+                this.map.tiles[y][x] = this.map.grid[y][x].type;
+            }
         }
     }
 
