@@ -1,5 +1,6 @@
 import { UnitRenderer } from './UnitRenderer';
 import { Assets } from '../../Assets';
+import { AssetCache } from '../../utils/AssetCache';
 import type { Enemy } from '../../Enemy';
 
 export type SpriteOrientationMode = 'ROTATE' | 'FLIP' | 'DIR3';
@@ -61,7 +62,7 @@ export abstract class CachedUnitRenderer implements UnitRenderer {
         // Determine facing for key generation (needed for DIR3)
         const facing = this.getFacing(rotation);
         const frameKey = this.getSpriteKey(enemy.typeId, frameIdx, facing);
-        const sprite = Assets.get(frameKey);
+        const sprite = AssetCache.peek(frameKey);
 
         if (sprite) {
             ctx.save();
@@ -135,10 +136,11 @@ export abstract class CachedUnitRenderer implements UnitRenderer {
     }
 
     protected getSpriteKey(enemyTypeId: string, frameIdx: number, facing: SpriteFacing): string {
+        const id = enemyTypeId.toLowerCase();
         // Compatibility: ROTATE and FLIP modes use the legacy "walk_N" keys (side view baked)
-        if (this.orientationMode !== 'DIR3') return `unit_${enemyTypeId}_walk_${frameIdx}`;
+        if (this.orientationMode !== 'DIR3') return `unit_${id}_walk_${frameIdx}`;
         // DIR3 uses directional keys
-        return `unit_${enemyTypeId}_${facing.toLowerCase()}_walk_${frameIdx}`;
+        return `unit_${id}_${facing.toLowerCase()}_walk_${frameIdx}`;
     }
 
     /**

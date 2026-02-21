@@ -2,6 +2,7 @@ import { Enemy } from './Enemy';
 import { Projectile } from './Projectile';
 import { EffectSystem, EffectPriority } from './EffectSystem';
 import { PerformanceMonitor } from './utils/PerformanceMonitor';
+import { PerformanceProfiler } from './utils/PerformanceProfiler';
 import { SoundManager, SoundPriority } from './SoundManager';
 import { SpatialGrid } from './SpatialGrid';
 
@@ -49,10 +50,8 @@ export class CollisionSystem {
             const searchRadius = 100; // Reasonable search radius for collision
             const count = this.enemyGrid.queryInRadius(proj.x, proj.y, searchRadius, CollisionSystem.aoeBuffer);
 
-            // PERF: Allow tracking count
-            if (PerformanceMonitor.isEnabled()) {
-                PerformanceMonitor.addCount('CollisionChecks', count);
-            }
+            // PERF: Custom Stress Test Profiler
+            PerformanceProfiler.count('pairsChecked', count);
 
             for (let e = 0; e < count; e++) {
                 const enemy = CollisionSystem.aoeBuffer[e];

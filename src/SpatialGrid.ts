@@ -13,6 +13,8 @@ export interface IGridEntity {
     y: number;
 }
 
+import { PerformanceProfiler } from './utils/PerformanceProfiler';
+
 export class SpatialGrid<T extends IGridEntity> {
     private cellSize: number;
     private cols: number;
@@ -86,6 +88,7 @@ export class SpatialGrid<T extends IGridEntity> {
      * Uses a shared buffer to avoid GC. CAUTION: Result is valid only until next call.
      */
     public getNearby(x: number, y: number, radius: number): T[] {
+        PerformanceProfiler.count('gridQueries', 1);
         this.queryBuffer.length = 0; // Clear without allocation
 
         // Calculate which cells to check
@@ -138,6 +141,7 @@ export class SpatialGrid<T extends IGridEntity> {
      * @returns Number of entities found
      */
     public queryInRadius(x: number, y: number, radius: number, outBuffer: T[]): number {
+        PerformanceProfiler.count('gridQueries', 1);
         outBuffer.length = 0;
 
         // PADDING: Add extra range to catch large units (e.g. Bosses) whose center

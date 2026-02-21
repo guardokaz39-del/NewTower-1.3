@@ -97,6 +97,7 @@ for (let i = 0; i < enemies.length; i++) {
 
 ### Object Pool для частых объектов
 
+```typescript
 class EffectPool {
     private pool: IEffect[] = [];
 
@@ -109,7 +110,6 @@ class EffectPool {
         this.pool.push(effect);
     }
 }
-
 ```
 
 **Важно для Pool.reset():**
@@ -190,7 +190,7 @@ class PathCache {
         const key = `${start.x},${start.y}-${end.x},${end.y}`;
         if (!this.cache.has(key)) {
             // [NEW] Hard limit check
-            if (this.cache.size > 512) this.cache.clear(); 
+            if (this.cache.size > 4096) this.cache.clear(); 
             this.cache.set(key, Pathfinder.calculate(start, end));
         }
         return this.cache.get(key)!;
@@ -204,8 +204,14 @@ class PathCache {
 
 ### 11. AssetCache Constraints [NEW]
 
-- **Hard Limit**: `AssetCache` и любые другие кэши (Pathfinding, FlowField) **ОБЯЗАНЫ** иметь лимит размера (напр. 512 элементов).
+- **Hard Limit**: `AssetCache` и любые другие кэши (Pathfinding, FlowField) **ОБЯЗАНЫ** иметь лимит размера (напр. 4096 элементов для спрайтов). Конфигурации типа DIR3 генерируют до 96+ спрайтов на врага, поэтому лимит ниже 4000 приводит к частым сбросам (cache bouncing).
 - **Overflow Strategy**: При переполнении — полный сброс (`clear()`). LRU слишком дорог для JS.
+
+### 12. String-Matching in Caches (Cache Bouncing) [CRITICAL]
+
+- **Регистронезависимость ключей**: При обращении к глобальным кэшам (`AssetCache.get()`, `AssetCache.peek()`) ключи, основанные на идентификаторах сущностей (`typeId`, `id`), должны **всегда** приводиться к нижнему регистру (`.toLowerCase()`).
+- **Сценарий отказа**: Если `SpriteBaker` печет спрайт как `unit_scout`, а конфиг игры передает `SCOUT`, рендерер не найдет спрайт и перейдет на медленный векторный fallback, что уронит производительность до <15 FPS (80,000+ PathOps).
+- **Паттерн**: Формирование ключей должно быть инкапсулировано (напр., в `CachedUnitRenderer.getSpriteKey`), чтобы предотвратить рассинхронизацию.
 
 ---
 
@@ -334,4 +340,4 @@ ctx.drawImage(aura, x, y);
 
 ---
 
-*Последнее обновление: 2026-02-09 (Optimization Phase 2)*
+Последнее обновление: 2026-02-21 (Optimization Phase 2 & String Caching Fix)

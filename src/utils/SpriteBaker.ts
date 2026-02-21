@@ -83,7 +83,7 @@ export class SpriteBaker {
         // Calculate frame index
         const t = (gameTime % cycleDuration) / cycleDuration;
         const frameIndex = Math.floor(t * this.FRAMES);
-        const key = `unit_${typeId}_walk_${frameIndex}`;
+        const key = `unit_${typeId.toLowerCase()}_walk_${frameIndex}`;
 
         // Fixed: Use peek() to avoid creating 1x1 empty canvases
         return AssetCache.peek(key);
