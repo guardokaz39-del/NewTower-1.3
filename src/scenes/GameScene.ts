@@ -607,14 +607,26 @@ export class GameScene extends BaseScene implements IGameScene {
         const hoverX = this.input.hoverCol * CONFIG.TILE_SIZE + CONFIG.TILE_SIZE / 2;
         const hoverY = this.input.hoverRow * CONFIG.TILE_SIZE + CONFIG.TILE_SIZE / 2;
 
-        const hoveredTower = this.gameState.towers.find((t) => {
-            const dist = Math.hypot(t.x - hoverX, t.y - hoverY);
-            return dist < 32; // Within tower radius
-        });
+        let hoveredTower: Tower | null = null;
+        for (let i = 0; i < this.gameState.towers.length; i++) {
+            const t = this.gameState.towers[i];
+            const distSq = (t.x - hoverX) * (t.x - hoverX) + (t.y - hoverY) * (t.y - hoverY);
+            if (distSq < 1024) { // 32 * 32
+                hoveredTower = t;
+                break;
+            }
+        }
 
         if (hoveredTower && !hoveredTower.isBuilding) {
             const modeKey = hoveredTower.targetingMode.toUpperCase();
-            const mode = Object.values(CONFIG.TARGETING_MODES).find((m: any) => m.id === hoveredTower.targetingMode);
+            const targetingModes = Object.values(CONFIG.TARGETING_MODES);
+            let mode = null;
+            for (let i = 0; i < targetingModes.length; i++) {
+                if ((targetingModes[i] as any).id === hoveredTower.targetingMode) {
+                    mode = targetingModes[i] as any;
+                    break;
+                }
+            }
             if (mode) {
                 // Draw small icon above tower
                 ctx.save();

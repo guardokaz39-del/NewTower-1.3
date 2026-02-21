@@ -50,7 +50,7 @@ graph TB
 ### 🎮 Game Loop
 
 | File | Role |
-|------|------|
+| --- | --- |
 | `src/Game.ts` | Main game loop, scene management, input |
 | `src/scenes/GameScene.ts` | Core gameplay orchestrator, implements `IGameScene` |
 | `src/scenes/EditorScene.ts` | Wave/map editor ([Docs](editor_system.md)) |
@@ -60,7 +60,7 @@ graph TB
 ### 🏰 Entities
 
 | File | Role |
-|------|------|
+| --- | --- |
 | `src/Enemy.ts` | Enemy entity with HP, armor, status effects (slow, burn DOT tick), pathfinding |
 | `src/Tower.ts` | Tower entity with cards, stats calculation, targeting modes |
 | `src/Projectile.ts` | Pooled projectile with effects, pierce, crits, trails |
@@ -125,10 +125,18 @@ The game uses a **Logical Coordinate System** decoupled from physical pixels to 
 | `src/EffectSystem.ts` | Visual effects: explosions, particles, debris |
 | `src/CardSystem.ts` | Hand management, drag-drop to towers/forge |
 | `src/ForgeSystem.ts` | Card combining/upgrading |
-| `src/systems/TargetingSystem.ts` | Centralized O(1) targeting logic with hysteresis |
+| `src/TargetingSystem.ts` | Centralized O(1) targeting logic with hysteresis |
 | `src/systems/ProjectileSystem.ts` | Projectile pooling and lifecycle management |
 | `src/WeaponSystem.ts` | Firing logic, cooldowns, recoil, gated shooting |
 | `src/SaveManager.ts` | Persistence, schema versioning, safe save cadence |
+| `src/scenes/GameController.ts` | Отвечает за инпуты (Space = toggleTimeScale, Click = Building) |
+
+---
+
+### 🧪 Тестирование
+
+Проект покрыт автоматическими юнит-тестами (Jest).
+**Подробнее:** [Руководство по тестированию](testing_guide.md)
 
 ---
 

@@ -125,11 +125,10 @@ export class ProjectileSystem {
         // 2. Return to pool
         this.pool.push(p);
 
-        // 3. Swap Remove from active
-        const last = this.active.pop();
-        if (last && last !== p) {
-            this.active[index] = last;
-        }
+        // 3. Swap Remove from active (Safe swap & pop)
+        const last = this.active[this.active.length - 1];
+        this.active[index] = last;
+        this.active.pop();
     }
 
     public draw(ctx: CanvasRenderingContext2D) {

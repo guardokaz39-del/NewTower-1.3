@@ -186,14 +186,9 @@ export class GameController {
         const col = Math.floor(x / CONFIG.TILE_SIZE);
         const row = Math.floor(y / CONFIG.TILE_SIZE);
 
-        // Check if this is a tower card
-        if (
-            card.type.id === 'fire' ||
-            card.type.id === 'ice' ||
-            card.type.id === 'sniper' ||
-            card.type.id === 'multi' ||
-            card.type.id === 'minigun'
-        ) {
+        // Check if this is a tower card (exists in CONFIG.CARD_TYPES)
+        const isTowerCard = Object.values(CONFIG.CARD_TYPES).some(t => t.id === card.type.id);
+        if (isTowerCard) {
             const success = this.entityManager.addCardToTower(card, col, row, this.isBuildable);
 
             if (success) {
@@ -285,17 +280,14 @@ export class GameController {
     }
 
     private handleSpaceKey(): void {
-        // Space key logic will be handled by WaveManager
-        // Just toggle time scale if wave is active
-        const waveActive = false; // This should come from WaveManager
+        // Space key exclusively toggles time scale, anytime.
+        this.state.toggleTimeScale();
 
-        if (waveActive) {
-            this.state.toggleTimeScale();
-            const centerX = window.innerWidth / 2;
-            const centerY = window.innerHeight / 2;
-            const text = this.state.timeScale === 2.0 ? '>> 2x Speed' : '> 1x Speed';
-            this.showFloatingText(text, centerX, centerY, '#fff');
-        }
+        const centerX = window.innerWidth / 2;
+        const centerY = window.innerHeight / 2;
+        const text = this.state.timeScale >= 2.0 ? '>> 2x Speed' : '> 1x Speed';
+
+        this.showFloatingText(text, centerX, centerY, '#fff');
     }
 
     // === Helper Methods ===

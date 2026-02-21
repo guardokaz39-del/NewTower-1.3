@@ -174,19 +174,20 @@ export class CollisionSystem {
             });
 
             // 2. PHYSICS (Decoupled: Instant Area Damage via Grid)
-            // PERF: Use SpatialGrid instead of iterating all enemies
+            // PERF: Use local array for splash to prevent recursive static buffer overwrite if enemies die and explode
             const radius = splash.splashRadius || splash.radius || 40;
-            const count = this.enemyGrid.queryInRadius(target.x, target.y, radius, CollisionSystem.aoeBuffer);
+            const splashTargets: Enemy[] = [];
+            const count = this.enemyGrid.queryInRadius(target.x, target.y, radius, splashTargets);
             const radiusSq = radius * radius;
 
             for (let i = 0; i < count; i++) {
-                const neighbor = CollisionSystem.aoeBuffer[i];
+                const neighbor = splashTargets[i];
                 if (neighbor === target || !neighbor.isAlive()) continue;
 
                 const dx = neighbor.x - target.x;
                 const dy = neighbor.y - target.y;
                 if (dx * dx + dy * dy <= radiusSq) {
-                    neighbor.takeDamage(p.damage * 0.7);
+                    neighbor.takeDamage(p.damage * 0.7, p); // Pass projectile context
                 }
             }
         }
@@ -239,19 +240,20 @@ export class CollisionSystem {
             });
 
             // 2. PHYSICS (Decoupled: Instant Area Damage via Grid)
-            // PERF: Use SpatialGrid
+            // PERF: Use local array for death explosion to prevent recursive static buffer overwrite
             const radius = killingProjectile.explosionRadius || 60;
-            const count = this.enemyGrid.queryInRadius(deathX, deathY, radius, CollisionSystem.aoeBuffer);
+            const deathExplosionTargets: Enemy[] = [];
+            const count = this.enemyGrid.queryInRadius(deathX, deathY, radius, deathExplosionTargets);
             const radiusSq = radius * radius;
 
             for (let i = 0; i < count; i++) {
-                const neighbor = CollisionSystem.aoeBuffer[i];
+                const neighbor = deathExplosionTargets[i];
                 if (!neighbor.isAlive()) continue;
 
                 const dx = neighbor.x - deathX;
                 const dy = neighbor.y - deathY;
                 if (dx * dx + dy * dy <= radiusSq) {
-                    neighbor.takeDamage(killingProjectile.explosionDamage);
+                    neighbor.takeDamage(killingProjectile.explosionDamage, killingProjectile);
                 }
             }
         }
@@ -272,8 +274,9 @@ export class CollisionSystem {
                     color: 'rgba(0, 188, 212, 0.5)',
                 });
 
-                // Apply slow to nearby enemies - PERF: Using SpatialGrid
-                const count = this.enemyGrid.queryInRadius(deathX, deathY, chainRadius, CollisionSystem.aoeBuffer);
+                // Apply slow to nearby enemies - PERF: Using local array
+                const chainSlowTargets: Enemy[] = [];
+                const count = this.enemyGrid.queryInRadius(deathX, deathY, chainRadius, chainSlowTargets);
                 const radiusSq = chainRadius * chainRadius;
 
                 // Find original slow effect properties
@@ -285,7 +288,7 @@ export class CollisionSystem {
                     const power = slowEffect.slowPower || slowEffect.power || 0.4;
 
                     for (let i = 0; i < count; i++) {
-                        const neighbor = CollisionSystem.aoeBuffer[i];
+                        const neighbor = chainSlowTargets[i];
                         if (!neighbor.isAlive()) continue;
 
                         const dx = neighbor.x - deathX;

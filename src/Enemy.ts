@@ -230,7 +230,13 @@ export class Enemy {
     // ИСПРАВЛЕНИЕ: метод стал public
     public move(dt: number, flowField: any): void { // Using 'any' briefly to avoid circular deps if types not ready, but better import FlowField interface
         let speedMod = 1;
-        const slow = this.statuses.find((s) => s.type === 'slow');
+        let slow = null;
+        for (let i = 0; i < this.statuses.length; i++) {
+            if (this.statuses[i].type === 'slow') {
+                slow = this.statuses[i];
+                break;
+            }
+        }
         if (slow) speedMod -= slow.power;
 
         const currentSpeed = Math.max(0, this.baseSpeed * speedMod * dt); // Apply delta time
@@ -292,17 +298,34 @@ export class Enemy {
     }
 
     public applyStatus(type: 'slow' | 'burn', duration: number, power: number, damageBonus?: number) {
-        const existing = this.statuses.find((s) => s.type === type);
-        if (existing) {
-            existing.duration = duration;
-            existing.power = power;
-        } else {
-            this.statuses.push({ type, duration, power });
+        let existing = null;
+        for (let i = 0; i < this.statuses.length; i++) {
+            if (this.statuses[i].type === type) {
+                existing = this.statuses[i];
+                break;
+            }
         }
 
-        // Apply damage modifier for slowed enemies (Ice level 2+)
-        if (type === 'slow' && damageBonus) {
-            this.damageModifier = damageBonus;
+        if (existing) {
+            // Refresh duration
+            existing.duration = Math.max(existing.duration, duration);
+
+            if (type === 'slow') {
+                // For slow, keep the strongest effect (highest power/slow amount)
+                existing.power = Math.max(existing.power, power);
+                // Apply highest damage modifier
+                if (damageBonus) {
+                    this.damageModifier = Math.max(this.damageModifier, damageBonus);
+                }
+            } else if (type === 'burn') {
+                // For burn, keep the strongest DoT
+                existing.power = Math.max(existing.power, power);
+            }
+        } else {
+            this.statuses.push({ type, duration, power });
+            if (type === 'slow' && damageBonus) {
+                this.damageModifier = Math.max(this.damageModifier, damageBonus);
+            }
         }
     }
 
@@ -344,13 +367,16 @@ export class Enemy {
                     // Without this, deathSpawns (Flesh Colossus), sapper_rat explosion,
                     // and ENEMY_DIED listeners won't fire for burn kills
                     const typeConfig = getEnemyType(this.typeId);
-                    if (typeConfig?.deathSpawns && typeConfig.deathSpawns.length > 0) {
+                    if (typeConfig && typeConfig.deathSpawns && typeConfig.deathSpawns.length > 0) {
                         EventBus.getInstance().emit('ENEMY_DEATH_SPAWN', {
                             enemy: this,
                             spawns: typeConfig.deathSpawns
                         });
                     }
                     EventBus.getInstance().emit(Events.ENEMY_DIED, { enemy: this });
+
+                    // Critical hit fix: purge burn status so we don't emit death twice if update is called again
+                    this.statuses.splice(i, 1);
                 }
                 break; // One burn source (last applied overwrites)
             }
