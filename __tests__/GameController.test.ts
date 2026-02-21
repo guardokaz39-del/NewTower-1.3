@@ -1,21 +1,19 @@
+import { describe, it, expect, vi } from 'vitest';
 import { GameController } from '../src/scenes/GameController';
 
 describe('GameController Keybinds', () => {
     it('should strictly toggle time scale without starting the wave on Spacebar', () => {
         const mockState = {
-            toggleTimeScale: jest.fn(),
+            toggleTimeScale: vi.fn(),
             timeScale: 2.0,
             enemies: [] as any[]
         };
 
-        // Mock window for screen dimensions
-        (global as any).window = { innerWidth: 1920, innerHeight: 1080 };
-
         const controller = Object.create(GameController.prototype);
         controller['state'] = mockState as any;
-        controller['showFloatingText'] = jest.fn();
+        controller['showFloatingText'] = vi.fn();
 
-        const keyEvent = { code: 'Space', preventDefault: jest.fn() } as unknown as KeyboardEvent;
+        const keyEvent = { code: 'Space', preventDefault: vi.fn() } as unknown as KeyboardEvent;
 
         controller.handleKeyDown(keyEvent);
 

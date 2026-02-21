@@ -1,3 +1,4 @@
+import { describe, it, expect, beforeEach } from 'vitest';
 import { FlowField } from '../src/FlowField';
 
 describe('FlowField Navigation', () => {

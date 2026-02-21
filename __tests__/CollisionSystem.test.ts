@@ -1,3 +1,4 @@
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { CollisionSystem } from '../src/CollisionSystem';
 import { ProjectileSystem } from '../src/systems/ProjectileSystem';
 import { Enemy } from '../src/Enemy';
@@ -9,13 +10,9 @@ describe('CollisionSystem Splash Safety', () => {
 
     beforeEach(() => {
         projSys = new ProjectileSystem();
-        const effectSysMock = { add: jest.fn(), spawn: jest.fn() } as any;
+        const effectSysMock = { add: vi.fn(), spawn: vi.fn() } as any;
 
-        // Mock window for spatial grid initialization
-        if (typeof window === 'undefined') {
-            (global as any).window = { innerWidth: 1920, innerHeight: 1080 };
-        }
-
+        // window is provided by jsdom via setup.ts
         colSys = new CollisionSystem(effectSysMock);
     });
 

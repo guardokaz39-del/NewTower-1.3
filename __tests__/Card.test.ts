@@ -1,3 +1,4 @@
+import { describe, test, expect } from 'vitest';
 import { Card, CardType } from '../src/Card';
 
 describe('Card System', () => {

@@ -1,3 +1,4 @@
+import { describe, it, expect, beforeEach } from 'vitest';
 import { EventBus, Events } from '../src/EventBus';
 
 describe('EventBus Mechanics', () => {

@@ -1,3 +1,4 @@
+import { describe, it, expect, beforeEach } from 'vitest';
 import { Tower } from '../src/Tower';
 import { mergeCardsWithStacking } from '../src/CardStackingSystem';
 import { TargetingSystem } from '../src/systems/TargetingSystem';
@@ -26,8 +27,7 @@ describe('Tower & Card Stacking', () => {
     });
 
     it('should target correctly based on "strongest" vs "closest" mode', () => {
-        // Setup mock environment
-        (global as any).document = { createElement: () => ({ getContext: () => ({}) }) };
+        // Canvas mock is handled by __tests__/setup.ts
         const tower = new Tower(0, 0); // At origin
         tower.targetingMode = 'closest';
 

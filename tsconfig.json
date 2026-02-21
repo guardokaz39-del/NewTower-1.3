@@ -23,7 +23,6 @@
     "noImplicitReturns": true,
     "types": [
       "vite/client",
-      "jest",
       "node"
     ]
   },

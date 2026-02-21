@@ -1,3 +1,4 @@
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { WaveManager } from '../src/WaveManager';
 
 describe('WaveManager Flow', () => {
@@ -8,11 +9,14 @@ describe('WaveManager Flow', () => {
         mockScene = {
             wave: 0,
             lives: 10,
-            addMoney: jest.fn(),
-            metrics: { trackMoneyEarned: jest.fn(), trackWaveReached: jest.fn() },
-            showFloatingText: jest.fn(),
-            spawnEnemy: jest.fn(),
-            game: { width: 800 }
+            addMoney: vi.fn(),
+            metrics: { trackMoneyEarned: vi.fn(), trackWaveReached: vi.fn() },
+            showFloatingText: vi.fn(),
+            spawnEnemy: vi.fn(),
+            giveRandomCard: vi.fn(),
+            enemies: [],
+            game: { width: 800 },
+            mapData: null,
         };
         waveManager = new WaveManager(mockScene, 12345);
     });

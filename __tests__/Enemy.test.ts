@@ -1,3 +1,4 @@
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { Enemy } from '../src/Enemy';
 import { EventBus, Events } from '../src/EventBus';
 
@@ -5,18 +6,7 @@ describe('Enemy mechanics', () => {
     let enemy: Enemy;
 
     beforeEach(() => {
-        // Mock global canvas/image for any asset loading errors
-        (global as any).Image = class {
-            constructor() { return {}; }
-        };
-        (global as any).document = {
-            createElement: () => ({
-                getContext: () => ({}),
-                width: 0,
-                height: 0,
-            }),
-        };
-
+        // Canvas/Image mocks are handled by __tests__/setup.ts
         EventBus.getInstance().clear();
         enemy = new Enemy();
         enemy.init({ health: 100, speed: 100, path: [{ x: 0, y: 0 }, { x: 10, y: 10 }] } as any);
@@ -26,7 +16,7 @@ describe('Enemy mechanics', () => {
     });
 
     afterEach(() => {
-        jest.restoreAllMocks();
+        vi.restoreAllMocks();
     });
 
     it('should correctly stack MULTIPLE slow statuses choosing the strongest', () => {
@@ -53,7 +43,7 @@ describe('Enemy mechanics', () => {
     });
 
     it('should trigger ENEMY_DIED strictly ONE time when dying from Burn tick', () => {
-        const emitSpy = jest.spyOn(EventBus.getInstance(), 'emit');
+        const emitSpy = vi.spyOn(EventBus.getInstance(), 'emit');
 
         enemy.currentHealth = 5; // Low health
 
