@@ -10,6 +10,7 @@ import { GoblinUnitRenderer } from './units/GoblinUnitRenderer';
 
 import { SpiderUnitRenderer } from './units/SpiderUnitRenderer';
 import { SkeletonCommanderUnitRenderer } from './units/SkeletonCommanderUnitRenderer';
+import { SkeletonMinerRenderer } from './units/SkeletonMinerRenderer';
 
 import { TrollUnitRenderer } from './units/TrollUnitRenderer';
 import { RatUnitRenderer } from './units/RatUnitRenderer';
@@ -29,6 +30,7 @@ export class EnemyRenderer {
         'WRAITH': new WraithUnitRenderer(),
         'GOBLIN': new GoblinUnitRenderer(),
         'SKELETON_COMMANDER': new SkeletonCommanderUnitRenderer(),
+        'SKELETON_MINER': new SkeletonMinerRenderer(),
         'RAT': new RatUnitRenderer(),
         'MAGMA': new MagmaUnitRenderer(),
         'FLESH': new FleshUnitRenderer(),

@@ -80,6 +80,7 @@ graph TB
 **Unit Renderers** (`src/renderers/units/`):
 
 - `SkeletonUnitRenderer.ts`
+- `SkeletonMinerRenderer.ts`
 - `HellhoundUnitRenderer.ts`
 - `OrcUnitRenderer.ts`
 - `TrollUnitRenderer.ts`
@@ -164,6 +165,8 @@ The game uses a **Logical Coordinate System** decoupled from physical pixels to 
 ---
 
 ### 👹 Enemy Archetypes (`src/config/Enemies.ts`)
+
+> **📖 Руководство:** Как правильно добавить нового врага от А до Я, читайте в [Пайплайн Создания Врагов](enemy_creation_pipeline.md).
 
 | ID | Name | Archetype |
 |----|------|-----------|

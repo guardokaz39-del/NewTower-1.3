@@ -352,7 +352,7 @@ export class DevConsole {
         });
 
         addHeader('👾 СПАВН ВРАГОВ');
-        ['GRUNT', 'SCOUT', 'TANK', 'BOSS', 'SKELETON_COMMANDER', 'TROLL_ARMORED'].forEach(type => {
+        ['GRUNT', 'SCOUT', 'TANK', 'BOSS', 'SKELETON_COMMANDER', 'TROLL_ARMORED', 'SKELETON_MINER'].forEach(type => {
             addBtn(`+ ${type}`, '👾', () => {
                 this.scene.spawnEnemy?.(type);
                 Logger.info(LogChannel.GAME, `Спавн ${type}`);

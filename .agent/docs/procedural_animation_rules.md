@@ -63,3 +63,83 @@ let dirX = (facing === 'UP') ? (isLeft ? -1.5 : 1.5) : (isLeft ? -2 : 2);
 let dirY = (facing === 'UP') ? -1 : 2;
 // для SIDE стопа всегда смотрит вперед
 ```
+
+---
+
+## 4. Архитектура Наследования (Хуки и ООП)
+
+При создании сложных масштабируемых систем (таких как `BaseSkeletonRenderer`) мы используем паттерн **Template Method**: базовый класс рисует общую структуру (кости), а дочерние классы реализуют "хуки" (`drawHeadDecoration`, `drawBodyArmor`, `drawRightHandItem`), чтобы добавлять уникальную экипировку.
+
+### ⚠️ Ошибка "Static Readonly" (Проблема переопределения цветов)
+
+**Проблема:** Если вы объявляете цвета костей в базовом классе как `protected static readonly BONE_MAIN = '#...';`, дочерние классы не смогут их легко переопределить для своих инстансов. Статика привязана к классу, а не объекту.
+
+**Решение:** Для любых параметров, которые могут меняться у наследников (цвета, размеры, отступы), используйте свойства экземпляра (Instance Properties) и переопределяйте их через `override`:
+
+**Неправильно (Базовый класс):**
+
+```typescript
+protected static readonly BONE_MAIN = '#e0d0b0';
+// Дочерний класс (SkeletonMiner) не сможет изменить этот цвет для себя
+```
+
+**Правильно (Базовый класс):**
+
+```typescript
+protected boneMain: string = '#e0d0b0'; // Свойство экземпляра
+```
+
+**Дочерний класс:**
+
+```typescript
+export class SkeletonMinerRenderer extends BaseSkeletonRenderer {
+    protected override boneMain = '#d4cba7'; // Теперь шахтер имеет грязные кости
+}
+```
+
+Всегда закладывайте в базовый процедурный класс возможность гибкого переопределения палитры через переменные экземпляра.
+
+---
+
+## 5. Контракт Отрисовки Черепа (`drawSkull`)
+
+`BaseSkeletonRenderer` **НЕ рисует череп автоматически** в `drawTorso()`. Череп рисуется через shared protected метод `drawSkull()`, который подклассы **обязаны вызвать** в `drawHeadDecoration()`.
+
+> [!CAUTION]
+> Если забыть `this.drawSkull()` в `drawHeadDecoration()`, у врага будет шлем/каска без головы — каска повиснет на уровне шеи.
+
+### Правильный шаблон
+
+```typescript
+protected drawHeadDecoration(ctx: CanvasRenderingContext2D, pose: SkeletonPose): void {
+    ctx.save();
+    ctx.translate(pose.anchors.head.x, pose.anchors.head.y);
+    ctx.rotate(pose.anchors.head.angle);
+
+    // 1. СНАЧАЛА — череп (нижний слой)
+    this.drawSkull(ctx, pose.scale, pose.facing);
+
+    // 2. ПОТОМ — экипировка поверх (каска, шлем, капюшон...)
+    // ...
+
+    ctx.restore();
+}
+```
+
+### Переопределяемые свойства
+
+| Свойство | По умолч. | Описание |
+| --- | --- | --- |
+| `boneMain` | `#e0d0b0` | Светлый цвет кости |
+| `boneShadow` | `#4e342e` | Тёмная обводка |
+| `eyeGlow` | `#d32f2f` | Цвет свечения глаз |
+| `headRadius` | `5.5` | Радиус черепной коробки |
+
+### Пример: SkeletonMiner (зелёные глаза, грязные кости)
+
+```typescript
+export class SkeletonMinerRenderer extends BaseSkeletonRenderer {
+    protected override boneMain = '#d4cba7';
+    protected override eyeGlow = '#66bb6a';
+}
+```

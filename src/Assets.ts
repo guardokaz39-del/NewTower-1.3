@@ -13,6 +13,7 @@ import { RatUnitRenderer } from './renderers/units/RatUnitRenderer';
 import { HellhoundUnitRenderer } from './renderers/units/HellhoundUnitRenderer';
 import { MagmaUnitRenderer } from './renderers/units/MagmaUnitRenderer';
 import { FleshUnitRenderer } from './renderers/units/FleshUnitRenderer';
+import { SkeletonMinerRenderer } from './renderers/units/SkeletonMinerRenderer';
 import { Logger, LogChannel, LogLevel } from './utils/Logger';
 
 export class Assets {
@@ -1973,6 +1974,10 @@ export class Assets {
             // 2. Skeleton
             SpriteBaker.bakeWalkCycle('skeleton', new SkeletonUnitRenderer());
             console.log('✓ Baked walk cycle for "skeleton"');
+
+            // 2.5 Skeleton Miner
+            SpriteBaker.bakeWalkCycle('skeleton_miner', new SkeletonMinerRenderer());
+            console.log('✓ Baked walk cycle for "skeleton_miner"');
 
             // 3. Goblin
             SpriteBaker.bakeWalkCycle('goblin', new GoblinUnitRenderer());

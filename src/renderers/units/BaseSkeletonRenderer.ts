@@ -51,10 +51,10 @@ export abstract class BaseSkeletonRenderer extends CachedUnitRenderer {
     protected static readonly UPPER_ARM_LEN = 5.5;
     protected static readonly LOWER_ARM_LEN = 5.5;
 
-    // Default colors for base bone drawing
-    protected static readonly BONE_MAIN = '#e0d0b0'; // Restored original light bone tint
-    protected static readonly BONE_SHADOW = '#4e342e'; // Strong dark brown for outline context to pop from road
-    protected static readonly BONE_DARK = '#a89070'; // Original recessed bone
+    // Default colors for base bone drawing (Instance properties so subclasses can override)
+    protected boneMain = '#e0d0b0'; // Restored original light bone tint
+    protected boneShadow = '#4e342e'; // Strong dark brown for outline context to pop from road
+    protected boneDark = '#a89070'; // Original recessed bone
 
     public getBakeFacings(): ('SIDE' | 'UP' | 'DOWN')[] {
         return ['SIDE', 'UP', 'DOWN'];
@@ -378,7 +378,7 @@ export abstract class BaseSkeletonRenderer extends CachedUnitRenderer {
 
     private drawBone(ctx: CanvasRenderingContext2D, p1: { x: number, y: number }, p2: { x: number, y: number }, thickness: number) {
         // Shadow pass
-        ctx.strokeStyle = BaseSkeletonRenderer.BONE_SHADOW;
+        ctx.strokeStyle = this.boneShadow;
         ctx.lineWidth = thickness + 2;
         ctx.beginPath();
         ctx.moveTo(p1.x, p1.y);
@@ -386,7 +386,7 @@ export abstract class BaseSkeletonRenderer extends CachedUnitRenderer {
         ctx.stroke();
 
         // Main bone pass
-        ctx.strokeStyle = BaseSkeletonRenderer.BONE_MAIN;
+        ctx.strokeStyle = this.boneMain;
         ctx.lineWidth = thickness;
         ctx.beginPath();
         ctx.moveTo(p1.x, p1.y);
@@ -422,8 +422,8 @@ export abstract class BaseSkeletonRenderer extends CachedUnitRenderer {
         // Spine
         this.drawBone(ctx, p.joints.pelvis, p.joints.neck, 3.5);
 
-        ctx.strokeStyle = BaseSkeletonRenderer.BONE_MAIN;
-        ctx.fillStyle = BaseSkeletonRenderer.BONE_MAIN;
+        ctx.strokeStyle = this.boneMain;
+        ctx.fillStyle = this.boneMain;
 
         // Pelvis bone block
         ctx.beginPath();
@@ -454,10 +454,74 @@ export abstract class BaseSkeletonRenderer extends CachedUnitRenderer {
             ctx.stroke();
         }
 
-        // Skull is usually drawn via headDecoration or basic
-        // We defer skull drawing to either subclasses, but provide a basic one if they don't override
-        // Actually, skull is part of body base if there's no helmet covering face
+
+        // Skull is drawn via the shared drawSkull() helper,
+        // called explicitly by subclass drawHeadDecoration() hooks.
     }
+
+    // Default eye glow color (subclasses can override)
+    protected eyeGlow = '#d32f2f';
+    protected headRadius = 5.5;
+
+    /**
+     * Shared skull drawing for all skeleton variants.
+     * Call from drawHeadDecoration() BEFORE equipment layering.
+     * Expects ctx already translated/rotated to head anchor.
+     */
+    protected drawSkull(ctx: CanvasRenderingContext2D, scale: number, facing: SpriteFacing): void {
+        const r = this.headRadius * scale;
+
+        ctx.fillStyle = this.boneMain;
+        ctx.beginPath();
+
+        if (facing === 'SIDE') {
+            ctx.arc(-1 * scale, -2 * scale, r, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Snout
+            ctx.beginPath();
+            ctx.fillRect(1 * scale, 0, 3 * scale, 3 * scale);
+
+            // Eye socket
+            const eyeX = 3 * scale;
+            const eyeY = -0.5 * scale;
+            ctx.fillStyle = '#111';
+            ctx.beginPath(); ctx.ellipse(eyeX, eyeY, 1.5 * scale, 2 * scale, 0, 0, Math.PI * 2); ctx.fill();
+
+            // Glow
+            ctx.fillStyle = this.eyeGlow;
+            ctx.beginPath(); ctx.arc(eyeX + 0.5 * scale, eyeY, 0.6 * scale, 0, Math.PI * 2); ctx.fill();
+
+        } else if (facing === 'DOWN') {
+            ctx.arc(0, -2 * scale, r, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Jaw
+            ctx.beginPath();
+            ctx.rect(-2.5 * scale, 2 * scale, 5 * scale, 2.5 * scale);
+            ctx.fill();
+
+            // Eyes
+            const eyeY = 0;
+            const eyeX = 2 * scale;
+            const eyeSize = 1.8 * scale;
+            ctx.fillStyle = '#111';
+            ctx.beginPath(); ctx.arc(-eyeX, eyeY, eyeSize, 0, Math.PI * 2); ctx.fill();
+            ctx.beginPath(); ctx.arc(eyeX, eyeY, eyeSize, 0, Math.PI * 2); ctx.fill();
+
+            // Glow
+            ctx.fillStyle = this.eyeGlow;
+            const glowSize = 0.6 * scale;
+            ctx.beginPath(); ctx.arc(-eyeX, eyeY, glowSize, 0, Math.PI * 2); ctx.fill();
+            ctx.beginPath(); ctx.arc(eyeX, eyeY, glowSize, 0, Math.PI * 2); ctx.fill();
+
+        } else {
+            // UP — plain cranium
+            ctx.arc(0, -2 * scale, r, 0, Math.PI * 2);
+            ctx.fill();
+        }
+    }
+
 
     // Helper method for 2D IK (2 segments)
     protected solve2BoneIK(

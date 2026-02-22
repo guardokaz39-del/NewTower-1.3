@@ -50,10 +50,16 @@ The Editor prevents memory leaks and DOM pollution through strict cleanup in `Ed
 
 The `saveMap` function enforces validity **before** writing to storage:
 
+- **Path Resolution:** `resolveFullPath()` converts sparse waypoints (Start → WPs → End) into a dense tile-by-tile BFS path via `Pathfinder.findPath()` for each segment.
 - **Path Connectivity:** Checks if Start is connected to End.
 - **Path Integrity:** Verifies no loops or unreachable signals (in `FULLPATH` mode).
 - **Data Sync:** Synchronizes `WaypointManager` state to `MapManager` before validation.
 - **User Alert:** Blocks save and alerts user if validation fails.
+
+> [!CAUTION]
+> `WaypointManager.getFullPath()` returns **разреженные** (sparse) waypoints — только поставленные вручную маркеры. Это НЕ тайл-за-тайлом путь. Если записать их напрямую в `map.waypoints` с режимом `'FULLPATH'`, `validatePath()` выдаст ошибки "disconnected" и "loop", потому что проверяет Manhattan distance ≤ 1 между соседними точками.
+>
+> Всегда пропускайте через `resolveFullPath()` перед валидацией и сохранением!
 
 ### 3. Wave Editor Safety
 

@@ -333,9 +333,11 @@ export class EditorScene extends BaseScene {
     }
 
     private openWaveConfig() {
-        // Use WaypointManager's full path
+        // Resolve sparse editor waypoints → dense BFS path
         if (this.waypointMgr.isValid()) {
-            this.map.waypoints = this.waypointMgr.getFullPath();
+            const resolved = this.resolveFullPath();
+            if (!resolved) return; // Error already shown to user
+            this.map.waypoints = resolved;
         } else {
             alert('Set Start and End points first!');
             return;
@@ -360,9 +362,11 @@ export class EditorScene extends BaseScene {
         // [FIX] Ensure map waves are updated before serialization
         this.map.waves = waves;
 
-        // Sync waypoints for validation
+        // Resolve sparse editor waypoints → dense BFS path for validation
         if (this.waypointMgr.isValid()) {
-            this.map.waypoints = this.waypointMgr.getFullPath();
+            const resolved = this.resolveFullPath();
+            if (!resolved) return; // BFS failed — error already shown
+            this.map.waypoints = resolved;
             this.map.waypointsMode = 'FULLPATH';
         }
 
@@ -389,6 +393,41 @@ export class EditorScene extends BaseScene {
         } else {
             alert('Failed to save map (Storage full?)');
         }
+    }
+
+    /**
+     * Resolve sparse editor waypoints (Start, WP1, WP2, ..., End)
+     * into a dense tile-by-tile BFS path.
+     * Returns null if any segment is unreachable.
+     */
+    private resolveFullPath(): { x: number; y: number }[] | null {
+        const sparse = this.waypointMgr.getFullPath();
+        if (sparse.length < 2) {
+            alert('Need at least Start and End points!');
+            return null;
+        }
+
+        Pathfinder.invalidateCache();
+        const fullPath: { x: number; y: number }[] = [];
+
+        for (let i = 0; i < sparse.length - 1; i++) {
+            const from = sparse[i];
+            const to = sparse[i + 1];
+            const segment = Pathfinder.findPath(this.map.grid, from, to);
+
+            if (segment.length === 0) {
+                alert(`No path between (${from.x},${from.y}) → (${to.x},${to.y}).\nCheck that road tiles connect these points.`);
+                return null;
+            }
+
+            // Append segment, skip first point on subsequent segments to avoid duplicates
+            const startIdx = (i === 0) ? 0 : 1;
+            for (let j = startIdx; j < segment.length; j++) {
+                fullPath.push(segment[j]);
+            }
+        }
+
+        return fullPath;
     }
 
     private createUI() {

@@ -1,5 +1,4 @@
 import { BaseSkeletonRenderer, SkeletonPose } from './BaseSkeletonRenderer';
-import { SpriteFacing } from './CachedUnitRenderer';
 
 /**
  * Standard Sword and Shield Skeleton.
@@ -7,13 +6,12 @@ import { SpriteFacing } from './CachedUnitRenderer';
  */
 export class SkeletonUnitRenderer extends BaseSkeletonRenderer {
     // Palette
-    private static readonly RED_GLOW = '#d32f2f'; // Original dark red
     private static readonly ARMOR_DARK = '#2d2d2d'; // Original dark
     private static readonly ARMOR_LIGHT = '#546e7a'; // Original plate metallic
     private static readonly SHIELD_WOOD = '#5d4037'; // Original wood
     private static readonly SHIELD_RIM = '#8d6e63'; // Original rim
 
-    private static readonly HEAD_RADIUS = 5.5;
+    // Eye glow and head radius are inherited from BaseSkeletonRenderer
 
     // We don't need to override getBakeFacings, as BaseSkeletonRenderer provides ['SIDE', 'UP', 'DOWN']
     // We don't need to override drawFrameDirectional either, the base handles Z-ordering
@@ -29,13 +27,14 @@ export class SkeletonUnitRenderer extends BaseSkeletonRenderer {
 
         const s = pose.scale;
 
-        // Draw Skull base (since base class doesn't draw it by default)
+        // Draw Skull base (shared from BaseSkeletonRenderer)
         this.drawSkull(ctx, s, pose.facing);
 
         ctx.restore();
     }
 
     protected override drawBodyArmor(ctx: CanvasRenderingContext2D, pose: SkeletonPose): void {
+
         ctx.save();
         ctx.translate(pose.anchors.torso.x, pose.anchors.torso.y);
         const s = pose.scale;
@@ -131,63 +130,5 @@ export class SkeletonUnitRenderer extends BaseSkeletonRenderer {
         }
 
         ctx.restore();
-    }
-
-
-    // ============================================================================
-    // HELPER METHODS (Private to Skeleton)
-    // ============================================================================
-
-    private drawSkull(ctx: CanvasRenderingContext2D, scale: number, facing: SpriteFacing) {
-        const r = SkeletonUnitRenderer.HEAD_RADIUS * scale;
-
-        ctx.fillStyle = BaseSkeletonRenderer.BONE_MAIN;
-        ctx.beginPath();
-
-        if (facing === 'SIDE') {
-            ctx.arc(-1 * scale, -2 * scale, r, 0, Math.PI * 2);
-            ctx.fill();
-
-            // Snout
-            ctx.beginPath();
-            ctx.fillRect(1 * scale, 0, 3 * scale, 3 * scale);
-
-            // Eye
-            const eyeX = 3 * scale;
-            const eyeY = -0.5 * scale;
-            ctx.fillStyle = '#111';
-            ctx.beginPath(); ctx.ellipse(eyeX, eyeY, 1.5 * scale, 2 * scale, 0, 0, Math.PI * 2); ctx.fill();
-
-            ctx.fillStyle = SkeletonUnitRenderer.RED_GLOW;
-            ctx.beginPath(); ctx.arc(eyeX + 0.5 * scale, eyeY, 0.6 * scale, 0, Math.PI * 2); ctx.fill();
-
-        } else if (facing === 'DOWN') {
-            ctx.arc(0, -2 * scale, r, 0, Math.PI * 2);
-            ctx.fill();
-
-            // Jaw
-            ctx.beginPath();
-            ctx.rect(-2.5 * scale, 2 * scale, 5 * scale, 2.5 * scale);
-            ctx.fill();
-
-            // Eyes
-            const eyeY = 0;
-            const eyeX = 2 * scale;
-            const eyeSize = 1.8 * scale;
-            ctx.fillStyle = '#111';
-            ctx.beginPath(); ctx.arc(-eyeX, eyeY, eyeSize, 0, Math.PI * 2); ctx.fill();
-            ctx.beginPath(); ctx.arc(eyeX, eyeY, eyeSize, 0, Math.PI * 2); ctx.fill();
-
-            // Glow
-            ctx.fillStyle = SkeletonUnitRenderer.RED_GLOW;
-            const glowSize = 0.6 * scale;
-            ctx.beginPath(); ctx.arc(-eyeX, eyeY, glowSize, 0, Math.PI * 2); ctx.fill();
-            ctx.beginPath(); ctx.arc(eyeX, eyeY, glowSize, 0, Math.PI * 2); ctx.fill();
-
-        } else {
-            // UP
-            ctx.arc(0, -2 * scale, r, 0, Math.PI * 2);
-            ctx.fill();
-        }
     }
 }

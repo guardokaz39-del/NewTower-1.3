@@ -55,6 +55,18 @@ export const ENEMY_TYPES: Record<string, IEnemyTypeConfig> = {
         scale: 1.2,
     },
     // --- NEW VARIANTS ---
+    SKELETON_MINER: {
+        id: 'skeleton_miner',
+        name: 'Скелет-Шахтёр',
+        symbol: '⛏️',
+        hpMod: 1.44, // 20% more than basic skeleton (1.2)
+        speed: 85, // Slightly slower than basic skeleton
+        reward: 5,
+        color: '#d7ccc8', // Dirty bone color
+        desc: 'Крепкий работяга с киркой и мешком угля.',
+        archetype: 'SKELETON_MINER',
+        scale: 1.05, // Slightly bigger presence
+    },
     SKELETON_COMMANDER: {
         id: 'skeleton_commander',
         name: 'Командир Скелетов',
