@@ -22,6 +22,7 @@ export interface EventPayloadMap {
     ENEMY_DIED: { enemy: any }; // Using any to avoid circular dependency with Enemy for now, or use interface
     ENEMY_SPAWNED: string;
     SPAWN_PUDDLE: { x: number; y: number };
+    PROJECTILE_SPAWNED: { x: number; y: number; target: any; stats: any };
 
     // Boss Mechanics
     ENEMY_SPLIT: { enemy: any; threshold: number };
@@ -121,6 +122,7 @@ export const Events = {
     ENEMY_DIED: 'ENEMY_DIED',
     ENEMY_SPAWNED: 'ENEMY_SPAWNED',
     SPAWN_PUDDLE: 'SPAWN_PUDDLE',
+    PROJECTILE_SPAWNED: 'PROJECTILE_SPAWNED',
     ENEMY_SPLIT: 'ENEMY_SPLIT',
     ENEMY_DEATH_SPAWN: 'ENEMY_DEATH_SPAWN',
     CARD_DROPPED: 'CARD_DROPPED'

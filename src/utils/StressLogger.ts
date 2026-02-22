@@ -4,7 +4,9 @@ export interface StressPhaseStats {
     phaseName: string;
     duration: number;
     avgFps: number;
-    minFps: number; // 1% low
+    minFps: number; // Absolute minimum
+    p01Fps: number; // 1% low
+    p05Fps: number; // 5% low
     maxEntities: number;
 
     // Avg timings per frame
@@ -15,9 +17,8 @@ export interface StressPhaseStats {
     avgDrawParticles: number;
 
     // Advanced Metrics
+    // Keep strictly sorted
     medianFps: number;
-    p95Fps: number;
-    p99Fps: number;
     stddevFps: number;
 
     avgFrameMs?: number;
@@ -93,8 +94,8 @@ export class StressLogger {
             avgCollision: 0,
             avgDrawParticles: 0,
             medianFps: 0,
-            p95Fps: 0,
-            p99Fps: 0,
+            p05Fps: 0,
+            p01Fps: 0,
             stddevFps: 0,
             avgDrawCalls: 0,
             avgDrawImage: 0,
@@ -198,8 +199,8 @@ export class StressLogger {
         const l50 = Math.floor(this.fpsSamples.length * 0.50);
 
         this.currentPhase.minFps = this.fpsSamples[0] || 0;
-        this.currentPhase.p99Fps = this.fpsSamples[l01] || 0;
-        this.currentPhase.p95Fps = this.fpsSamples[l05] || 0;
+        this.currentPhase.p01Fps = this.fpsSamples[l01] || 0;
+        this.currentPhase.p05Fps = this.fpsSamples[l05] || 0;
         this.currentPhase.medianFps = this.fpsSamples[l50] || 0;
 
         // Frame MS metrics
@@ -255,7 +256,7 @@ export class StressLogger {
         md += `Date: ${new Date().toLocaleString()}\n\n`;
 
         md += `## 🔬 Phase Breakdown\n`;
-        md += `| Phase | Dur(s) | FPS(Med|Avg) | P95 | P99 | FrameMs(Avg/P95) | Jitter | Ents | Core(ms) | Rend(ms) | Draws (Img/Rect/Path) | Tx/S/State |\n`;
+        md += `| Phase | Dur(s) | FPS(Med|Avg) | P05 | P01 | FrameMs(Avg/P95) | Jitter | Ents | Core(ms) | Rend(ms) | Draws (Img/Rect/Path) | Tx/S/State |\n`;
         md += `|-------|--------|--------------|-----|-----|------------------|--------|------|----------|----------|-----------------------|------------|\n`;
 
         this.phases.forEach(p => {
@@ -272,7 +273,7 @@ export class StressLogger {
             const drawBreakdown = `${p.avgDrawImage.toFixed(0)}/${p.avgFillRect.toFixed(0)}/${p.avgPathOps.toFixed(0)}`;
             const stateBreakdown = `${p.avgTransform.toFixed(0)}/${p.avgSaveRestore.toFixed(0)}/${p.avgStateChanges.toFixed(0)}`;
 
-            md += `| ${p.phaseName} | ${durationSec} | ${fpsStr} | ${p.p95Fps.toFixed(0)} | ${p.p99Fps.toFixed(0)} | ${frameMetrics} | ${p.stddevFps.toFixed(1)} | ${p.maxEntities} | ${coreMs} | ${p.avgRender.toFixed(2)} | ${drawBreakdown} | ${stateBreakdown} |\n`;
+            md += `| ${p.phaseName} | ${durationSec} | ${fpsStr} | ${p.p05Fps.toFixed(0)} | ${p.p01Fps.toFixed(0)} | ${frameMetrics} | ${p.stddevFps.toFixed(1)} | ${p.maxEntities} | ${coreMs} | ${p.avgRender.toFixed(2)} | ${drawBreakdown} | ${stateBreakdown} |\n`;
         });
 
         md += `\n## 🚨 Analysis\n`;
@@ -305,5 +306,9 @@ export class StressLogger {
     public static reset() {
         this.phases = [];
         this.currentPhase = null;
+        this.frameCount = 0;
+        this.totalFps = 0;
+        this.fpsSamples = [];
+        this.frameMsSamples = [];
     }
 }

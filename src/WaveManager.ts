@@ -55,6 +55,7 @@ export class WaveManager {
 
             // Snapshot lives for "Perfect Wave" check (only on fresh start of a sequence)
             this.waveStartLives = this.scene.lives;
+            this.lastEarlyBonusTime = nowMs; // Initialize to prevent instant early bonus on first stack
 
             this.generateWave(this.scene.wave);
             EventBus.getInstance().emit(Events.WAVE_STARTED, this.scene.wave);

@@ -38,11 +38,11 @@
 Строгий порядок обновлений для детерминированности:
 
 1. **Move Entities**: Враги двигаются (`EntityManager`).
-2. **Build Grid**: Сетка перестраивается (`CollisionSystem.prepareGrid`).
-3. **Targeting**: Башни ищут цели в актуальной сетке (`Tower.update`).
-4. **Fire**: Оружие стреляет по выбранным целям (`WeaponSystem.update`).
-5. **Move Projectiles**: Снаряды летят (`ProjectileSystem`).
-6. **Collision Check**: Проверка попаданий (`CollisionSystem.update`).
+2. **Build Grid**: Сетка перестраивается (`CollisionSystem.prepareGrid(enemies)`). *Ограничения сетки напрямую зависят от `window.innerWidth`, что критично учитывать при тестировании JSDOM.*
+3. **Targeting**: Башни ищут цели в актуальной сетке (`Tower.update(dt)`).
+4. **Fire**: Оружие стреляет по выбранным целям (`WeaponSystem.update(towers, enemies, projSys)`).
+5. **Move Projectiles**: Снаряды летят (`ProjectileSystem.update(dt)`).
+6. **Collision Check**: Проверка попаданий (`CollisionSystem.update(projSys, enemies)`).
 
 ### 6. Phase 2: Precision & Stability (New)
 
