@@ -39,10 +39,8 @@ export class CardSelectionUI {
             return;
         }
 
-        // Add click listener (only once)
-        if (!this.startButton.onclick) {
-            this.startButton.addEventListener('click', () => this.complete());
-        }
+        // Add click listener (overrides any existing to prevent double triggers)
+        this.startButton.onclick = () => this.complete();
 
         console.log('CardSelectionUI: All elements found successfully');
 

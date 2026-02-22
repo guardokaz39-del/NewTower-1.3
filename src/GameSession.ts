@@ -89,13 +89,13 @@ export class GameSession {
         this.acidSystem.update(dt, this.gameState.enemies);
         this.commanderSystem.update(dt, this.gameState.enemies);
 
-        // 2. Prepare Spatial Grid
-        this.collision.prepareGrid(this.gameState.enemies);
+        // 2. Invalidate Grid Check
+        this.collision.invalidateGrid();
 
         // 3. Update Towers
         for (let i = 0; i < this.gameState.towers.length; i++) {
             const t = this.gameState.towers[i];
-            t.update(dt, this.collision.enemyGrid, this.map.flowField);
+            t.update(dt, this.collision.getValidGrid(this.gameState.enemies), this.map.flowField);
             t.updateBuilding(this.effects, dt);
             // RendererFactory update moved to Scene? No, RendererFactory updates visual state on Tower. 
             // Ideally Tower update handles logic, RendererFactory handles visual.

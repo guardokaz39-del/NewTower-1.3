@@ -116,6 +116,41 @@ public destroy() {
 }
 ```
 
+### Strict Initialization Order
+
+To prevent `null` reference crashes (e.g. `document.getElementById` returning null), Systems that rely on Dynamic UI layers must be initialized **after** `UIManager` has built the DOM.
+
+**✅ GOOD Pattern:**
+
+```typescript
+// GameScene.init()
+this.uiManager = new UIManager(this); // Builds #hand-container, etc.
+this.cardSystem = new CardSystem(this);
+this.cardSystem.initUI(); // Safe to access DOM
+```
+
+**❌ BAD Pattern:**
+
+```typescript
+// GameScene.init()
+this.cardSystem = new CardSystem(this);
+this.cardSystem.initUI(); // CRASH: #hand-container doesn't exist yet!
+this.uiManager = new UIManager(this);
+```
+
+### Double-Transition Bugs (Click Handlers)
+
+When dealing with simple UI buttons that transition states (e.g. `startButton`), avoid `element.addEventListener('click', handler)` because scene restarts can cause the listener to be bound twice if `destroy()` misses it.
+
+**Preferred Approach for Single-Action Buttons:**
+
+```typescript
+// Overwrites any previous listener safely
+this.startButton.onclick = () => {
+    EventBus.getInstance().emit(Events.WAVE_START_REQUESTED);
+};
+```
+
 ---
 
 ## 🎨 Design Token System (`src/design/`)

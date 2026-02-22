@@ -16,11 +16,13 @@ export interface IGridEntity {
 import { PerformanceProfiler } from './utils/PerformanceProfiler';
 
 export class SpatialGrid<T extends IGridEntity> {
-    private cellSize: number;
+    public readonly cellSize: number;
     private cols: number;
     private rows: number;
     // PERF: Flat 1D array instead of Map<string, T[]>
     private cells: T[][];
+
+    public size: number = 0;
 
     constructor(worldWidth: number, worldHeight: number, cellSize: number = 128) {
         this.cellSize = cellSize;
@@ -40,6 +42,7 @@ export class SpatialGrid<T extends IGridEntity> {
      * PERF: Does NOT deallocate arrays - just resets length to 0
      */
     public clear(): void {
+        this.size = 0;
         for (let i = 0; i < this.cells.length; i++) {
             this.cells[i].length = 0;
         }
@@ -73,6 +76,7 @@ export class SpatialGrid<T extends IGridEntity> {
         const idx = this.getCellIndex(entity.x, entity.y);
         if (idx >= 0) {
             this.cells[idx].push(entity);
+            this.size++;
         }
     }
 

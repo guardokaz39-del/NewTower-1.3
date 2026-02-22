@@ -340,8 +340,11 @@ export class DevConsole {
         });
         addBtn('Статистика сетки (SpatialGrid)', '📐', () => {
             const collision = this.scene.collision;
-            if (collision?.enemyGrid?.getStats) {
-                const stats = collision.enemyGrid.getStats();
+            // Provide empty array to getValidGrid to just get the grid state safely for dev console stats. 
+            // Better yet, we can pass scene.enemies but in DevConsole we want minimal interference.
+            const grid = collision?.getValidGrid(this.scene.enemies || []);
+            if (grid?.getStats) {
+                const stats = grid.getStats();
                 Logger.info(LogChannel.SYSTEM, `SpatialGrid: ${stats.occupiedCells}/${stats.totalCells} ячеек, ${stats.totalEntities} сущностей`);
             } else {
                 Logger.warn(LogChannel.SYSTEM, 'SpatialGrid недоступен');

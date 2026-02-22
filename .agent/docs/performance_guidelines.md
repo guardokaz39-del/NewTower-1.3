@@ -306,10 +306,11 @@ ctx.drawImage(aura, x, y);
 
 ### 7. SpatialGrid для AOE [NEW]
 
-Для любых эффектов по площади (Splash, Explosion, Aura) **ОБЯЗАТЕЛЬНО** использовать `SpatialGrid`.
+Для любых эффектов по площади (Splash, Explosion, Aura) **ОБЯЗАТЕЛЬНО** использовать `CollisionSystem.getValidGrid()`.
 
 - **Запрещено**: `enemies.forEach(e => dist(e, target))` (O(N))
 - **Обязательно**: `grid.getNearby(x, y, r)` (O(1))
+- **Self-Tracking**: Сетка умная — она сама отслеживает изменения списка врагов (`enemies.length` или `Enemy.x/y` переходы между ячейками 128x128) и пересобирается **только** если это необходимо. Не дергайте пересборку сетки руками!
 
 ### 8. Rendering: Sprites vs Vectors [NEW]
 

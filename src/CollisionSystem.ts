@@ -8,7 +8,10 @@ import { SpatialGrid } from './SpatialGrid';
 
 export class CollisionSystem {
     private effects: EffectSystem;
-    public readonly enemyGrid: SpatialGrid<Enemy>; // Public for DevConsole stats
+    private enemyGrid: SpatialGrid<Enemy>;
+
+    private gridDirty: boolean = true;
+    private enemyLastCells: WeakMap<Enemy, { x: number, y: number }> = new WeakMap();
 
     constructor(effects: EffectSystem) {
         this.effects = effects;
@@ -19,7 +22,44 @@ export class CollisionSystem {
 
     private static aoeBuffer: Enemy[] = [];
 
-    public prepareGrid(enemies: Enemy[]) {
+    public invalidateGrid() {
+        this.gridDirty = true;
+    }
+
+    public getValidGrid(enemies: Enemy[]): SpatialGrid<Enemy> {
+        // Automatically check if rebuilding is necessary
+        let autoDirty = false;
+
+        let aliveCount = 0;
+        for (let i = 0; i < enemies.length; i++) {
+            const enemy = enemies[i];
+            if (enemy && enemy.isAlive()) {
+                aliveCount++;
+                const currentCellX = Math.floor(enemy.x / this.enemyGrid.cellSize);
+                const currentCellY = Math.floor(enemy.y / this.enemyGrid.cellSize);
+
+                const lastCell = this.enemyLastCells.get(enemy);
+                if (!lastCell || lastCell.x !== currentCellX || lastCell.y !== currentCellY) {
+                    autoDirty = true;
+                    this.enemyLastCells.set(enemy, { x: currentCellX, y: currentCellY });
+                }
+            }
+        }
+
+        // We also need to know if the total alive enemies changed. 
+        // A simple check is comparing grid size to aliveCount.
+        if (aliveCount !== this.enemyGrid.size) {
+            autoDirty = true;
+        }
+
+        if (this.gridDirty || autoDirty) {
+            this.prepareGrid(enemies);
+            this.gridDirty = false;
+        }
+        return this.enemyGrid;
+    }
+
+    private prepareGrid(enemies: Enemy[]) {
         this.enemyGrid.clear();
         for (let i = 0; i < enemies.length; i++) {
             const enemy = enemies[i];
@@ -31,9 +71,7 @@ export class CollisionSystem {
     }
 
     public update(projectiles: Projectile[], enemies: Enemy[]) {
-        // PERF: Grid is now prepared externally by GameScene
-        // This allows sharing the grid with TargetingSystem
-
+        const activeGrid = this.getValidGrid(enemies);
 
         // Check projectile collisions using spatial grid
         for (let p = 0; p < projectiles.length; p++) {
@@ -48,7 +86,7 @@ export class CollisionSystem {
 
             // Get only nearby enemies instead of checking all enemies
             const searchRadius = 100; // Reasonable search radius for collision
-            const count = this.enemyGrid.queryInRadius(proj.x, proj.y, searchRadius, CollisionSystem.aoeBuffer);
+            const count = activeGrid.queryInRadius(proj.x, proj.y, searchRadius, CollisionSystem.aoeBuffer);
 
             // PERF: Custom Stress Test Profiler
             PerformanceProfiler.count('pairsChecked', count);
@@ -67,7 +105,7 @@ export class CollisionSystem {
                 const hitDistSq = hitDist * hitDist;
 
                 if (distSq < hitDistSq) {
-                    this.handleHit(proj, enemy, enemies);
+                    this.handleHit(proj, enemy, enemies, activeGrid);
 
                     if (proj.pierce > 0) {
                         proj.pierce--;
@@ -81,7 +119,7 @@ export class CollisionSystem {
         }
     }
 
-    private handleHit(p: Projectile, target: Enemy, allEnemies: Enemy[]) {
+    private handleHit(p: Projectile, target: Enemy, allEnemies: Enemy[], activeGrid: SpatialGrid<Enemy>) {
         // Apply damage with projectile reference (for tracking kills)
         let wasSlowed = false;
         for (let i = 0; i < target.statuses.length; i++) {
@@ -149,7 +187,7 @@ export class CollisionSystem {
         // Handle enemy death effects
         const enemyDied = !target.isAlive();
         if (enemyDied) {
-            this.handleEnemyDeath(target, p, wasSlowed);
+            this.handleEnemyDeath(target, p, wasSlowed, activeGrid);
         }
 
         // Splash damage effect
@@ -176,7 +214,7 @@ export class CollisionSystem {
             // PERF: Use local array for splash to prevent recursive static buffer overwrite if enemies die and explode
             const radius = splash.splashRadius || splash.radius || 40;
             const splashTargets: Enemy[] = [];
-            const count = this.enemyGrid.queryInRadius(target.x, target.y, radius, splashTargets);
+            const count = activeGrid.queryInRadius(target.x, target.y, radius, splashTargets);
             const radiusSq = radius * radius;
 
             for (let i = 0; i < count; i++) {
@@ -218,7 +256,7 @@ export class CollisionSystem {
         }
     }
 
-    private handleEnemyDeath(enemy: Enemy, killingProjectile: Projectile, wasSlowed: boolean) {
+    private handleEnemyDeath(enemy: Enemy, killingProjectile: Projectile, wasSlowed: boolean, activeGrid: SpatialGrid<Enemy>) {
         const deathX = enemy.x;
         const deathY = enemy.y;
 
@@ -242,7 +280,7 @@ export class CollisionSystem {
             // PERF: Use local array for death explosion to prevent recursive static buffer overwrite
             const radius = killingProjectile.explosionRadius || 60;
             const deathExplosionTargets: Enemy[] = [];
-            const count = this.enemyGrid.queryInRadius(deathX, deathY, radius, deathExplosionTargets);
+            const count = activeGrid.queryInRadius(deathX, deathY, radius, deathExplosionTargets);
             const radiusSq = radius * radius;
 
             for (let i = 0; i < count; i++) {
@@ -275,7 +313,7 @@ export class CollisionSystem {
 
                 // Apply slow to nearby enemies - PERF: Using local array
                 const chainSlowTargets: Enemy[] = [];
-                const count = this.enemyGrid.queryInRadius(deathX, deathY, chainRadius, chainSlowTargets);
+                const count = activeGrid.queryInRadius(deathX, deathY, chainRadius, chainSlowTargets);
                 const radiusSq = chainRadius * chainRadius;
 
                 // Find original slow effect properties

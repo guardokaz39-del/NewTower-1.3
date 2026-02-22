@@ -300,7 +300,7 @@ export class StressTestScene extends BaseScene implements IGameScene {
 
             // Towers & Weapons
             for (const t of this.gameState.towers) {
-                t.update(dt, this.collision.enemyGrid, this.map.flowField);
+                t.update(dt, this.collision.getValidGrid(this.gameState.enemies), this.map.flowField);
             }
             this.weaponSystem.update(
                 this.gameState.towers,
@@ -315,8 +315,8 @@ export class StressTestScene extends BaseScene implements IGameScene {
         PerformanceProfiler.end('Logic');
 
         if (this.benchMode !== 'renderOnly') {
-            PerformanceProfiler.start('Collision');
-            this.collision.prepareGrid(this.gameState.enemies);
+            PerformanceProfiler.start('Collision');            // 2. Invalidate Grid Check
+            this.collision.invalidateGrid();
             this.collision.update(this.projectileSystem.projectiles, this.gameState.enemies);
             PerformanceProfiler.end('Collision');
 

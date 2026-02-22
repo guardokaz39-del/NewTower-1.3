@@ -18,19 +18,46 @@ export class CardSystem {
 
     // Dragging state
     public dragCard: ICard | null = null;
-    private ghostEl: HTMLElement;
+    private ghostEl!: HTMLElement;
 
-    private handContainer: HTMLElement;
+    private handContainer!: HTMLElement;
+    private isUIInitialized: boolean = false;
 
     constructor(scene: IGameScene, startingCards: string[] = ['FIRE', 'ICE', 'SNIPER']) {
         this.scene = scene;
-        this.handContainer = document.getElementById('hand')!;
-
-        this.ghostEl = document.getElementById('drag-ghost')!;
-        this.ghostEl.style.pointerEvents = 'none';
 
         // Add starting cards
         startingCards.forEach(cardKey => this.addCard(cardKey, 1));
+    }
+
+    public initUI() {
+        let wrapper = document.getElementById('hand-container');
+        if (wrapper) {
+            let hand = document.getElementById('hand');
+            if (!hand) {
+                hand = document.createElement('div');
+                hand.id = 'hand';
+                wrapper.appendChild(hand);
+            }
+            this.handContainer = hand;
+        } else {
+            this.handContainer = document.createElement('div');
+            this.handContainer.id = 'hand';
+            document.body.appendChild(this.handContainer);
+        }
+
+        let ghost = document.getElementById('drag-ghost');
+        if (!ghost) {
+            ghost = document.createElement('div');
+            ghost.id = 'drag-ghost';
+            document.body.appendChild(ghost);
+        }
+        this.ghostEl = ghost;
+        this.ghostEl.style.display = 'none';
+        this.ghostEl.style.pointerEvents = 'none';
+
+        this.isUIInitialized = true;
+        this.render();
     }
 
     public startDrag(card: ICard, e: PointerEvent) {
@@ -124,6 +151,7 @@ export class CardSystem {
     }
 
     public render() {
+        if (!this.isUIInitialized || !this.handContainer) return;
         this.handContainer.innerHTML = '';
         this.hand.forEach((card) => {
             const el = CardSystem.createCardElement(card);

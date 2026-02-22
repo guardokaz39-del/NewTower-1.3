@@ -303,6 +303,9 @@ export class GameScene extends BaseScene implements IGameScene {
             this.ui.update();
         }
 
+        // Initialize CardSystem UI safely AFTER the UIManager is set up
+        this.session.cardSys.initUI();
+
         // Use this.on for automatic cleanup
         this.on(window, 'keydown', this.onKeyDown);
     }
@@ -394,14 +397,14 @@ export class GameScene extends BaseScene implements IGameScene {
             this.commanderSystem.update(dt, this.gameState.enemies);
             PerformanceMonitor.endTimer('Entities');
 
-            // 2. Prepare Spatial Grid (for Targeting and Collision)
-            this.collision.prepareGrid(this.gameState.enemies);
+            // 2. Invalidate Spatial Grid check (Auto-rebuilds if dirty in getValidGrid)
+            this.collision.invalidateGrid();
 
             // 3. Update Towers (Targeting & Visuals)
             for (let i = 0; i < this.gameState.towers.length; i++) {
                 const t = this.gameState.towers[i];
                 // Targeting logic
-                t.update(dt, this.collision.enemyGrid, this.map.flowField);
+                t.update(dt, this.collision.getValidGrid(this.gameState.enemies), this.map.flowField);
                 // Visual logic
                 t.updateBuilding(this.effects, dt);
                 RendererFactory.updateTower(dt, t);

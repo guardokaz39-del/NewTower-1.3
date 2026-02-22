@@ -12,7 +12,13 @@ export enum LogChannel {
     RENDER = 'RNDR',
     AUDIO = 'AUDIO',
     INPUT = 'INPT',
-    NETWORK = 'NET'
+    NETWORK = 'NET',
+    LIFECYCLE = 'LIFECYCLE',
+    ASSETS = 'ASSETS',
+    UI = 'UI',
+    COMBAT = 'COMBAT',
+    PERF = 'PERF',
+    SAVE = 'SAVE'
 }
 
 export interface LogEntry {
@@ -41,6 +47,9 @@ export class Logger {
     private lastLogTime: number = 0;
     private throttleTimeMs: number = 1000; // Reset "count" logic if spam stops for 1 second
 
+    // logOnce TTL Map
+    private ttlLogs: Map<string, number> = new Map();
+
     private constructor() {
         console.log('%c Logger Initialized ', 'background: #222; color: #bada55');
     }
@@ -54,7 +63,7 @@ export class Logger {
 
     // --- Public API ---
 
-    public static verbose(channel: LogChannel, msg: string, data?: any) {
+    public static debug(channel: LogChannel, msg: string, data?: any) {
         Logger.getInstance().log(LogLevel.VERBOSE, channel, msg, data);
     }
 
@@ -68,6 +77,25 @@ export class Logger {
 
     public static error(channel: LogChannel, msg: string, data?: any) {
         Logger.getInstance().log(LogLevel.ERROR, channel, msg, data);
+    }
+
+    public static groupCollapsed(label: string) {
+        console.groupCollapsed(label);
+    }
+
+    public static groupEnd() {
+        console.groupEnd();
+    }
+
+    public static logOnce(key: string, channel: LogChannel, msg: string, level: LogLevel = LogLevel.INFO, ttlMs: number = 5000, data?: any) {
+        const logger = Logger.getInstance();
+        const now = Date.now();
+        const lastPrint = logger.ttlLogs.get(key) || 0;
+
+        if (now - lastPrint >= ttlMs) {
+            logger.ttlLogs.set(key, now);
+            logger.log(level, channel, msg, data);
+        }
     }
 
     public static getHistory(): LogEntry[] {

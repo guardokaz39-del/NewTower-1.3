@@ -120,7 +120,7 @@ The game uses a **Logical Coordinate System** decoupled from physical pixels to 
 | File | Role |
 |------|------|
 | `src/WaveManager.ts` | Wave spawning, patterns (Normal/Random/Swarm) |
-| `src/CollisionSystem.ts` | Projectile-enemy collision via SpatialGrid, applies splash/slow/burn effects |
+| `src/CollisionSystem.ts` | Projectile-enemy collision via SpatialGrid. Uses foolproof `getValidGrid()` for automatic cell tracking and grid rebuilding without manual `prepareGrid` calls. |
 | `src/FlowField.ts` | Vector Field pathfinding for mass unit movement |
 | `src/EffectSystem.ts` | Visual effects: explosions, particles, debris |
 | `src/CardSystem.ts` | Hand management, drag-drop to towers/forge |
@@ -184,9 +184,19 @@ The game uses a **Logical Coordinate System** decoupled from physical pixels to 
 
 | File | Role |
 |------|------|
-| `src/Assets.ts` | Procedural texture generation (1800+ lines). **Pre-bakes heavy effects (Auras, Glows) for performance.** |
+| `src/Assets.ts` | Procedural texture creation (1800+ lines). **Pre-bakes heavy effects (Auras, Glows) for performance.** Handles graceful fallback logging by grouping Missing PNGs into a summary block. |
 | `src/VisualConfig.ts` | Color palettes for all objects |
 | `src/ProceduralPatterns.ts` | Noise/pattern utilities |
+
+---
+
+### 📝 Logging System (`src/utils/Logger.ts`)
+
+The game uses a centralized `Logger` designed to prevent DevConsole spam:
+
+- **Channels**: ASSETS, SCENE, UI, COMBAT, PERF, SAVE, LIFECYCLE, NET.
+- **TTL Deduplication**: `Logger.logOnce(key, msg, ttlMs)` silences exact-match repeating logs for a set duration (default 5s) to avoid runaway F12 noise.
+- **Grouping**: Uses `Logger.groupCollapsed()` to hide massive boot summaries.
 
 ---
 

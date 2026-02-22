@@ -87,11 +87,11 @@ describe('Combat Integration Pipeline (P2)', () => {
         // Tick loop (Simulating GameController.update logic)
         for (let i = 0; i < ticks; i++) {
             // 1. Grid Preparation
-            colSys.prepareGrid(enemies);
+            const grid = colSys.getValidGrid(enemies);
 
             // 2. Tower Targeting & Aiming
-            tower.target = TargetingSystem.findTarget(tower, colSys.enemyGrid, flowField);
-            tower.update(dt, colSys.enemyGrid, flowField);
+            tower.target = TargetingSystem.findTarget(tower, grid, flowField);
+            tower.update(dt, grid, flowField);
 
             // 3. Weapon System (Shooting)
             weaponSys.update(towers, enemies, projSys, dt, mockEffectSystem);

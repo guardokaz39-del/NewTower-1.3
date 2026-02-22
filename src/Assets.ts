@@ -13,6 +13,7 @@ import { RatUnitRenderer } from './renderers/units/RatUnitRenderer';
 import { HellhoundUnitRenderer } from './renderers/units/HellhoundUnitRenderer';
 import { MagmaUnitRenderer } from './renderers/units/MagmaUnitRenderer';
 import { FleshUnitRenderer } from './renderers/units/FleshUnitRenderer';
+import { Logger, LogChannel, LogLevel } from './utils/Logger';
 
 export class Assets {
     // Хранилище изображений
@@ -32,6 +33,17 @@ export class Assets {
         procedural: 0
     };
 
+    private static missingAssets: Record<string, string[]> = {
+        tiles: [],
+        enemies: [],
+        towers: [],
+        props: [],
+        projectiles: [],
+        other: []
+    };
+
+    private static skippedAssets: number = 0;
+
     // ГЛАВНЫЙ МЕТОД ЗАГРУЗКИ
     public static async loadAll(): Promise<void> {
         console.log('\n╔════════════════════════════════════════╗');
@@ -41,27 +53,42 @@ export class Assets {
         this.loadStats = { attempted: 0, loaded: 0, failed: 0, procedural: 0 };
 
         if (this.USE_EXTERNAL_ASSETS) {
-            console.log('[1/2] Попытка загрузить внешние PNG ассеты...');
+            Logger.info(LogChannel.ASSETS, '[1/3] Попытка загрузить внешние PNG ассеты...');
             try {
                 await this.loadExternalAssets();
-                console.log(`✓ Внешние PNG: загружено ${this.loadStats.loaded}, не найдено ${this.loadStats.failed}\n`);
             } catch (error) {
-                console.warn('⚠ Ошибки при загрузке PNG, используем процедурные', error);
+                Logger.warn(LogChannel.ASSETS, 'Ошибки при загрузке PNG, используем процедурные', error);
             }
         }
 
         // Генерируем процедурные текстуры для недостающих ассетов
-        console.log('[2/2] Генерация процедурных текстур для недостающих ассетов...');
+        Logger.info(LogChannel.ASSETS, '[2/3] Генерация процедурных текстур для недостающих ассетов...');
         this.generateFallbackTextures();
 
         // PHASE 3: Bake Animations
-        console.log('[3/2] Запекание анимаций врагов (Sprite Baking)...');
+        Logger.info(LogChannel.ASSETS, '[3/3] Запекание анимаций врагов (Sprite Baking)...');
         this.generateBakedSprites();
 
-        console.log('\n╔════════════════════════════════════════╗');
-        console.log(`║   ИТОГО: ${Object.keys(this.images).length} ассетов загружено           ║`);
-        console.log(`║   PNG: ${this.loadStats.loaded} | Процедурных: ${this.loadStats.procedural}          ║`);
-        console.log('╚════════════════════════════════════════╝\n');
+        Logger.groupCollapsed('ASSETS Boot Summary');
+        Logger.info(LogChannel.ASSETS, `PNG Loaded: ${this.loadStats.loaded}`);
+        Logger.info(LogChannel.ASSETS, `Procedural Generated: ${this.loadStats.procedural}`);
+
+        if (this.skippedAssets > 0) {
+            Logger.info(LogChannel.ASSETS, `Skipped N already-cached textures: ${this.skippedAssets}`);
+        }
+
+        const missingCount = Object.values(this.missingAssets).reduce((a, b) => a + b.length, 0);
+        if (missingCount > 0) {
+            Logger.warn(LogChannel.ASSETS, `Missing PNG (${missingCount}) → procedural fallback enabled`);
+            for (const [key, list] of Object.entries(this.missingAssets)) {
+                if (list.length > 0) {
+                    const showCount = Math.min(list.length, 5);
+                    const hidden = list.length - showCount;
+                    Logger.warn(LogChannel.ASSETS, `  ${key}/* (${list.length}): ${list.slice(0, showCount).join(', ')}${hidden > 0 ? ` ...and ${hidden} more` : ''}`);
+                }
+            }
+        }
+        Logger.groupEnd();
 
         return Promise.resolve();
     }
@@ -147,14 +174,23 @@ export class Assets {
             const img = new Image();
             img.onload = () => {
                 this.images[name] = img;
-                if (!silent) {
-                    console.log(`✅ Assets: "${path}" loaded successfully`);
-                }
                 resolve(true);
             };
             img.onerror = () => {
                 if (!silent) {
-                    console.log(`❌ Assets: "${path}" not found, will use procedural fallback`);
+                    // Categorize missing assets for the final summary
+                    let prefix = 'other';
+                    if (path.includes('tiles/')) prefix = 'tiles';
+                    else if (path.includes('enemies/')) prefix = 'enemies';
+                    else if (path.includes('towers/')) prefix = 'towers';
+                    else if (path.includes('projectiles/')) prefix = 'projectiles';
+                    else if (path.includes('props/')) prefix = 'props';
+
+                    if (this.missingAssets[prefix]) {
+                        this.missingAssets[prefix].push(path);
+                    } else {
+                        this.missingAssets['other'].push(path);
+                    }
                 }
                 resolve(false);
             };
@@ -350,12 +386,10 @@ export class Assets {
         } else {
             // Для всех остальных ассетов генерируем через старую систему
             // НО ТОЛЬКО ЕСЛИ они ещё не загружены!
-            console.log(`[Assets] No specific fallback for "${name}", checking if already loaded...`);
             if (!this.images[name]) {
-                console.log(`[Assets] "${name}" not loaded, generating procedurally...`);
                 this.generateAllTextures();  // Генерируем ВСЕ недостающие
             } else {
-                console.log(`[Assets] "${name}" already loaded (PNG), skipping generation`);
+                this.skippedAssets++;
             }
         }
     }
@@ -531,7 +565,7 @@ export class Assets {
     ) {
         // КРИТИЧНО: Не перезаписывать уже загруженные PNG!
         if (this.images[name]) {
-            console.log(`[generateTexture] Skipping "${name}" - already loaded as PNG`);
+            this.skippedAssets++;
             return;
         }
 
@@ -563,7 +597,7 @@ export class Assets {
     ): void {
         // КРИТИЧНО (из аудита): Защита от повторной генерации!
         if (this.images[name]) {
-            console.warn(`[Assets] Texture "${name}" already generated, skipping`);
+            this.skippedAssets++;
             return;
         }
 
@@ -591,7 +625,6 @@ export class Assets {
         }
 
         this.images[name] = canvas;
-        console.log(`[generateLayeredTexture] Generated "${name}" with ${Object.keys(layers).length} layers`);
     }
 
 

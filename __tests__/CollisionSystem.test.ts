@@ -21,7 +21,7 @@ describe('CollisionSystem Public API', () => {
         const far = new Enemy(); far.init({ health: 100, speed: 50, path: [] } as any); far.x = 100; far.y = 200; // Distance 100
 
         const enemies = [center, near, far];
-        colSys.prepareGrid(enemies);
+        colSys.getValidGrid(enemies);
 
         const proj = new Projectile();
         proj.init(100, 100, { x: 100, y: 100 }, {
@@ -50,7 +50,7 @@ describe('CollisionSystem Public API', () => {
     it('should prevent double-hits on the same enemy in a single tick', () => {
         const enemy = new Enemy(); enemy.init({ health: 100, speed: 50, path: [] } as any); enemy.x = 100; enemy.y = 100;
 
-        colSys.prepareGrid([enemy]);
+        colSys.getValidGrid([enemy]);
 
         const proj = new Projectile();
         proj.init(100, 100, { x: 100, y: 100 }, {
@@ -82,7 +82,7 @@ describe('CollisionSystem Public API', () => {
             e.currentHealth = 50; // Low health to ensure death
         });
 
-        colSys.prepareGrid(enemies);
+        colSys.getValidGrid(enemies);
 
         const explosiveProj = new Projectile();
         explosiveProj.init(100, 100, { x: 100, y: 100 }, {

@@ -68,12 +68,8 @@ export class InputSystem {
             if (scene.cardSys && scene.cardSys.dragCard) {
                 // dragCard expects global screen coords or logical?
                 // CardSystem usually uses DOM elements or Canvas drawing?
-                // Check CardSystem... for now pass ClientX/Y as it was before, 
-                // OR duplicate logic inside CardSystem if it needs logical.
-                // The original code passed e.clientX/Y. Let's keep that for Drag ops that might be DOM based.
-                // Wait, if CardSystem draws to canvas, it needs logical.
-                // Let's pass logical.
-                scene.cardSys.updateDrag(this.mouseX, this.mouseY);
+                // CardSystem ghost uses DOM style.left/top, so it needs real viewport coordinates (clientX/Y)
+                scene.cardSys.updateDrag(e.clientX, e.clientY);
             }
         }
     }
