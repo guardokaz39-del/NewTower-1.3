@@ -50,19 +50,31 @@ export abstract class CachedUnitRenderer implements UnitRenderer {
      */
     public drawBody(ctx: CanvasRenderingContext2D, enemy: Enemy, scale: number, rotation: number): void {
         const time = Date.now() * 0.001;
-        const walkCycle = time * (enemy.baseSpeed * this.walkCycleMultiplier);
-
-        // Calculate normalized time t (0..1) for the cycle
-        const t = (walkCycle % (Math.PI * 2)) / (Math.PI * 2);
-
-        // Try to get Cached Sprite
-        // We assume 32 frames for the walk cycle (standard in SpriteBaker)
-        const frameIdx = Math.floor(t * 32) % 32;
-
-        // Determine facing for key generation (needed for DIR3)
         const facing = this.getFacing(rotation);
-        const frameKey = this.getSpriteKey(enemy.typeId, frameIdx, facing);
-        const sprite = AssetCache.peek(frameKey);
+
+        // Determine animation set ('walk' or 'idle')
+        // We cast to any because isMoving might not be explicitly typed on Enemy yet
+        const enemyAny = enemy as any;
+        const isMoving = enemyAny.isMoving !== undefined ? enemyAny.isMoving : true; // Fallback to walk if unknown
+        const animSet: 'walk' | 'idle' = isMoving ? 'walk' : 'idle';
+
+        let sprite;
+        let t = 0;
+
+        if (animSet === 'walk') {
+            const walkCycle = time * (enemy.baseSpeed * this.walkCycleMultiplier);
+            t = (walkCycle % (Math.PI * 2)) / (Math.PI * 2);
+            const frameIdx = Math.floor(t * 32) % 32;
+            const frameKey = this.getSpriteKey(enemy.typeId, frameIdx, facing, 'walk');
+            sprite = AssetCache.peek(frameKey);
+        } else {
+            // Idle breathing (slower cycle)
+            const idleCycle = time * 0.5; // Fixed idle speed
+            t = (idleCycle % (Math.PI * 2)) / (Math.PI * 2);
+            const frameIdx = Math.floor(t * 12) % 12; // 12 frames for idle
+            const frameKey = this.getSpriteKey(enemy.typeId, frameIdx, facing, 'idle');
+            sprite = AssetCache.peek(frameKey);
+        }
 
         if (sprite) {
             ctx.save();
@@ -135,12 +147,12 @@ export abstract class CachedUnitRenderer implements UnitRenderer {
         return enemy.lastFacingLeft;
     }
 
-    protected getSpriteKey(enemyTypeId: string, frameIdx: number, facing: SpriteFacing): string {
+    protected getSpriteKey(enemyTypeId: string, frameIdx: number, facing: SpriteFacing, animSet: 'walk' | 'idle' = 'walk'): string {
         const id = enemyTypeId.toLowerCase();
         // Compatibility: ROTATE and FLIP modes use the legacy "walk_N" keys (side view baked)
-        if (this.orientationMode !== 'DIR3') return `unit_${id}_walk_${frameIdx}`;
+        if (this.orientationMode !== 'DIR3') return `unit_${id}_${animSet}_${frameIdx}`;
         // DIR3 uses directional keys
-        return `unit_${id}_${facing.toLowerCase()}_walk_${frameIdx}`;
+        return `unit_${id}_${facing.toLowerCase()}_${animSet}_${frameIdx}`;
     }
 
     /**

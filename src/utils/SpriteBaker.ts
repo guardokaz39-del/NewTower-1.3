@@ -3,20 +3,20 @@ import { UnitRenderer } from '../renderers/units/UnitRenderer';
 import { Enemy } from '../Enemy';
 
 export class SpriteBaker {
-    private static readonly FRAMES = 32; // Higher framerate for smoothness (32 frames)
+    private static readonly WALK_FRAMES = 32; // Higher framerate for smoothness (32 frames)
+    private static readonly IDLE_FRAMES = 12; // Lower framerate for breathing/idle (12 frames)
     private static readonly SIZE = 96;   // 1.5x Tile Size (64) -> 96 for extra detail/weapons
 
     /**
-     * Bakes the walk cycle for a specific renderer.
-     * Generates a sprite sheet or individual frames in cache.
-     * We use individual frames in AssetCache for simplicity: 'unit_orc_walk_0', 'unit_orc_walk_1'...
+     * Bakes the animations for a specific renderer.
+     * Generates individual frames in cache for both 'walk' and 'idle' states.
+     * Output keys: 'unit_orc_walk_0', 'unit_orc_idle_0'...
      */
     public static bakeWalkCycle(typeId: string, renderer: UnitRenderer) {
-        console.log(`[SpriteBaker] Baking ${this.FRAMES} frames for "${typeId}"...`);
+        console.log(`[SpriteBaker] Baking ${this.WALK_FRAMES} walk and ${this.IDLE_FRAMES} idle frames for "${typeId}"...`);
 
-        // Mock enemy for rendering context (Plain object to avoid side effects)
-        const mockEnemy = {
-            typeId: typeId, // Some renderers use typeId
+        const mockEnemyWalk = {
+            typeId: typeId,
             x: 0,
             y: 0,
             currentHealth: 100,
@@ -25,67 +25,99 @@ export class SpriteBaker {
             baseSpeed: 1,
             finished: false,
             hitFlashTimer: 0,
-            // Add other necessary properties as mocks if renderers crash
+            isMoving: true // Signal to renderer
+        } as any;
+
+        const mockEnemyIdle = {
+            ...mockEnemyWalk,
+            isMoving: false // Signal for idle breathing/pulsing
         } as any;
 
         const facings = renderer.getBakeFacings ? renderer.getBakeFacings() : ['SIDE'] as const;
 
         for (const facing of facings) {
-            for (let i = 0; i < this.FRAMES; i++) {
-                // Key generation: 'walk' for legacy/SIDE-only, or 'facing_walk' for UP/DOWN/SIDE if DIR3
-                // We keep 'unit_orc_walk_i' for SIDE if it's the only facing, OR if we want strict compatibility?
-                // The plan says: if facings == ['SIDE'] -> unit_${type}_walk_${i}
-                // else -> unit_${type}_${facing.toLowerCase()}_walk_${i}
+            // 1. Bake Walk Cycle
+            this.bakeSet(typeId, facing, renderer, mockEnemyWalk, 'walk', this.WALK_FRAMES);
 
-                let frameKey: string;
-                if (facings.length === 1 && facings[0] === 'SIDE') {
-                    frameKey = `unit_${typeId}_walk_${i}`;
-                } else {
-                    frameKey = `unit_${typeId}_${facing.toLowerCase()}_walk_${i}`;
+            // 2. Bake Idle Cycle
+            this.bakeSet(typeId, facing, renderer, mockEnemyIdle, 'idle', this.IDLE_FRAMES);
+        }
+    }
+
+    private static bakeSet(
+        typeId: string,
+        facing: 'SIDE' | 'UP' | 'DOWN',
+        renderer: UnitRenderer,
+        mockEnemy: any,
+        animSet: 'walk' | 'idle',
+        frameCount: number
+    ) {
+        // Compatibility check: if only SIDE is supported and we bake WALK, use legacy key format.
+        // Otherwise, use explicit DIR3 + AnimSet format.
+        const facingsCount = renderer.getBakeFacings ? renderer.getBakeFacings().length : 1;
+        const useLegacyKey = (facingsCount === 1 && facing === 'SIDE' && animSet === 'walk');
+
+        for (let i = 0; i < frameCount; i++) {
+            let frameKey: string;
+            if (useLegacyKey) {
+                frameKey = `unit_${typeId}_walk_${i}`;
+            } else {
+                frameKey = `unit_${typeId}_${facing.toLowerCase()}_${animSet}_${i}`;
+            }
+
+            // Normalized time (0.0 -> 1.0)
+            const t = i / frameCount;
+
+            AssetCache.get(frameKey, (ctx, w, h) => {
+                ctx.translate(w / 2, h / 2);
+
+                if (renderer.drawFrameDirectional) {
+                    renderer.drawFrameDirectional(ctx, mockEnemy, t, facing);
+                } else if (renderer.drawFrame) {
+                    renderer.drawFrame(ctx, mockEnemy, t);
                 }
+            }, this.SIZE, this.SIZE);
 
-                // Normalized time (0.0 -> 1.0)
-                const t = i / this.FRAMES;
-
-                AssetCache.get(frameKey, (ctx, w, h) => {
-                    ctx.translate(w / 2, h / 2);
-
-                    // Invoke renderer
-                    if (renderer.drawFrameDirectional) {
-                        renderer.drawFrameDirectional(ctx, mockEnemy, t, facing);
-                    } else if (renderer.drawFrame) {
-                        // Fallback to standard drawFrame (usually SIDE)
-                        renderer.drawFrame(ctx, mockEnemy, t);
-                    }
+            // Generate White Silhouette for Hit Flash (Pre-baked)
+            const sprite = AssetCache.peek(frameKey);
+            if (sprite) {
+                const silhouetteKey = frameKey + '_white';
+                AssetCache.get(silhouetteKey, (ctxS, w, h) => {
+                    ctxS.drawImage(sprite, 0, 0);
+                    ctxS.globalCompositeOperation = 'source-in';
+                    ctxS.fillStyle = '#ffffff';
+                    ctxS.fillRect(0, 0, w, h);
                 }, this.SIZE, this.SIZE);
-
-                // [NEW] Generate White Silhouette for Hit Flash (Pre-baked)
-                const sprite = AssetCache.peek(frameKey);
-                if (sprite) {
-                    const silhouetteKey = frameKey + '_white';
-                    // Only bake if not exists (or implement a force-bake/peek check inside)
-                    // AssetCache.get checks existence, so we just provide the factory.
-                    AssetCache.get(silhouetteKey, (ctxS, w, h) => {
-                        // Draw the original sprite
-                        ctxS.drawImage(sprite, 0, 0);
-
-                        // Composite white on top, keeping alpha
-                        ctxS.globalCompositeOperation = 'source-in';
-                        ctxS.fillStyle = '#ffffff';
-                        ctxS.fillRect(0, 0, w, h);
-                    }, this.SIZE, this.SIZE);
-                }
             }
         }
     }
 
-    public static getFrame(typeId: string, gameTime: number, cycleDuration: number): HTMLCanvasElement | undefined {
-        // Calculate frame index
-        const t = (gameTime % cycleDuration) / cycleDuration;
-        const frameIndex = Math.floor(t * this.FRAMES);
-        const key = `unit_${typeId.toLowerCase()}_walk_${frameIndex}`;
+    /**
+     * Retrieves a specific frame from the cache based on game time and state.
+     */
+    public static getFrame(
+        typeId: string,
+        gameTime: number,
+        cycleDuration: number,
+        animSet: 'walk' | 'idle' = 'walk',
+        facing: 'SIDE' | 'UP' | 'DOWN' = 'SIDE'
+    ): HTMLCanvasElement | undefined {
 
-        // Fixed: Use peek() to avoid creating 1x1 empty canvases
-        return AssetCache.peek(key);
+        const frameCount = animSet === 'walk' ? this.WALK_FRAMES : this.IDLE_FRAMES;
+        const t = (gameTime % cycleDuration) / cycleDuration;
+        const frameIndex = Math.floor(t * frameCount);
+
+        // Legacy fallback check: if asking for SIDE walk without specific renderer knowledge,
+        // we assume the key might be in legacy format 'unit_orc_walk_0'.
+        // To be safe, try new format first, then fallback.
+        const explicitKey = `unit_${typeId.toLowerCase()}_${facing.toLowerCase()}_${animSet}_${frameIndex}`;
+        let sprite = AssetCache.peek(explicitKey);
+
+        if (!sprite && animSet === 'walk' && facing === 'SIDE') {
+            const legacyKey = `unit_${typeId.toLowerCase()}_walk_${frameIndex}`;
+            sprite = AssetCache.peek(legacyKey);
+        }
+
+        return sprite;
     }
 }
