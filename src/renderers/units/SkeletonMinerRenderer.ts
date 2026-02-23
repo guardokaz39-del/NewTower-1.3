@@ -1,4 +1,6 @@
 import { BaseSkeletonRenderer, SkeletonPose } from './BaseSkeletonRenderer';
+import { Enemy } from '../../Enemy';
+import { SpriteFacing } from './CachedUnitRenderer';
 
 export class SkeletonMinerRenderer extends BaseSkeletonRenderer {
     protected override boneMain = '#d4cba7'; // Грязновато-желтый цвет
@@ -13,6 +15,14 @@ export class SkeletonMinerRenderer extends BaseSkeletonRenderer {
     private static readonly PICKAXE_METAL = '#9e9e9e';
     private static readonly BAG_COLOR = '#4e342e'; // Кожаный мешок
     private static readonly COAL_COLOR = '#212121';
+
+    public override drawFrameDirectional(ctx: CanvasRenderingContext2D, enemy: Enemy, t: number, facing: SpriteFacing): void {
+        ctx.save();
+        // Сжимаем шахтера по вертикали на 15%
+        ctx.scale(1, 0.85);
+        super.drawFrameDirectional(ctx, enemy, t, facing);
+        ctx.restore();
+    }
 
     protected drawUnderlay(ctx: CanvasRenderingContext2D, pose: SkeletonPose): void {
         // Если идем вверх, мешок должен быть нарисован ПОД телом (на спине)? 

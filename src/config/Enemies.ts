@@ -67,6 +67,18 @@ export const ENEMY_TYPES: Record<string, IEnemyTypeConfig> = {
         archetype: 'SKELETON_MINER',
         scale: 1.05, // Slightly bigger presence
     },
+    SKELETON_BERSERKER: {
+        id: 'skeleton_berserker',
+        name: 'Скелет-Берсерк',
+        symbol: '🪓',
+        hpMod: 2.0, // High health pool
+        speed: 65, // Slow base speed, becomes 130 when enraged
+        reward: 8,
+        color: '#c62828', // Enrage red color
+        desc: 'Огромный скелет с двуручным топором. При HP < 50% впадает в ярость, удваивая скорость.',
+        archetype: 'SKELETON_BERSERKER',
+        scale: 1.25, // Visually larger and more intimidating
+    },
     SKELETON_COMMANDER: {
         id: 'skeleton_commander',
         name: 'Командир Скелетов',

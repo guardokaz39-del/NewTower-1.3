@@ -230,16 +230,20 @@ export class Enemy {
     // ИСПРАВЛЕНИЕ: метод стал public
     public move(dt: number, flowField: any): void { // Using 'any' briefly to avoid circular deps if types not ready, but better import FlowField interface
         let speedMod = 1;
-        let slow = null;
-        for (let i = 0; i < this.statuses.length; i++) {
-            if (this.statuses[i].type === 'slow') {
-                slow = this.statuses[i];
-                break;
+        // Apply slow statuses
+        for (const status of this.statuses) { // Assuming statuses is an array of IStatus
+            if (status.type === 'slow') { // Assuming IStatus has a 'type' and 'power' property
+                speedMod *= (1 - status.power); // Assuming 'power' is the slow percentage (e.g., 0.5 for 50% slow)
             }
         }
-        if (slow) speedMod -= slow.power;
 
-        const currentSpeed = Math.max(0, this.baseSpeed * speedMod * dt); // Apply delta time
+        // BERSERKER ENRAGE MECHANIC
+        // Double movement speed when health drops below 50%
+        if (this.typeId === 'skeleton_berserker' && (this.currentHealth / this.maxHealth) < 0.5) {
+            speedMod *= 2.0;
+        }
+
+        const currentSpeed = Math.max(0, this.baseSpeed * speedMod * dt);
 
         // Flow Field Movement
         // Get vector from the field (Zero Allocation)

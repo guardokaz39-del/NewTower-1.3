@@ -14,6 +14,8 @@ import { HellhoundUnitRenderer } from './renderers/units/HellhoundUnitRenderer';
 import { MagmaUnitRenderer } from './renderers/units/MagmaUnitRenderer';
 import { FleshUnitRenderer } from './renderers/units/FleshUnitRenderer';
 import { SkeletonMinerRenderer } from './renderers/units/SkeletonMinerRenderer';
+import { SkeletonBerserkerRenderer } from './renderers/units/SkeletonBerserkerRenderer';
+import { SkeletonCommanderUnitRenderer } from './renderers/units/SkeletonCommanderUnitRenderer';
 import { Logger, LogChannel, LogLevel } from './utils/Logger';
 
 export class Assets {
@@ -680,10 +682,6 @@ export class Assets {
                 ctx.fillRect(cx - halfW, cy - halfH, w, h);
 
                 // This simple logic fills the whole tile if it's fog
-                // But for bitmasking we want to show "edges" where there is NO fog neighbor
-
-                // Actually, for "Fog of War" where 1=Fog (Hidden), we draw the fog.
-                // If I am a Fog tile, I am fully obscured. 
                 // But to make it look nice (soft edges), we can use gradients or rounded corners 
                 // on sides that are NOT connected to other fog.
 
@@ -1999,7 +1997,9 @@ export class Assets {
             // 7. Hellhound
             SpriteBaker.bakeWalkCycle('hellhound', new HellhoundUnitRenderer());
             SpriteBaker.bakeWalkCycle('scout', new HellhoundUnitRenderer());
-            console.log('✓ Baked walk cycle for "hellhound" & "scout"');
+            SpriteBaker.bakeWalkCycle('skeleton_berserker', new SkeletonBerserkerRenderer());
+            SpriteBaker.bakeWalkCycle('skeleton_commander', new SkeletonCommanderUnitRenderer());
+            console.log('✓ Baked walk cycle for "hellhound", "scout", "skeleton_berserker", "skeleton_commander"');
 
             // 8. Magma (King & Statue)
             SpriteBaker.bakeWalkCycle('magma_king', new MagmaUnitRenderer());

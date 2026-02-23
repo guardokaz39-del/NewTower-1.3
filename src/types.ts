@@ -32,7 +32,7 @@ export interface IEnemyTypeConfig {
     color: string;
     desc: string;
     // Modular Visuals
-    archetype?: 'SKELETON' | 'WOLF' | 'TROLL' | 'SPIDER' | 'HELLHOUND' | 'ORC' | 'WRAITH' | 'GOBLIN' | 'SKELETON_COMMANDER' | 'RAT' | 'MAGMA' | 'FLESH' | 'SKELETON_MINER';
+    archetype?: 'SKELETON' | 'WOLF' | 'TROLL' | 'SPIDER' | 'HELLHOUND' | 'ORC' | 'WRAITH' | 'GOBLIN' | 'SKELETON_COMMANDER' | 'RAT' | 'MAGMA' | 'FLESH' | 'SKELETON_MINER' | 'SKELETON_BERSERKER';
     scale?: number;
     props?: string[]; // IDs of props
     tint?: string;    // Hex color override
