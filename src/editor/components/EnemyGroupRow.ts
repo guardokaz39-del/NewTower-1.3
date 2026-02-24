@@ -11,6 +11,7 @@ interface EnemyGroupProps {
     baseInterval: number;
     delayBefore: number;
     spawnPattern: SpawnPattern;
+    hasError?: boolean;
     onChange: (updates: Partial<IWaveGroupRaw>) => void;
     onDuplicate: () => void;
     onRemove: () => void;
@@ -19,7 +20,11 @@ interface EnemyGroupProps {
 export class EnemyGroupRow extends BaseComponent<EnemyGroupProps> {
 
     protected createRootElement(): HTMLElement {
-        return this.createElement('div', 'we-enemy-row');
+        const el = this.createElement('div', 'we-enemy-row');
+        if (this.data.hasError) {
+            el.classList.add('we-enemy-row--error');
+        }
+        return el;
     }
 
     public render(): void {

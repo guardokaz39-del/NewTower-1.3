@@ -400,3 +400,93 @@
     background: rgba(0, 0, 0, 0.3);
     margin: 8px 0;
 }
+
+/* ===== Phase 4 Additions ===== */
+
+.we-preset-panel {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    padding: 8px 16px;
+    background: rgba(0, 0, 0, 0.2);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.we-bulk-toolbar {
+    display: flex;
+    gap: 8px;
+    padding: 8px;
+    background: rgba(0, 0, 0, 0.15);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.we-move-btn {
+    padding: 4px;
+    width: 20px;
+    height: 20px;
+    background: transparent;
+    border: none;
+    color: #aaa;
+    cursor: pointer;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 10px;
+}
+
+.we-move-btn:hover {
+    background: rgba(255, 255, 255, 0.1);
+    color: #fff;
+}
+
+/* ===== Phase 5 Additions ===== */
+
+.we-wave-item {
+    animation: we-fade-in 0.2s ease;
+}
+
+@keyframes we-fade-in {
+    from {
+        opacity: 0;
+        transform: translateY(-8px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.we-validation-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 8px;
+    margin: 8px;
+    border-radius: 4px;
+    font-size: 12px;
+}
+
+.we-validation-error {
+    color: #ff8a80;
+}
+
+.we-validation-warning {
+    color: #ffd180;
+}
+
+.we-wave-item--error {
+    border-color: #f44336 !important;
+    box-shadow: 0 0 4px rgba(244, 67, 54, 0.4);
+}
+
+.we-wave-item--warning {
+    border-color: #ff9800 !important;
+    box-shadow: 0 0 4px rgba(255, 152, 0, 0.4);
+}
+
+.we-enemy-row--error {
+    border: 1px solid rgba(244, 67, 54, 0.6) !important;
+    background: rgba(244, 67, 54, 0.1) !important;
+}

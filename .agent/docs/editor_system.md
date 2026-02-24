@@ -105,15 +105,17 @@ Map saving is handled by `Utils.serializeMap()` and `EditorScene.saveMap()`.
 
 ### Архитектура компонентов
 
-```
+```text
 WaveEditor.ts (Host: overlay + toolbar + status bar)
-├── WaveList.ts (Аккордеон волн)
+├── WavePresetPanel.ts (Выбор, применение, сохранение и удаление пресетов)
+├── WaveList.ts (Аккордеон волн + Bulk логика: удалить все/дублировать все)
 │   ├── WaveSettingsPanel.ts (name, startDelay, waitForClear, shuffle, bonus)
-│   │   └── SpawnTimingControl.ts (range + number input, синхронизированны)
+│   │   └── SpawnTimingControl.ts (range + number input, синхронизованно)
 │   ├── WaveTimeline.ts (Canvas визуализация)
 │   ├── ThreatMeter.ts (Шкала угрозы)
 │   └── EnemyGroupRow.ts (2 строки: тип/кол-во + таймиг)
 │       └── SpawnTimingControl.ts × 2 (интервал + задержка)
+├── ValidationPanel.ts (Отображение ошибок и предупреждений)
 └── WaveEditorHistory.ts (Undo/Redo, JSON snapshots, max 30)
 ```
 
@@ -122,12 +124,22 @@ WaveEditor.ts (Host: overlay + toolbar + status bar)
 | Компонент | Файл | Описание |
 |-----------|------|----------|
 | `WaveEditor` | `WaveEditor.ts` | Хост: оверлей, toolbar (undo/redo), status bar, Ctrl+Z/Y/S |
-| `WaveList` | `components/WaveList.ts` | Аккордеон: клик раскрывает содержимое волны |
+| `WavePresetPanel` | `components/WavePresetPanel.ts` | Выпадающий список пресетов (built-in и кастомные) и кнопки управления |
+| `ValidationPanel` | `components/ValidationPanel.ts` | Панель вывода `validateExtended()` (ошибки блокируют сохранение) |
+| `WaveList` | `components/WaveList.ts` | Аккордеон волн, содержит Bulk Operations Tooltar (удаление/дублирование всех) |
 | `WaveSettingsPanel` | `components/WaveSettingsPanel.ts` | Метаданные волны + авто-сводка |
 | `WaveTimeline` | `components/WaveTimeline.ts` | Canvas: цветные блоки = группы, серые = задержки |
 | `EnemyGroupRow` | `components/EnemyGroupRow.ts` | 2-строчный: тип/кол-во/паттерн + интервал/задержка |
 | `SpawnTimingControl` | `components/SpawnTimingControl.ts` | Переиспользуемый: range + число |
 | `ThreatMeter` | `components/ThreatMeter.ts` | Шкала угрозы с цветовой градацией |
+
+### Массовые Операции и Валидация
+
+Добавлен инструментарий массового редактирования:
+
+- **Presets**: `WavePresets.ts` управляет встроенными и кастомными пресетами, сохраненными в `localStorage`.
+- **Bulk Ops**: Метод `WaveModel.replaceAllWaves` позволяет полностью заменить драфт (сохраняя шаг в Undo-стек). Кнопки "Move Up/Down" управляют позицией отдельной волны.
+- **Extended Validation**: Метод `validateExtended()` возвращает массивы warning/error, которые визуализируются как в `ValidationPanel`, так и внутри `WaveList` (красные/желтые рамки `EnemyGroupRow`).
 
 ### WaveEditorHistory (Undo/Redo)
 

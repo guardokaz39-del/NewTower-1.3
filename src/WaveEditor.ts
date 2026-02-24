@@ -1,12 +1,16 @@
 import { IWaveConfig } from './MapData';
 import { WaveModel } from './editor/WaveModel';
 import { WaveList } from './editor/components/WaveList';
+import { WavePresetPanel } from './editor/components/WavePresetPanel';
+import { ValidationPanel } from './editor/components/ValidationPanel';
 import './editor/editor.css';
 
 export class WaveEditor {
     private container!: HTMLElement;
     private model: WaveModel;
     private waveList!: WaveList;
+    private presetPanel!: WavePresetPanel;
+    private validationPanel!: ValidationPanel;
     private onSave: (waves: IWaveConfig[]) => void;
     private onClose: () => void;
 
@@ -52,6 +56,9 @@ export class WaveEditor {
             if (this.waveList) {
                 this.waveList.render();
             }
+            if (this.validationPanel) {
+                this.validationPanel.updateResult(this.model.validateExtended());
+            }
             this.updateToolbar();
         });
     }
@@ -96,6 +103,10 @@ export class WaveEditor {
         header.appendChild(toolbar);
         this.container.appendChild(header);
 
+        // Add WavePresetPanel here
+        this.presetPanel = new WavePresetPanel(this.model);
+        this.presetPanel.mount(this.container);
+
         // Status Bar
         this.statusBar = document.createElement('div');
         this.statusBar.className = 'we-status-bar';
@@ -110,6 +121,10 @@ export class WaveEditor {
         this.waveList.mount(content);
 
         this.container.appendChild(content);
+
+        // Add Validation Panel here
+        this.validationPanel = new ValidationPanel(this.model.validateExtended());
+        this.validationPanel.mount(this.container);
 
         // 5. Footer (Buttons)
         const footer = document.createElement('div');
@@ -158,8 +173,9 @@ export class WaveEditor {
     }
 
     private save() {
-        if (!this.model.validate()) {
-            alert('Некорректная конфигурация! Проверьте пустые волны или группы.');
+        const result = this.model.validateExtended();
+        if (!result.isValid) {
+            this.validationPanel.updateResult(result);
             return;
         }
         this.onSave(this.model.getWaves());
@@ -178,6 +194,12 @@ export class WaveEditor {
         // Component Cleanup
         if (this.waveList) {
             this.waveList.destroy();
+        }
+        if (this.presetPanel) {
+            this.presetPanel.destroy();
+        }
+        if (this.validationPanel) {
+            this.validationPanel.destroy();
         }
 
         // Model Cleanup

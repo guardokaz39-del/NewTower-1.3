@@ -242,3 +242,72 @@ describe('WaveModel', () => {
         expect(model.validate()).toBe(false);
     });
 });
+
+// ============================================================
+// WaveModel — Phase 4-5
+// ============================================================
+describe('WaveModel — Phase 4-5', () => {
+    let model: WaveModel;
+
+    beforeEach(() => {
+        model = new WaveModel([
+            {
+                enemies: [
+                    { type: 'GRUNT', count: 5, pattern: 'normal', baseInterval: 0.66 },
+                ],
+                shuffleMode: 'none',
+            },
+        ]);
+    });
+
+    it('replaceAllWaves replaces all waves and pushes history', () => {
+        model.replaceAllWaves([{ enemies: [{ type: 'ORC', count: 10, pattern: 'normal', baseInterval: 1 }] }]);
+        expect(model.getWaveCount()).toBe(1);
+        expect(model.getWave(0).enemies[0].type).toBe('ORC');
+
+        model.undo();
+        expect(model.getWave(0).enemies[0].type).toBe('GRUNT');
+    });
+
+    it('replaceAllWaves with empty array creates default wave', () => {
+        model.replaceAllWaves([]);
+        expect(model.getWaveCount()).toBe(1);
+        expect(model.getWave(0).enemies[0].type).toBe('GRUNT'); // default fallback
+    });
+
+    it('validateExtended returns errors for empty wave', () => {
+        model.removeEnemyGroup(0, 0);
+        const { isValid, errors } = model.validateExtended();
+        expect(isValid).toBe(false);
+        expect(errors.some(e => e.message === 'Волна без групп врагов')).toBe(true);
+    });
+
+    it('validateExtended returns error for count < 1', () => {
+        model.updateEnemyGroup(0, 0, { count: 0 });
+        const { isValid, errors } = model.validateExtended();
+        expect(isValid).toBe(false);
+        expect(errors.some(e => e.field === 'count')).toBe(true);
+    });
+
+    it('validateExtended returns error for baseInterval <= 0', () => {
+        model.updateEnemyGroup(0, 0, { baseInterval: 0 });
+        const { isValid, errors } = model.validateExtended();
+        expect(isValid).toBe(false);
+        expect(errors.some(e => e.field === 'baseInterval')).toBe(true);
+    });
+
+    it('moveWaveUp/Down reorders correctly', () => {
+        model.addWave();
+        model.updateWaveSettings(0, { name: 'Wave 1' });
+        model.updateWaveSettings(1, { name: 'Wave 2' });
+
+        model.moveWaveDown(0);
+        expect(model.getWave(0).name).toBe('Wave 2');
+        expect(model.getWave(1).name).toBe('Wave 1');
+
+        model.moveWaveUp(1);
+        expect(model.getWave(0).name).toBe('Wave 1');
+        expect(model.getWave(1).name).toBe('Wave 2');
+    });
+});
+

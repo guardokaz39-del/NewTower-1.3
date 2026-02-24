@@ -1,6 +1,20 @@
 import { IWaveConfig, IWaveGroupRaw } from '../MapData';
+import { EnemyRegistry } from './EnemyRegistry';
 import { ThreatService } from './ThreatService';
 import { WaveEditorHistory } from './WaveEditorHistory';
+
+export interface IValidationMessage {
+    waveIndex: number;
+    groupIndex?: number;
+    message: string;
+    field?: string;
+}
+
+export interface IValidationResult {
+    isValid: boolean;
+    errors: IValidationMessage[];
+    warnings: IValidationMessage[];
+}
 
 type ChangeListener = () => void;
 
@@ -108,6 +122,31 @@ export class WaveModel {
         this.notify();
     }
 
+    public replaceAllWaves(newWaves: IWaveConfig[]) {
+        this.history.push('Заменить все волны', this.waves);
+        this.waves = JSON.parse(JSON.stringify(newWaves));
+        if (this.waves.length === 0) {
+            this.waves.push({
+                enemies: [{
+                    type: 'GRUNT',
+                    count: 5,
+                    pattern: 'normal',
+                    baseInterval: 0.66,
+                }],
+                shuffleMode: 'none',
+            });
+        }
+        this.notify();
+    }
+
+    public moveWaveUp(index: number) {
+        if (index > 0) this.moveWave(index, index - 1);
+    }
+
+    public moveWaveDown(index: number) {
+        if (index < this.waves.length - 1) this.moveWave(index, index + 1);
+    }
+
     // --- New Methods ---
 
     public updateWaveSettings(index: number, updates: Partial<Pick<IWaveConfig, 'name' | 'startDelay' | 'waitForClear' | 'bonusReward' | 'shuffleMode'>>) {
@@ -185,18 +224,48 @@ export class WaveModel {
 
     // --- Validation ---
 
-    public validate(): boolean {
-        // Basic validation: must have waves, each wave must have enemies
-        if (this.waves.length === 0) return false;
+    public validateExtended(): IValidationResult {
+        const errors: IValidationMessage[] = [];
+        const warnings: IValidationMessage[] = [];
 
-        for (const wave of this.waves) {
-            if (!wave.enemies || wave.enemies.length === 0) return false;
-            for (const group of wave.enemies) {
-                if (group.count < 1) return false;
-                if (!group.type) return false;
-            }
+        if (this.waves.length === 0) {
+            errors.push({ waveIndex: -1, message: 'Нет ни одной волны' });
         }
-        return true;
+
+        this.waves.forEach((wave, wi) => {
+            if (!wave.enemies || wave.enemies.length === 0) {
+                errors.push({ waveIndex: wi, message: 'Волна без групп врагов' });
+            }
+            wave.enemies?.forEach((g, gi) => {
+                if (g.count < 1) {
+                    errors.push({ waveIndex: wi, groupIndex: gi, message: 'Количество < 1', field: 'count' });
+                }
+                if ((g.baseInterval ?? 0.66) <= 0) {
+                    errors.push({ waveIndex: wi, groupIndex: gi, message: 'Интервал <= 0', field: 'baseInterval' });
+                }
+                if (!g.type) {
+                    errors.push({ waveIndex: wi, groupIndex: gi, message: 'Не выбран тип врага', field: 'type' });
+                }
+                if (g.type && !EnemyRegistry.getType(g.type)) {
+                    warnings.push({ waveIndex: wi, groupIndex: gi, message: `Неизвестный тип: ${g.type}`, field: 'type' });
+                }
+            });
+
+            const threat = this.getThreat(wi);
+            if (threat > 3000) {
+                warnings.push({ waveIndex: wi, message: `Угроза ${Math.round(threat)} — NIGHTMARE!` });
+            }
+            const dur = this.getEstimatedDuration(wi);
+            if (dur > 120) {
+                warnings.push({ waveIndex: wi, message: `Длительность ${dur.toFixed(0)}с — очень долго` });
+            }
+        });
+
+        return { isValid: errors.length === 0, errors, warnings };
+    }
+
+    public validate(): boolean {
+        return this.validateExtended().isValid;
     }
 
     // --- Observer Pattern ---
