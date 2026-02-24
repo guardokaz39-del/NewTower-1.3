@@ -9,7 +9,7 @@ export interface EventPayloadMap {
     LIVES_CHANGED: number;
 
     // Wave
-    WAVE_STARTED: number;
+    WAVE_STARTED: { wave: number; name?: string };
     WAVE_COMPLETED: number;
 
     // Game State

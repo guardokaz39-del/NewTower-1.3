@@ -73,8 +73,8 @@ export class GameHUD {
         const bus = EventBus.getInstance();
         this.unsubMoney = bus.on(Events.MONEY_CHANGED, (money: number) => this.updateMoney(money));
         this.unsubLives = bus.on(Events.LIVES_CHANGED, (lives: number) => this.updateLives(lives));
-        this.unsubWaveStart = bus.on(Events.WAVE_STARTED, (wave: number) => {
-            this.updateWaveText(wave);
+        this.unsubWaveStart = bus.on(Events.WAVE_STARTED, (data: { wave: number; name?: string }) => {
+            this.updateWaveText(data.wave);
             this.updateStartBtn(true);
         });
         this.unsubWaveEnd = bus.on(Events.WAVE_COMPLETED, () => this.updateStartBtn(false));

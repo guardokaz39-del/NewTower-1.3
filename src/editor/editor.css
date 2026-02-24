@@ -15,7 +15,8 @@
 }
 
 .wave-editor-container {
-    width: 500px;
+    max-width: 800px;
+    width: 90vw;
     max-height: 85vh;
     background: rgba(30, 30, 35, 0.95);
     border: 1px solid rgba(255, 255, 255, 0.1);
@@ -60,11 +61,13 @@
 .we-content::-webkit-scrollbar {
     width: 8px;
 }
+
 .we-content::-webkit-scrollbar-track {
-    background: rgba(0,0,0,0.2);
+    background: rgba(0, 0, 0, 0.2);
 }
+
 .we-content::-webkit-scrollbar-thumb {
-    background: rgba(255,255,255,0.2);
+    background: rgba(255, 255, 255, 0.2);
     border-radius: 4px;
 }
 
@@ -96,19 +99,28 @@
     background: #4caf50;
     color: white;
 }
-.we-btn-primary:hover { background: #43a047; }
+
+.we-btn-primary:hover {
+    background: #43a047;
+}
 
 .we-btn-danger {
     background: #f44336;
     color: white;
 }
-.we-btn-danger:hover { background: #e53935; }
+
+.we-btn-danger:hover {
+    background: #e53935;
+}
 
 .we-btn-secondary {
-    background: rgba(255,255,255,0.1);
+    background: rgba(255, 255, 255, 0.1);
     color: #eee;
 }
-.we-btn-secondary:hover { background: rgba(255,255,255,0.2); }
+
+.we-btn-secondary:hover {
+    background: rgba(255, 255, 255, 0.2);
+}
 
 .we-btn-icon {
     padding: 4px;
@@ -118,8 +130,9 @@
     background: transparent;
     color: #aaa;
 }
+
 .we-btn-icon:hover {
-    background: rgba(255,255,255,0.1);
+    background: rgba(255, 255, 255, 0.1);
     color: #fff;
 }
 
@@ -146,7 +159,7 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
-    background: rgba(0,0,0,0.2);
+    background: rgba(0, 0, 0, 0.2);
     cursor: pointer;
 }
 
@@ -158,30 +171,23 @@
 
 .we-wave-content {
     padding: 10px;
-    border-top: 1px solid rgba(255,255,255,0.05);
+    border-top: 1px solid rgba(255, 255, 255, 0.05);
 }
 
-/* Enemy Row */
-.we-enemy-row {
-    display: flex;
-    gap: 8px;
-    align-items: center;
-    margin-bottom: 8px;
-    padding: 4px;
-    border-radius: 4px;
-    background: rgba(0,0,0,0.2);
-}
+/* Enemy Row (see Phase 2 section below) */
 
-.we-enemy-row select, .we-enemy-row input {
-    background: rgba(0,0,0,0.3);
-    border: 1px solid rgba(255,255,255,0.1);
+.we-enemy-row select,
+.we-enemy-row input {
+    background: rgba(0, 0, 0, 0.3);
+    border: 1px solid rgba(255, 255, 255, 0.1);
     color: #fff;
     padding: 4px 8px;
     border-radius: 4px;
     font-size: 13px;
 }
 
-.we-enemy-row select:focus, .we-enemy-row input:focus {
+.we-enemy-row select:focus,
+.we-enemy-row input:focus {
     border-color: #2196f3;
     outline: none;
 }
@@ -189,7 +195,7 @@
 /* Threat Meter */
 .we-threat-meter {
     height: 4px;
-    background: rgba(255,255,255,0.1);
+    background: rgba(255, 255, 255, 0.1);
     border-radius: 2px;
     overflow: hidden;
     margin-top: 4px;
@@ -205,6 +211,192 @@
     font-size: 10px;
     padding: 2px 6px;
     border-radius: 10px;
-    background: rgba(0,0,0,0.4);
+    background: rgba(0, 0, 0, 0.4);
     font-weight: bold;
+}
+
+/* ===== Phase 2 Additions ===== */
+
+/* Toolbar */
+.we-toolbar {
+    display: flex;
+    gap: 4px;
+    align-items: center;
+}
+
+/* Status Bar */
+.we-status-bar {
+    font-size: 12px;
+    color: #888;
+    padding: 6px 16px;
+    background: rgba(0, 0, 0, 0.15);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    font-family: 'Consolas', 'Courier New', monospace;
+}
+
+/* Disabled button */
+.we-btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+    pointer-events: none;
+}
+
+/* Timing Control (SpawnTimingControl) */
+.we-timing-control {
+    display: flex;
+    flex-direction: row;
+    gap: 6px;
+    align-items: center;
+    font-size: 12px;
+}
+
+.we-timing-label {
+    color: #aaa;
+    white-space: nowrap;
+    min-width: 80px;
+}
+
+.we-timing-range {
+    width: 80px;
+    accent-color: #2196f3;
+    cursor: pointer;
+}
+
+.we-timing-number {
+    width: 55px;
+    background: rgba(0, 0, 0, 0.3);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: #fff;
+    padding: 2px 4px;
+    border-radius: 4px;
+    font-size: 12px;
+    text-align: center;
+}
+
+.we-timing-number:focus {
+    border-color: #2196f3;
+    outline: none;
+}
+
+.we-timing-suffix {
+    color: #666;
+    font-size: 11px;
+}
+
+/* Settings Panel (WaveSettingsPanel) */
+.we-settings-panel {
+    background: rgba(255, 255, 255, 0.03);
+    padding: 10px;
+    border-radius: 6px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-bottom: 8px;
+}
+
+.we-settings-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.we-settings-label {
+    color: #aaa;
+    font-size: 12px;
+    min-width: 110px;
+    white-space: nowrap;
+}
+
+.we-settings-input {
+    background: rgba(0, 0, 0, 0.3);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: #fff;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 13px;
+    flex: 1;
+    max-width: 200px;
+}
+
+.we-settings-input:focus {
+    border-color: #2196f3;
+    outline: none;
+}
+
+.we-settings-summary {
+    font-size: 11px;
+    color: #888;
+    padding: 6px 8px;
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 4px;
+    font-family: 'Consolas', 'Courier New', monospace;
+    margin-top: 4px;
+}
+
+/* Enemy Row — two-row layout */
+.we-enemy-row {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin-bottom: 8px;
+    padding: 6px;
+    border-radius: 4px;
+    background: rgba(0, 0, 0, 0.2);
+}
+
+.we-enemy-main {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+.we-enemy-timing {
+    display: flex;
+    gap: 16px;
+    align-items: center;
+    padding: 4px 0 0 24px;
+    border-top: 1px solid rgba(255, 255, 255, 0.03);
+}
+
+/* Type Color Dot */
+.we-type-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+/* Threat Dot */
+.we-threat-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    margin-left: 4px;
+}
+
+/* Duration Label */
+.we-duration-label {
+    font-size: 11px;
+    color: #aaa;
+    font-family: 'Consolas', 'Courier New', monospace;
+    white-space: nowrap;
+}
+
+/* Cycle Badge */
+.we-cycle-badge {
+    font-size: 10px;
+    color: #666;
+    font-style: italic;
+    margin-left: 8px;
+}
+
+/* Timeline Canvas (Phase 3) */
+.we-timeline-canvas {
+    width: 100%;
+    height: 40px;
+    border-radius: 4px;
+    background: rgba(0, 0, 0, 0.3);
+    margin: 8px 0;
 }

@@ -1,5 +1,6 @@
-import { IWaveConfig, SpawnPattern, IWaveGroupRaw } from '../MapData';
+import { IWaveConfig, IWaveGroupRaw } from '../MapData';
 import { ThreatService } from './ThreatService';
+import { WaveEditorHistory } from './WaveEditorHistory';
 
 type ChangeListener = () => void;
 
@@ -10,6 +11,7 @@ type ChangeListener = () => void;
 export class WaveModel {
     private waves: IWaveConfig[];
     private listeners: ChangeListener[] = [];
+    private history = new WaveEditorHistory();
 
     constructor(initialWaves: IWaveConfig[]) {
         // Deep copy to ensure we hold a draft state
@@ -42,19 +44,22 @@ export class WaveModel {
     // --- Mutation Methods ---
 
     public addWave() {
+        this.history.push('Add Wave', this.waves);
         this.waves.push({
             enemies: [{
                 type: 'GRUNT',
                 count: 5,
                 pattern: 'normal',
-                spawnRate: 'medium' // Default for new waves
-            }]
+                baseInterval: 0.66,
+            }],
+            shuffleMode: 'none', // New maps: designer controls order
         });
         this.notify();
     }
 
     public removeWave(index: number) {
         if (index >= 0 && index < this.waves.length) {
+            this.history.push('Remove Wave', this.waves);
             this.waves.splice(index, 1);
             this.notify();
         }
@@ -63,11 +68,12 @@ export class WaveModel {
     public addEnemyGroup(waveIndex: number) {
         const wave = this.waves[waveIndex];
         if (wave) {
+            this.history.push('Add Enemy Group', this.waves);
             wave.enemies.push({
                 type: 'GRUNT',
                 count: 1,
                 pattern: 'normal',
-                spawnRate: 'medium'
+                baseInterval: 0.66,
             });
             this.notify();
         }
@@ -76,6 +82,7 @@ export class WaveModel {
     public removeEnemyGroup(waveIndex: number, groupIndex: number) {
         const wave = this.waves[waveIndex];
         if (wave && wave.enemies.length > groupIndex) {
+            this.history.push('Remove Enemy Group', this.waves);
             wave.enemies.splice(groupIndex, 1);
             this.notify();
         }
@@ -85,6 +92,7 @@ export class WaveModel {
     public updateEnemyGroup(waveIndex: number, groupIndex: number, updates: Partial<IWaveGroupRaw>) {
         const wave = this.waves[waveIndex];
         if (wave && wave.enemies[groupIndex]) {
+            this.history.push('Update Enemy Group', this.waves);
             Object.assign(wave.enemies[groupIndex], updates);
             this.notify();
         }
@@ -93,11 +101,87 @@ export class WaveModel {
     public moveWave(fromIndex: number, toIndex: number) {
         if (fromIndex < 0 || fromIndex >= this.waves.length || toIndex < 0 || toIndex >= this.waves.length) return;
 
+        this.history.push('Move Wave', this.waves);
         const element = this.waves[fromIndex];
         this.waves.splice(fromIndex, 1);
         this.waves.splice(toIndex, 0, element);
         this.notify();
     }
+
+    // --- New Methods ---
+
+    public updateWaveSettings(index: number, updates: Partial<Pick<IWaveConfig, 'name' | 'startDelay' | 'waitForClear' | 'bonusReward' | 'shuffleMode'>>) {
+        const wave = this.waves[index];
+        if (!wave) return;
+        this.history.push('Update Wave Settings', this.waves);
+        Object.assign(wave, updates);
+        this.notify();
+    }
+
+    public updateGroupTiming(waveIndex: number, groupIndex: number, updates: { baseInterval?: number; delayBefore?: number }) {
+        const wave = this.waves[waveIndex];
+        if (!wave || !wave.enemies[groupIndex]) return;
+        this.history.push('Update Group Timing', this.waves);
+        Object.assign(wave.enemies[groupIndex], updates);
+        this.notify();
+    }
+
+    public duplicateWave(index: number) {
+        if (index < 0 || index >= this.waves.length) return;
+        this.history.push('Duplicate Wave', this.waves);
+        const copy: IWaveConfig = JSON.parse(JSON.stringify(this.waves[index]));
+        this.waves.splice(index + 1, 0, copy);
+        this.notify();
+    }
+
+    public duplicateGroup(waveIndex: number, groupIndex: number) {
+        const wave = this.waves[waveIndex];
+        if (!wave || !wave.enemies[groupIndex]) return;
+        this.history.push('Duplicate Group', this.waves);
+        const copy: IWaveGroupRaw = JSON.parse(JSON.stringify(wave.enemies[groupIndex]));
+        wave.enemies.splice(groupIndex + 1, 0, copy);
+        this.notify();
+    }
+
+    public moveGroup(waveIndex: number, fromIdx: number, toIdx: number) {
+        const wave = this.waves[waveIndex];
+        if (!wave || fromIdx < 0 || fromIdx >= wave.enemies.length || toIdx < 0 || toIdx >= wave.enemies.length) return;
+        this.history.push('Move Group', this.waves);
+        const [element] = wave.enemies.splice(fromIdx, 1);
+        wave.enemies.splice(toIdx, 0, element);
+        this.notify();
+    }
+
+    public getEstimatedDuration(waveIndex: number): number {
+        const wave = this.waves[waveIndex];
+        if (!wave || !wave.enemies) return 0;
+        let total = wave.startDelay ?? 0;
+        wave.enemies.forEach(g => {
+            total += g.delayBefore ?? 0;
+            const interval = g.baseInterval ?? 0.66;
+            total += g.count * interval;
+        });
+        return total;
+    }
+
+    public undo(): boolean {
+        const state = this.history.undo(this.waves);
+        if (!state) return false;
+        this.waves = state;
+        this.notify();
+        return true;
+    }
+
+    public redo(): boolean {
+        const state = this.history.redo(this.waves);
+        if (!state) return false;
+        this.waves = state;
+        this.notify();
+        return true;
+    }
+
+    public canUndo(): boolean { return this.history.canUndo(); }
+    public canRedo(): boolean { return this.history.canRedo(); }
 
     // --- Validation ---
 
@@ -131,5 +215,6 @@ export class WaveModel {
 
     public destroy() {
         this.listeners = [];
+        this.history.clear();
     }
 }

@@ -67,6 +67,7 @@ The `WaveEditor` runs as an overlay.
 
 - **Reference Tracking:** `EditorScene` tracks the active instance.
 - **Automatic Destruction:** If the scene exits while the editor is open, it is force-destroyed to prevent "ghost" UIs.
+- **Keyboard Cleanup:** `WaveEditor` adds `keydown` listener for Ctrl+Z/Y/S — MUST be removed in `destroy()` via stored `boundKeyHandler` reference.
 
 ---
 
@@ -96,3 +97,89 @@ Map saving is handled by `Utils.serializeMap()` and `EditorScene.saveMap()`.
 - **Strict Typing:** `waves` are cast to `IWaveConfig[]` to prevent `any` pollution.
 - **Explicit Modes:** `waypointsMode` is explicitly saved to ensure loaded maps behave consistently.
 - **Default Waves:** New maps generate default waves if none exist.
+- **Size Check:** `saveMapToStorage()` проверяет размер через `TextEncoder` — предупреждение при >4MB.
+
+---
+
+## 🌊 Wave Editor v2 (Overhaul)
+
+### Архитектура компонентов
+
+```
+WaveEditor.ts (Host: overlay + toolbar + status bar)
+├── WaveList.ts (Аккордеон волн)
+│   ├── WaveSettingsPanel.ts (name, startDelay, waitForClear, shuffle, bonus)
+│   │   └── SpawnTimingControl.ts (range + number input, синхронизированны)
+│   ├── WaveTimeline.ts (Canvas визуализация)
+│   ├── ThreatMeter.ts (Шкала угрозы)
+│   └── EnemyGroupRow.ts (2 строки: тип/кол-во + таймиг)
+│       └── SpawnTimingControl.ts × 2 (интервал + задержка)
+└── WaveEditorHistory.ts (Undo/Redo, JSON snapshots, max 30)
+```
+
+### Компоненты
+
+| Компонент | Файл | Описание |
+|-----------|------|----------|
+| `WaveEditor` | `WaveEditor.ts` | Хост: оверлей, toolbar (undo/redo), status bar, Ctrl+Z/Y/S |
+| `WaveList` | `components/WaveList.ts` | Аккордеон: клик раскрывает содержимое волны |
+| `WaveSettingsPanel` | `components/WaveSettingsPanel.ts` | Метаданные волны + авто-сводка |
+| `WaveTimeline` | `components/WaveTimeline.ts` | Canvas: цветные блоки = группы, серые = задержки |
+| `EnemyGroupRow` | `components/EnemyGroupRow.ts` | 2-строчный: тип/кол-во/паттерн + интервал/задержка |
+| `SpawnTimingControl` | `components/SpawnTimingControl.ts` | Переиспользуемый: range + число |
+| `ThreatMeter` | `components/ThreatMeter.ts` | Шкала угрозы с цветовой градацией |
+
+### WaveEditorHistory (Undo/Redo)
+
+`WaveEditorHistory.ts` — JSON snapshots, отдельный от `EditorHistory` (тайлы/объекты).
+
+- **Max 30** записей (FIFO).
+- `push(label, waves)` — snapshot ПЕРЕД мутацией.
+- `undo(currentWaves)` / `redo(currentWaves)` — возвращает восстановленный массив.
+- Все мутации `WaveModel` вызывают `history.push()` первым.
+
+### BaseComponent Lifecycle
+
+Все UI-компоненты наследуют `BaseComponent<T>`:
+
+```typescript
+abstract class BaseComponent<T> {
+    protected element: HTMLElement;
+    protected data: T;
+
+    constructor(data: T) {
+        this.data = data;
+        this.element = this.createRootElement(); // ← вызов в конструкторе!
+    }
+
+    abstract createRootElement(): HTMLElement;
+    abstract render(): void;
+
+    mount(parent: HTMLElement) {
+        parent.appendChild(this.element);
+        this.render();
+    }
+}
+```
+
+> [!WARNING]
+> НЕ объявляйте `private field!` в подклассах для полей, устанавливаемых в `createRootElement()`.
+> ES2022 class field initializers ПЕРЕЗАПИШУТ значение после `super()`. См. pitfall #8.
+
+### Keyboard Shortcuts
+
+| Комбинация | Действие |
+|-----------|----------|
+| `Ctrl+Z` | Undo |
+| `Ctrl+Y` | Redo |
+| `Ctrl+S` | Сохранить |
+
+Обработчик хранится в `boundKeyHandler` и удаляется в `destroy()`.
+
+### Правила разработки
+
+1. **Новые поля данных:** Обязательно обновить 3 файла: `MapData.ts` → `Utils.ts` → `WaveModel.ts`
+2. **Canvas компоненты:** Использовать `this.element as HTMLCanvasElement`, НЕ отдельное поле
+3. **Range слайдеры с историей:** `onchange` для записи, `oninput` только для UI-синхронизации
+4. **Тестирование:** Round-trip test для каждого нового поля в `WaveModel.test.ts`
+5. **Локализация:** UI строки на русском (кроме ID врагов)

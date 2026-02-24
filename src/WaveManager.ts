@@ -5,6 +5,9 @@ import { Rng } from './utils/Rng';
 import { SoundManager, SoundPriority } from './SoundManager';
 import { EventBus, Events } from './EventBus';
 
+/** Marker type for delay entries in spawn queue. Not an actual enemy. */
+const DELAY_MARKER = '__DELAY__' as const;
+
 /**
  * Metadata for a queued enemy spawn.
  * Internal Use Only: Derives from normalized IWaveGroup.
@@ -58,9 +61,19 @@ export class WaveManager {
             this.lastEarlyBonusTime = nowMs; // Initialize to prevent instant early bonus on first stack
 
             this.generateWave(this.scene.wave);
-            EventBus.getInstance().emit(Events.WAVE_STARTED, this.scene.wave);
+            const emitConfig = this.getWaveConfig(this.scene.wave);
+            EventBus.getInstance().emit(Events.WAVE_STARTED, {
+                wave: this.scene.wave,
+                name: emitConfig?.name
+            });
         } else {
             // Case B: Early Start (Stacking)
+            // Block stacking if current wave requires clear
+            const currentWaveConfig = this.getWaveConfig(this.scene.wave);
+            if (currentWaveConfig?.waitForClear) {
+                return; // Silently block — UI should disable the button
+            }
+
             // Give bonus only if cooldown passed to prevent accidental double-clicks
             if (nowMs - this.lastEarlyBonusTime > 500) {
                 this.scene.addMoney(CONFIG.ECONOMY.EARLY_WAVE_BONUS);
@@ -74,7 +87,11 @@ export class WaveManager {
             this.generateWave(this.scene.wave); // Appends to queue WITHOUT clearing
 
             // Notify UI of new wave number
-            EventBus.getInstance().emit(Events.WAVE_STARTED, this.scene.wave);
+            const emitConfig = this.getWaveConfig(this.scene.wave);
+            EventBus.getInstance().emit(Events.WAVE_STARTED, {
+                wave: this.scene.wave,
+                name: emitConfig?.name
+            });
         }
 
         this.scene.metrics.trackWaveReached(this.scene.wave);
@@ -94,12 +111,15 @@ export class WaveManager {
                 // Time to spawn!
                 // FIFO: Remove from head
                 const entry = this.spawnQueue.shift()!;
-                this.scene.spawnEnemy(entry.type);
 
-                // Sound: Boss Spawn
-                if (entry.type.toUpperCase() === 'SPIDER' || entry.type.toUpperCase() === 'TANK') {
-                    SoundManager.play('boss_spawn', SoundPriority.HIGH);
+                if (entry.type !== DELAY_MARKER) {
+                    this.scene.spawnEnemy(entry.type);
+                    // Sound: Boss Spawn
+                    if (entry.type.toUpperCase() === 'SPIDER' || entry.type.toUpperCase() === 'TANK') {
+                        SoundManager.play('boss_spawn', SoundPriority.HIGH);
+                    }
                 }
+                // DELAY entries consume their interval and do nothing
 
                 this.spawnTimer = 0;
             }
@@ -119,6 +139,12 @@ export class WaveManager {
         const reward = CONFIG.ECONOMY.WAVE_BASE_REWARD + (this.scene.wave * CONFIG.ECONOMY.WAVE_SCALING_FACTOR);
         this.scene.addMoney(reward);
 
+        // Custom bonus reward (Variant A: applies to last wave in stack)
+        const endWaveConfig = this.getWaveConfig(this.scene.wave);
+        if (endWaveConfig?.bonusReward && endWaveConfig.bonusReward > 0) {
+            this.scene.addMoney(endWaveConfig.bonusReward);
+            this.scene.metrics.trackMoneyEarned(endWaveConfig.bonusReward);
+        }
         // Perfect wave bonus
         if (this.scene.lives >= this.waveStartLives) {
             this.scene.addMoney(CONFIG.ECONOMY.PERFECT_WAVE_BONUS);
@@ -174,6 +200,12 @@ export class WaveManager {
         const waveConfig = this.getWaveConfig(waveNum);
         if (!waveConfig || !waveConfig.enemies) return;
 
+        // Start delay for this wave
+        const startDelay = waveConfig.startDelay ?? 0;
+        if (startDelay > 0) {
+            this.spawnQueue.push({ type: DELAY_MARKER, pattern: 'normal', interval: startDelay });
+        }
+
         // 1. Create ISOLATED RNG
         const waveSeed = (this.runSeed ^ (waveNum * 1664525)) >>> 0;
         const waveRng = new Rng(waveSeed);
@@ -184,6 +216,12 @@ export class WaveManager {
         waveConfig.enemies.forEach((rawGroup: IWaveGroupRaw) => {
             // STRICT MIGRATION: Convert Raw Config to Normalized Group
             const group: IWaveGroup = WaveManager.normalizeWaveGroup(rawGroup);
+
+            // Group delay (gap before this group)
+            const groupDelay = rawGroup.delayBefore ?? 0;
+            if (groupDelay > 0) {
+                waveEnemies.push({ type: DELAY_MARKER, pattern: 'normal', interval: groupDelay });
+            }
 
             for (let i = 0; i < group.count; i++) {
                 // Use NORMALIZED baseInterval
@@ -197,8 +235,13 @@ export class WaveManager {
             }
         });
 
-        // 3. Shuffle
-        waveRng.shuffle(waveEnemies);
+        // 3. Shuffle control — default 'all' preserves legacy behavior for old maps
+        // New maps from WaveEditor use 'none' by default
+        const shuffleMode = waveConfig.shuffleMode ?? 'all';
+        if (shuffleMode === 'all') {
+            waveRng.shuffle(waveEnemies);
+        }
+        // 'none' and 'within_group' preserve group order
 
         // 4. Append
         this.spawnQueue.push(...waveEnemies);

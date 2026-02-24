@@ -1,80 +1,149 @@
 # Wave System & Determinism
 
-This document details the Deterministic Wave System introduced in v1.4.
+Документ описывает систему волн, форматы данных и рантайм-контракты Wave Editor + WaveManager.
 
 ---
 
-## 1. Deterministic Simulation
+## 1. Детерминированная Симуляция
 
-To ensure that leaderboards and replays (future feature) are valid, the game simulation must be **Deterministic**. Replaying the same level with the same `seed` must result in the exact same outcome.
+Для корректности лидербордов и реплеев симуляция ДОЛЖНА быть **детерминированной**. Один seed → один результат.
 
 ### Mulberry32 (PRNG)
 
-We replaced the native `Math.random()` with a custom **Mulberry32** implementation.
+`Math.random()` заменён на **Mulberry32** (32-bit seeded PRNG).
 
-- **Fast**: 32-bit integer math.
-- **Seeded**: Initialized with a session seed.
-- **Scope**: Used for **Simulation Logic Only**.
-  - Enemy Spawning variants
-  - Damage Rolls (Crit chance)
-  - Drop Logic
-  - Tower targeting arbitration
-
-*Note: Visual effects (particles, screen shake) may still use `Math.random()` as they do not affect game state.*
-
-### Implementation Usage
+- **Scope:** ТОЛЬКО для симуляционной логики (спавн, крит, дроп, арбитраж таргетинга).
+- **Визуальные эффекты** (частицы, тряска) могут использовать `Math.random()`.
 
 ```typescript
-// ❌ BAD
+// ❌ Плохо
 if (Math.random() < 0.5) spawnOrc();
 
-// ✅ GOOD
+// ✅ Хорошо
 if (GameSession.rng.nextFloat() < 0.5) spawnOrc();
 ```
 
 ---
 
-## 2. Wave Configuration (`WaveConfig.ts`)
+## 2. Форматы данных волн
 
-Wave definitions have been migrated from "Loose JSON" to "Strict Typed Interfaces".
-
-### `IWaveDef` Structure
+### `IWaveConfig` (Хранение: `MapData.ts`)
 
 ```typescript
-interface IWaveDef {
-    groups: ISpawnGroup[]; // Sequence of spawn clusters
-    message?: string;      // "Boss Wave!" warning
-}
-
-interface ISpawnGroup {
-    type: string;          // Enemy ID ('GRUNT', 'BOSS', etc)
-    count: number;         // How many
-    interval: number;      // Seconds between spawns
-    wait?: IWaitCondition; // When to proceed to next group
+interface IWaveConfig {
+    enemies: IWaveGroupRaw[];
+    // Волновые метаданные (все опциональные для backward compat)
+    name?: string;                              // «Волна Босса!»
+    startDelay?: number;                        // Задержка перед стартом (сек)
+    waitForClear?: boolean;                     // Блокировать стакинг волн
+    bonusReward?: number;                       // Доп. золото за зачистку
+    shuffleMode?: 'none' | 'within_group' | 'all'; // Контроль порядка спавна
 }
 ```
 
-### Normalization
+### `IWaveGroupRaw` (Хранение: `MapData.ts`)
 
-The `WaveManager` automatically converts legacy or shorthand wave configs into this canonical format at runtime (`normalizeWaveConfig`). This prevents `undefined` errors during the heat of gameplay.
+```typescript
+interface IWaveGroupRaw {
+    type: string;                   // ID врага ('GRUNT', 'boss', ...)
+    count: number;                  // Количество
+    baseInterval?: number;          // Интервал между спавнами (сек), default: 0.66
+    pattern?: SpawnPattern;         // 'normal' | 'random' | 'swarm'
+    delayBefore?: number;           // Пауза перед этой группой (сек)
+    // Legacy (backward compat)
+    spawnRate?: 'fast' | 'medium' | 'slow';
+    spawnPattern?: SpawnPattern;    // Алиас для pattern
+    speed?: number;                 // Устаревший множитель
+}
+```
 
-### Pattern Types
+### `IWaveGroup` (Рантайм: нормализованный)
 
-1. **`waitForClear`**: The next group will NOT start until all currently alive enemies are dead. Used for Boss waves.
-2. **`time`**: Fixed delay after spawning the group.
-3. **`overlap`**: Allows waves to bleed into each other (advanced mapping).
+WaveManager конвертирует `IWaveGroupRaw` → `IWaveGroup` через `normalizeWaveGroup()`. Все legacy-поля (`spawnRate`, `speed`) маппятся на канонические.
 
 ---
 
-## 3. Threat Modeling
+## 3. Нормализация: Контракт
 
-The system calculates a "Threat Score" for each active enemy to prioritize targeting.
+### `normalizeWaveConfig()` — `Utils.ts`
 
-- **Base Priority**: `distToEnd`.
-- **Taunt Priority**: Special enemies (e.g., `MAGMA_STATUE`) have `threatPriority = 999`.
-- **Targeting Modes**:
-  - `FIRST` / `LAST` (Distance based)
-  - `STRONGEST` (HP based)
-  - `CLOSEST` (Proximity based)
+> [!CAUTION]
+> КРИТИЧНО: эта функция ОБЯЗАНА сохранять ВСЕ поля `IWaveConfig` и `IWaveGroupRaw`.
+> Несохранённые поля УНИЧТОЖАЮТСЯ при save/load. См. pitfall #9.
 
-This logic is centralized in `TargetingSystem.ts` and uses the `FlowField` for precise distance calculations.
+При добавлении нового поля:
+
+1. `IWaveConfig` / `IWaveGroupRaw` в `MapData.ts`
+2. `normalizeWaveConfig()` в `Utils.ts` — preserve + clamp
+3. `migrateMapData()` в `MapData.ts` — sanitize
+4. Юнит-тест round-trip в `WaveModel.test.ts`
+
+### `normalizeWaveGroup()` — `WaveManager.ts`
+
+Конвертирует `IWaveGroupRaw` → `IWaveGroup` с жёсткими дефолтами:
+
+| Поле | Дефолт | Источник |
+|------|--------|----------|
+| `baseInterval` | 0.66 | `spawnRate` маппинг или raw |
+| `pattern` | `'normal'` | `pattern` или `spawnPattern` |
+| `count` | 1 | clamp ≥ 1 |
+
+---
+
+## 4. Рантайм: `WaveManager.ts`
+
+### DELAY_MARKER
+
+Специальная запись в `spawnQueue` с `type = '__DELAY__'`. НЕ спавнит врага — только потребляет свой `interval`.
+
+Используется для:
+
+- `startDelay` (задержка перед всей волной)
+- `delayBefore` (пауза перед группой)
+
+### `shuffleMode`
+
+| Значение | Поведение | Дефолт для |
+|----------|-----------|-----------|
+| `'all'` | Перемешать всю волну (RNG) | Старые карты (backward compat) |
+| `'none'` | Группы спавнятся по порядку | Новые карты из WaveEditor |
+| `'within_group'` | Перемешать внутри группы | Редко |
+
+### `waitForClear`
+
+Если `true` — `startWave()` игнорируется (стакинг заблокирован). UI должен дизейблить кнопку.
+
+### `bonusReward`
+
+Доп. золото при `endWave()`. Применяется к последней волне стека (Variant A).
+
+### `WAVE_STARTED` Event
+
+```typescript
+// Тип payload: { wave: number; name?: string }
+EventBus.getInstance().emit(Events.WAVE_STARTED, {
+    wave: this.scene.wave,
+    name: emitConfig?.name
+});
+```
+
+Подписчики ОБЯЗАНЫ деструктурировать объект, а не принимать `number`:
+
+- `GameHUD.ts` → `data.wave`
+- `NotificationSystem.ts` → `data.wave`, `data.name`
+
+---
+
+## 5. Threat-модель
+
+`ThreatService.ts` рассчитывает «Уровень Угрозы» каждой группы/волны:
+
+```
+Threat = (PowerRating × count) × patternMultiplier × densityMultiplier
+```
+
+- **DensityMultiplier:** зависит от `baseInterval` (короткий → выше угроза)
+- **PatternMultiplier:** `normal: 1.0`, `random: 1.1`, `swarm: 1.5`
+- **PowerRating:** `HP × SpeedFactor` из `EnemyRegistry`
+
+Цвета: `<300` 🟢 → `<800` 🟡 → `<1500` 🟠 → `<2500` 🔴 → `>2500` 🟣

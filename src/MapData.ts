@@ -13,6 +13,7 @@ export interface IWaveGroupRaw {
     spawnRate?: 'fast' | 'medium' | 'slow';
     spawnPattern?: SpawnPattern; // Alias for pattern, seen in some legacy data
     speed?: number; // Legacy multiplier, rarely used but present in old saves
+    delayBefore?: number;   // Pause before this group spawns (seconds), default: 0
 }
 
 // Runtime format (Strictly normalized)
@@ -28,6 +29,11 @@ export interface IWaveGroup {
 export interface IWaveConfig {
     // Configs can be raw, we normalize them at runtime
     enemies: IWaveGroupRaw[];
+    name?: string;                              // Display name ("Boss Wave!")
+    startDelay?: number;                        // Delay before wave starts (seconds)
+    waitForClear?: boolean;                     // Block next wave until all enemies dead
+    bonusReward?: number;                       // Extra gold for clearing this wave
+    shuffleMode?: 'none' | 'within_group' | 'all'; // Spawn order control
 }
 
 // Полная структура файла сохранения
@@ -108,7 +114,7 @@ export function migrateMapData(raw: unknown): IMapData {
         throw new Error('Map data has empty tile rows');
     }
 
-    return {
+    const result: IMapData = {
         width: typeof data.width === 'number' ? data.width : width,
         height: typeof data.height === 'number' ? data.height : height,
         tiles,
@@ -123,4 +129,20 @@ export function migrateMapData(raw: unknown): IMapData {
         fogData: Array.isArray(data.fogData) ? (data.fogData as number[]) : [],
         schemaVersion: MAP_SCHEMA_VERSION,
     };
+
+    // Sanitize new wave fields
+    if (result.waves) {
+        result.waves.forEach(w => {
+            if (w.startDelay != null) w.startDelay = Math.max(0, w.startDelay);
+            if (w.bonusReward != null) w.bonusReward = Math.max(0, w.bonusReward);
+            if (w.enemies) {
+                w.enemies.forEach(g => {
+                    if (g.delayBefore != null) g.delayBefore = Math.max(0, g.delayBefore);
+                    if (g.baseInterval != null) g.baseInterval = Math.max(0.05, g.baseInterval);
+                });
+            }
+        });
+    }
+
+    return result;
 }

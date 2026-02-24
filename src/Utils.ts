@@ -1,5 +1,5 @@
 import { MapManager } from './Map';
-import { IMapData, IWaveConfig, MAP_SCHEMA_VERSION } from './MapData';
+import { IMapData, IWaveConfig, IWaveGroupRaw, MAP_SCHEMA_VERSION } from './MapData';
 import { CONFIG } from './Config';
 
 // Fast ID generator using counter instead of regex-based UUID
@@ -74,18 +74,41 @@ export function normalizeWaveConfig(wave: any): IWaveConfig {
         return { enemies: [] };
     }
 
-    return {
-        enemies: wave.enemies.map((group: any) => ({
-            type: group.type || 'GRUNT',
-            count: Math.max(1, parseInt(group.count) || 1),
-            spawnPattern: (['normal', 'random', 'swarm'].includes(group.spawnPattern))
-                ? group.spawnPattern
-                : 'normal',
-            // Сохраняем старые поля для совместимости
-            speed: group.speed,
-            spawnRate: group.spawnRate
-        }))
+    const result: IWaveConfig = {
+        enemies: wave.enemies.map((group: any) => {
+            const normalized: IWaveGroupRaw = {
+                type: group.type || 'GRUNT',
+                count: Math.max(1, parseInt(group.count) || 1),
+                spawnPattern: (['normal', 'random', 'swarm'].includes(group.spawnPattern))
+                    ? group.spawnPattern : 'normal',
+                // Legacy compat
+                speed: group.speed,
+                spawnRate: group.spawnRate,
+            };
+            // New fields — preserve with sane clamp
+            if (group.pattern && ['normal', 'random', 'swarm'].includes(group.pattern)) {
+                normalized.pattern = group.pattern;
+            }
+            if (group.baseInterval != null) {
+                normalized.baseInterval = Math.max(0.05, Number(group.baseInterval) || 0.66);
+            }
+            if (group.delayBefore != null) {
+                normalized.delayBefore = Math.max(0, Number(group.delayBefore) || 0);
+            }
+            return normalized;
+        })
     };
+
+    // Wave-level new fields — preserve with sane clamp
+    if (wave.name != null && String(wave.name).trim()) result.name = String(wave.name).trim();
+    if (wave.startDelay != null) result.startDelay = Math.max(0, Number(wave.startDelay) || 0);
+    if (wave.waitForClear != null) result.waitForClear = Boolean(wave.waitForClear);
+    if (wave.bonusReward != null) result.bonusReward = Math.max(0, Number(wave.bonusReward) || 0);
+    if (wave.shuffleMode && ['none', 'within_group', 'all'].includes(wave.shuffleMode)) {
+        result.shuffleMode = wave.shuffleMode;
+    }
+
+    return result;
 }
 
 
@@ -157,7 +180,13 @@ export function saveMapToStorage(name: string, data: IMapData): boolean {
     try {
         const maps = getSavedMaps();
         maps[name] = data;
-        localStorage.setItem('NEWTOWER_MAPS', JSON.stringify(maps));
+        const json = JSON.stringify(maps);
+        // Storage size safety check
+        const byteSize = new TextEncoder().encode(json).length;
+        if (byteSize > 4 * 1024 * 1024) {
+            console.warn(`[Storage] Approaching limit: ${(byteSize / 1024 / 1024).toFixed(1)}MB / 5MB`);
+        }
+        localStorage.setItem('NEWTOWER_MAPS', json);
         return true;
     } catch (e) {
         console.error('Failed to save map', e);

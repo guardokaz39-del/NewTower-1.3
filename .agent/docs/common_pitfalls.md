@@ -90,6 +90,84 @@ protected boneMain = '#e0d0b0'; // override в дочернем классе
 
 ---
 
+## 8. 🏗️ ES2022 Class Field Initialization Order (TypeScript)
+
+**Что случилось:** `WaveTimeline` крашился с `Cannot read properties of undefined (reading 'getBoundingClientRect')`. Поле `private canvas!: HTMLCanvasElement` было `undefined` несмотря на присвоение в `createRootElement()`.
+
+**Причина:** ES2022 `useDefineForClassFields: true` (по умолчанию в современном TS). Порядок выполнения:
+
+1. `super()` (BaseComponent) вызывает `createRootElement()` → `this.canvas = createElement('canvas')` ✅
+2. super() завершается
+3. **Инициализаторы полей подкласса** запускаются → `canvas!` **перезаписывает** значение на `undefined` ❌
+
+**Правило:** НИКОГДА не объявляйте поле класса, если оно инициализируется в методе, вызванном из `super()`:
+
+```typescript
+// ❌ КРАШ: поле перезапишется после super()
+class MyComponent extends BaseComponent {
+    private canvas!: HTMLCanvasElement;
+    protected createRootElement() {
+        this.canvas = document.createElement('canvas');
+        return this.canvas;
+    }
+}
+
+// ✅ Используйте this.element (уже установлен BaseComponent)
+class MyComponent extends BaseComponent {
+    protected createRootElement() {
+        const canvas = document.createElement('canvas');
+        return canvas;
+    }
+    render() {
+        const canvas = this.element as HTMLCanvasElement;
+    }
+}
+```
+
+**Файлы:** `WaveTimeline.ts`, `BaseComponent.ts`
+
+---
+
+## 9. 💾 `normalizeWaveConfig()` — Уничтожение данных (Data Layer)
+
+**Что случилось:** Новые поля волн (`name`, `startDelay`, `waitForClear`, `bonusReward`, `shuffleMode`) терялись после каждого save/load.
+
+**Причина:** `normalizeWaveConfig()` в `Utils.ts` строил результат через жёсткий объект `{ enemies: [...] }`, отбрасывая ВСЕ поля, не перечисленные явно. Новые поля из `IWaveConfig` просто не копировались.
+
+**Правило:** При добавлении новых полей в `IWaveConfig` или `IWaveGroupRaw`:
+
+1. Обновите `normalizeWaveConfig()` в `Utils.ts` — должен сохранять и клампить новые поля
+2. Обновите `migrateMapData()` в `MapData.ts` — добавьте санитизацию
+3. Проверьте round-trip тестом: `normalize(input) → JSON → normalize → assertEqual`
+
+**Файлы:** `Utils.ts`, `MapData.ts`
+
+---
+
+## 10. 🔄 `oninput` на Range-слайдерах → Флуд undo-стека (UI)
+
+**Что случилось:** Один сдвиг слайдера `baseInterval` генерировал 30–50 записей в undo-стеке, делая Ctrl+Z бесполезным.
+
+**Причина:** `range.oninput` срабатывает на каждый пиксель при перетаскивании, каждый вызов запускал `model.updateWaveSettings()` → `history.push()`.
+
+**Правило:** Для range-слайдеров, подключённых к undo-системе:
+
+- `onchange` — запись в историю (срабатывает при отпускании)
+- `oninput` — только визуальное обновление (синхронизация числового поля)
+
+```typescript
+// ❌ Плохо: 50 записей за один drag
+range.oninput = () => { model.update(range.value); };
+
+// ✅ Хорошо: 1 запись при отпускании
+range.onchange = () => { model.update(range.value); };
+range.oninput = () => { numInput.value = range.value; }; // Только UI
+```
+
+**Файлы:** `SpawnTimingControl.ts`
+
+---
+
 ## Чек-лист: Перед коммитом
 
 - [ ] Все наследники `BaseSkeletonRenderer` вызывают `drawSkull()` в `drawHeadDecoration()`?
@@ -98,3 +176,6 @@ protected boneMain = '#e0d0b0'; // override в дочернем классе
 - [ ] Нет `ctx.filter` или `ctx.createRadialGradient` в методах отрисовки (update/draw)?
 - [ ] IK разделён на `SIDE` и `UP/DOWN`?
 - [ ] Waypoints пропущены через `resolveFullPath()` перед сохранением?
+- [ ] Новые поля `IWaveConfig` / `IWaveGroupRaw` добавлены в `normalizeWaveConfig()` и `migrateMapData()`?
+- [ ] Нет `private field!` в подклассах `BaseComponent`, если поле ставится в `createRootElement()`?
+- [ ] Range-слайдеры с undo используют `onchange`, а не `oninput`?

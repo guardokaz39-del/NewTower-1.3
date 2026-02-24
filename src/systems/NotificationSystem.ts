@@ -26,8 +26,8 @@ export class NotificationSystem {
     private initSubscriptions() {
         const bus = EventBus.getInstance();
 
-        this.unsubs.push(bus.on(Events.WAVE_STARTED, (wave: number) => {
-            this.showWaveStart(wave);
+        this.unsubs.push(bus.on(Events.WAVE_STARTED, (data: { wave: number; name?: string }) => {
+            this.showWaveStart(data.wave, data.name);
         }));
 
         this.unsubs.push(bus.on(Events.WAVE_COMPLETED, (wave: number) => {
@@ -47,7 +47,7 @@ export class NotificationSystem {
     /**
      * Wave Start notification - big zoom-in text
      */
-    public showWaveStart(waveNum: number) {
+    public showWaveStart(waveNum: number, waveName?: string) {
         const cx = this.game.width / 2;
         const cy = this.game.height / 2;
 
@@ -66,7 +66,7 @@ export class NotificationSystem {
         // Subtitle
         this.effects.add({
             type: 'text',
-            text: 'INCOMING',
+            text: waveName || 'INCOMING',
             x: cx,
             y: cy + 50,
             life: 1.1, // 70 frames
