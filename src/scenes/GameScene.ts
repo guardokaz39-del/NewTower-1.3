@@ -130,6 +130,9 @@ export class GameScene extends BaseScene implements IGameScene {
     // Ambient cycle
     private dayTime: number = 0;
 
+    // Static Lights Cache
+    private mapStaticLights: { x: number, y: number, radius: number, color: string, intensity: number }[] = [];
+
     constructor(game: Game, mapData: IMapData, startingCards: string[]) {
         super();
         this.game = game;
@@ -365,18 +368,25 @@ export class GameScene extends BaseScene implements IGameScene {
         const speedMultiplier = isNight ? 1.5 : 1.0;
 
         // Update DayTime
-        // Warning: this relies on loops count. We should probably use dt.
-        // But for now keeping loops based 
-        this.dayTime += 0.0005 * loops * speedMultiplier;
+        // If mapData.timeOfDay is 'night', we just freeze it at night. 
+        if (this.mapData.timeOfDay === 'night') {
+            this.dayTime = -Math.PI / 2; // Fixed at -1 amplitude
+        } else {
+            this.dayTime += 0.0005 * loops * speedMultiplier;
+        }
 
         // Update DayNightCycle system
         // Pass real dt (accumulated per loop if we loop, but here we pass dt * loops roughly?)
         // Actually, if we loop 2 times with dt, we advance 2 * dt time. Correct.
 
         // Oscillate between 0.5 (Darkest evening) and 0.95 (Brightest day)
-        // Math.sin goes -1 to 1. 
-        // We want range [0.5, 0.95]. Center is 0.725, Amplitude is 0.225
-        const brightness = 0.75 + currentSin * 0.20;
+        // Set fixed darkness if night logic is active
+        let brightness;
+        if (this.mapData.timeOfDay === 'night') {
+            brightness = 0.3; // Hard dark for explicit night maps
+        } else {
+            brightness = 0.75 + currentSin * 0.20;
+        }
         this.lighting.ambientLight = brightness;
 
         // delta frames is NOT used anymore for logic, everything uses dt (seconds)
@@ -531,13 +541,19 @@ export class GameScene extends BaseScene implements IGameScene {
 
         // Draw lighting (over everything except UI)
         // Update size if needed
-        if (this.game.width !== this.lighting['width'] || this.game.height !== this.lighting['height']) {
+        if (this.game.width !== (this.lighting as any).width || this.game.height !== (this.lighting as any).height) {
             this.lighting.resize(this.game.width, this.game.height);
         }
         // Reset lights
         this.lighting.clear();
-        // Add dynamic lights...
-        // Add dynamic lights...
+
+        // Add static cached lights
+        for (let i = 0; i < this.mapStaticLights.length; i++) {
+            const l = this.mapStaticLights[i];
+            this.lighting.addLight(l.x, l.y, l.radius, l.color, l.intensity);
+        }
+
+        // Render lighting overlay
         this.lighting.render(ctx);
 
         // === EMISSIVE PASS (Glowing Eyes through Fog/Darkness) ===

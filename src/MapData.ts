@@ -38,7 +38,7 @@ export interface IWaveConfig {
 
 // Полная структура файла сохранения
 export interface IMapObject {
-    type: string; // 'stone' | 'rock' | 'tree' | 'wheat' | 'flowers'
+    type: string; // 'stone' | 'rock' | 'tree' | 'wheat' | 'flowers' | 'bush' | 'pine' | 'crate' | 'barrel' | 'torch_stand'
     x: number;
     y: number;
     properties?: Record<string, any>;
@@ -67,6 +67,7 @@ export interface IMapData {
     manualPath?: boolean; // @deprecated use waypointsMode
     waypointsMode?: WaypointsMode; // Defines the source of truth for navigation
     fogData?: number[]; // ARRAY: fog density per tile (0=Visible, 1-5=Fog density 20%-100%)
+    timeOfDay?: 'day' | 'night';
     schemaVersion?: number;
 }
 
@@ -87,7 +88,7 @@ export const DEMO_MAP: IMapData = {
     fogData: [],
 };
 
-export const MAP_SCHEMA_VERSION = 1;
+export const MAP_SCHEMA_VERSION = 2;
 
 /**
  * Validates and migrates raw map data from any source (localStorage, JSON import, etc.)
@@ -127,6 +128,7 @@ export function migrateMapData(raw: unknown): IMapData {
             ? 'FULLPATH'
             : 'ENDPOINTS',
         fogData: Array.isArray(data.fogData) ? (data.fogData as number[]) : [],
+        timeOfDay: (data.timeOfDay === 'night') ? 'night' : 'day',
         schemaVersion: MAP_SCHEMA_VERSION,
     };
 

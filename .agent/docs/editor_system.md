@@ -7,6 +7,8 @@ This document describes the architecture and safety mechanisms of the Map Editor
 | Component | File | Responsibilities |
 |-----------|------|------------------|
 | **EditorScene** | `scenes/EditorScene.ts` | Main controller. Handles input, tools, rendering, and UI orchestration. |
+| **EditorState** | `editor/EditorState.ts` | Centralized state management for mode, tools, brush size, Time of Day, etc. |
+| **EditorSidebar** | `editor/EditorSidebar.ts` | Dynamic UI sidebar for selecting tools and modes. |
 | **MapManager** | `Map.ts` | Manages grid state, tiles, objects, and pathfinding logic. |
 | **EditorHistory** | `editor/EditorHistory.ts` | Manages Undo/Redo stack with support for compound actions. |
 | **MapData** | `MapData.ts` | Defines data schemas (`IMapData`, `IWaveConfig`) and migration logic. |
@@ -20,11 +22,12 @@ This document describes the architecture and safety mechanisms of the Map Editor
 
 The game uses a strictly typed schema for map data. Key fields include:
 
-- `schemaVersion`: Tracks data format version (Current: `1`).
+- `schemaVersion`: Tracks data format version (Current: `2`).
 - `waypointsMode`: Defines path logic (`'FULLPATH'` vs `'ENDPOINTS'`).
 - `waves`: Array of `IWaveConfig` (strict type).
-- `tiles`: 2D array of tile IDs.
-- `objects`: Array of static objects (trees, rocks).
+- `tiles`: 2D array of tile IDs (0=Grass, 1=Road, 2=Water, 3=Sand, 4=Bridge, 5=Lava).
+- `objects`: Array of static objects (`stone`, `rock`, `tree`, `wheat`, `flowers`, `bush`, `pine`, `crate`, `barrel`, `torch_stand`).
+- `timeOfDay`: `'day'` or `'night'` to toggle visual lighting (affects Editor and Game rendering).
 
 ### Versioning & Migration
 
@@ -83,10 +86,28 @@ The `EditorHistory` class supports **Compound Actions** to handle continuous inp
 
 ### Supported Actions
 
-- **Tile Paint:** Change tile type (Grass <-> Road).
+- **Tile Paint:** Change tile type (Grass, Road, Water, Sand, Bridge, Lava).
 - **Fog Paint:** Change fog density.
 - **Object Placement:** Add/Remove objects.
 - **Waypoints:** Add/Move/Remove waypoints.
+- **Fill/Brush Operations:** Painted blocks with brushSize > 1 or BFS Flood Fill are recorded as single compound actions.
+
+---
+
+## 🎨 Editor Tools & Modes
+
+### 1. General Tools
+
+- **Brush Size:** Select 1x1, 2x2, or 3x3 to paint areas quickly using `[` and `]` hotkeys.
+- **Fill Tool:** Press `F` to use a continuous BFS flood fill with the currently selected paint tool.
+- **Eyedropper:** Use `Alt+Click` to quickly sample an object or tile from the map and automatically swap to its construction mode.
+- **Grid Overlay:** Toggle grid visibility by pressing `G`.
+
+### 2. Time of Day Preview
+
+- Visual lighting is toggled via Sidebar (`☀️ Day` / `🌙 Night`).
+- Switching to `night` enables the `LightingSystem` in `EditorScene.draw()` with `0.4` ambient brightness and draws emissive light from `torch_stand` objects.
+- Time of Day is saved to `IMapData.timeOfDay` and applied permanently when loading into `GameScene`.
 
 ---
 

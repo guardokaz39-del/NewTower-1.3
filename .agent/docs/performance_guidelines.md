@@ -158,6 +158,42 @@ class Tower {
 - Сохраняйте ссылки на существующие объекты где возможно.
 - Сбрасывайте примитивы (bool, number).
 
+### 2-Layer Sprite/Tile Rendering (Map Optimization)
+
+Для отрисовки статических сеток (карт) с частично анимированными тайлами используйте двухслойный подход (отработано в Phase 0):
+
+```typescript
+// ❌ ЗАПРЕЩЕНО: Вычислять соседей (bitmask) или рендерить сетку каждый кадр
+public drawTiles(ctx) {
+    for (let y=0; y<rows; y++) {
+        for (let x=0; x<cols; x++) {
+            const bitmask = calculateNeighbors(x, y); // Медленно!
+            ctx.drawImage(getSprite(bitmask), x, y); // Растеризация статики каждый кадр
+        }
+    }
+}
+
+// ✅ ПРАВИЛЬНО: prerender() для статики + кэш для анимации
+public prerender() {
+    // 1. Рисуем всю статику на оффскрин канвас (this.cacheCanvas)
+    // 2. Вычисляем bitmask ОДИН РАЗ и кладем в плоский массив
+    this._animatedTilePositions = [];
+    if (tile === 'water') {
+        const bitmask = calculateNeighbors(x, y);
+        this._animatedTilePositions.push({ bitmask, px, py });
+    }
+}
+
+public drawAnimatedTiles(ctx, time) {
+    // В игровом цикле: Итерируем только по сохраненному одномерному массиву!
+    const frame = Math.floor((time / 500) % 4);
+    for (let i = 0; i < this._animatedTilePositions.length; i++) {
+        const p = this._animatedTilePositions[i];
+        ctx.drawImage(Assets.get(`water_${p.bitmask}_f${frame}`), p.px, p.py);
+    }
+}
+```
+
 ### Entity IDs
 
 - **ЗАПРЕЩЕНО:** Использовать `string` / `UUID` для идентификации сущностей в игре (Enemy, Projectile).

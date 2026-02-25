@@ -27,7 +27,8 @@ export class MapManager {
     public objects: IMapObject[] = []; // Objects for decoration and blocking
     public flowField: FlowField;
 
-    private cacheCanvas: HTMLCanvasElement;
+    private cacheCanvas!: HTMLCanvasElement;
+    public _animatedTilePositions: { type: string, bitmask: number, px: number, py: number }[] = [];
 
     // Dirty flag pattern for FlowField optimization
     private isFlowFieldDirty: boolean = false;
@@ -150,13 +151,20 @@ export class MapManager {
     }
 
     public prerender() {
-        // Create offscreen canvas
-        this.cacheCanvas = document.createElement('canvas');
-        this.cacheCanvas.width = this.cols * CONFIG.TILE_SIZE;
-        this.cacheCanvas.height = this.rows * CONFIG.TILE_SIZE;
+        const w = this.cols * CONFIG.TILE_SIZE;
+        const h = this.rows * CONFIG.TILE_SIZE;
+
+        // Reuse existing canvas, resize only if dimensions changed
+        if (!this.cacheCanvas || this.cacheCanvas.width !== w || this.cacheCanvas.height !== h) {
+            this.cacheCanvas = document.createElement('canvas');
+            this.cacheCanvas.width = w;
+            this.cacheCanvas.height = h;
+        }
         const ctx = this.cacheCanvas.getContext('2d');
         if (!ctx) return;
+        ctx.clearRect(0, 0, w, h);
 
+        this._animatedTilePositions = [];
         const TS = CONFIG.TILE_SIZE;
 
         for (let y = 0; y < this.rows; y++) {
@@ -165,12 +173,49 @@ export class MapManager {
                 const px = x * TS;
                 const py = y * TS;
 
-                // Рисуем тайл на кэш-канвас
+                // Static tiles (grass=0, path=1, sand=3, bridge=4)
                 if (type === 1) {
                     this.drawTile(ctx, 'path', px, py);
-                } else {
+                } else if (type === 0) {
                     this.drawTile(ctx, 'grass', px, py);
+                } else if (type === 3) {
+                    this.drawTile(ctx, 'sand', px, py);
+                } else if (type === 4) {
+                    this.drawTile(ctx, 'bridge', px, py);
+                } else if (type === 2) {
+                    // Water - bitmask calculations
+                    const NORTH = (y > 0 && this.tiles[y - 1][x] === 2) ? 1 : 0;
+                    const WEST = (x > 0 && this.tiles[y][x - 1] === 2) ? 1 : 0;
+                    const EAST = (x < this.cols - 1 && this.tiles[y][x + 1] === 2) ? 1 : 0;
+                    const SOUTH = (y < this.rows - 1 && this.tiles[y + 1][x] === 2) ? 1 : 0;
+                    const bitmask = NORTH | (WEST << 1) | (EAST << 2) | (SOUTH << 3);
+                    this._animatedTilePositions.push({ type: 'water', bitmask, px, py });
+                } else if (type === 5) {
+                    // Lava
+                    const NORTH = (y > 0 && this.tiles[y - 1][x] === 5) ? 1 : 0;
+                    const WEST = (x > 0 && this.tiles[y][x - 1] === 5) ? 1 : 0;
+                    const EAST = (x < this.cols - 1 && this.tiles[y][x + 1] === 5) ? 1 : 0;
+                    const SOUTH = (y < this.rows - 1 && this.tiles[y + 1][x] === 5) ? 1 : 0;
+                    const bitmask = NORTH | (WEST << 1) | (EAST << 2) | (SOUTH << 3);
+                    this._animatedTilePositions.push({ type: 'lava', bitmask, px, py });
+                } else {
+                    this.drawTile(ctx, 'grass', px, py); // Fallback
                 }
+            }
+        }
+    }
+
+    public drawAnimatedTiles(ctx: CanvasRenderingContext2D, time: number) {
+        const frame = Math.floor((time / 500) % 4); // 4 frames, 500ms each
+        for (const pos of this._animatedTilePositions) {
+            const spriteKey = `${pos.type}_${pos.bitmask}_f${frame}`;
+            const sprite = Assets.get(spriteKey);
+            if (sprite) {
+                ctx.drawImage(sprite, pos.px, pos.py);
+            } else {
+                // Temporary fallback if sprites aren't baked yet
+                ctx.fillStyle = pos.type === 'lava' ? '#ff3300' : '#2196f3';
+                ctx.fillRect(pos.px, pos.py, CONFIG.TILE_SIZE, CONFIG.TILE_SIZE);
             }
         }
     }
@@ -181,7 +226,11 @@ export class MapManager {
         // MAZE FORBIDDEN CONTRACT: Cannot build on path
         if (this.tiles[row][col] === 1) return false;
 
-        if (this.tiles[row][col] !== 0) return false; // Only grass is buildable
+        // Water (2), Bridge (4), Lava (5) are NOT buildable
+        if (this.tiles[row][col] === 2 || this.tiles[row][col] === 4 || this.tiles[row][col] === 5) return false;
+
+        // Grass (0) and Sand (3) ARE buildable.
+        if (this.tiles[row][col] !== 0 && this.tiles[row][col] !== 3) return false;
 
         // Check if any object occupies this tile
         const hasObject = this.objects.some(obj => {
@@ -350,6 +399,20 @@ export class MapManager {
             } else {
                 img = Assets.get('grass');
             }
+        } else if (key === 'sand') {
+            const variantCount = Assets.getVariantCount('sand');
+            if (variantCount > 0) {
+                const index = Math.abs((x * 73 + y * 37)) % variantCount;
+                img = Assets.getVariant('sand', index);
+            } else {
+                img = Assets.get('sand_0');
+            }
+        } else if (key === 'bridge') {
+            const col = Math.floor(x / CONFIG.TILE_SIZE);
+            const row = Math.floor(y / CONFIG.TILE_SIZE);
+            // vertical bridge if connected top or bottom to another bridge, else horizontal
+            const isVertical = ((row > 0 && this.tiles[row - 1][col] === 4) || (row < this.rows - 1 && this.tiles[row + 1][col] === 4));
+            img = Assets.get(isVertical ? 'bridge_v' : 'bridge_h');
         } else {
             img = Assets.get(key);
         }

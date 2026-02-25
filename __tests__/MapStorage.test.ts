@@ -22,6 +22,7 @@ const VALID_MAP = {
     waves: [] as IWaveConfig[],
     startingMoney: 100,
     startingLives: 20,
+    timeOfDay: 'night' as const,
 };
 
 // Map without waypoints (valid structure, passes migrateMapData but fails validateMap)
@@ -72,6 +73,7 @@ describe('MapStorage', () => {
             expect(maps['test_map']).toBeDefined();
             expect(maps['test_map'].width).toBe(5);
             expect(maps['test_map'].tiles.length).toBe(5);
+            expect(maps['test_map'].timeOfDay).toBe('night'); // Phase 5 feature
         });
 
         it('deleteLocal removes entry', () => {
@@ -247,6 +249,7 @@ describe('MapStorage', () => {
             expect(result.width).toBe(5);
             expect(result.tiles.length).toBe(5);
             expect(result.schemaVersion).toBeDefined(); // migrateMapData applied
+            expect(result.timeOfDay).toBe('night'); // Phase 5 preserved
         });
 
         it('importFromFile with garbage JSON throws', async () => {

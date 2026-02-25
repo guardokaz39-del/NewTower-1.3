@@ -9,7 +9,9 @@ import { UIUtils } from '../UIUtils';
 import { Pathfinder } from '../Pathfinder';
 import { WaveEditor } from '../WaveEditor';
 import { FogSystem } from '../FogSystem';
-import { EditorToolbar, EditorMode } from '../editor/EditorToolbar';
+import { LightingSystem } from '../systems/LightingSystem';
+import { EditorState, EditorMode } from '../editor/EditorState';
+import { EditorSidebar } from '../editor/EditorSidebar';
 import { WaypointManager } from '../editor/WaypointManager';
 import { EditorHistory, EditorActions } from '../editor/EditorHistory';
 
@@ -17,13 +19,16 @@ export class EditorScene extends BaseScene {
     private game: Game;
     private map: MapManager;
     private fog: FogSystem;
-    private toolbar!: EditorToolbar;
-    private controlsContainer!: HTMLElement;
+    private lighting: LightingSystem;
+    private state: EditorState;
+    private sidebar!: EditorSidebar;
+    private editorRoot!: HTMLElement;
+    private canvasWrap!: HTMLElement;
+    private statusBar!: HTMLElement;
+    private originalCanvasParent: ParentNode | null = null;
     private waypointMgr!: WaypointManager;
     private history!: EditorHistory;
     private activeWaveEditor: WaveEditor | null = null;
-
-    private mode: EditorMode = 'paint_road';
 
     // FEATURE: Saved maps panel
     private mapsPanel!: HTMLElement;
@@ -39,6 +44,9 @@ export class EditorScene extends BaseScene {
     // Track previous mouse state for click detection (not hold)
     private prevMouseDown: boolean = false;
     private lastClickedTile: { col: number; row: number } | null = null;
+    private _tileDirty: boolean = true;
+    private time: number = 0;
+    private isAltDown: boolean = false;
 
     constructor(game: Game) {
         super();
@@ -61,16 +69,63 @@ export class EditorScene extends BaseScene {
 
         this.map = new MapManager(emptyData);
         this.fog = new FogSystem(emptyData);
+        this.lighting = new LightingSystem(game.width, game.height);
         this.waypointMgr = new WaypointManager();
         this.history = new EditorHistory();
+        this.state = new EditorState();
         this.createUI();
         this.createMapsPanel();
         // Hotkeys are now set up in onEnterImpl
     }
 
     protected onEnterImpl() {
-        this.toolbar.show();
-        this.controlsContainer.style.display = 'flex';
+        this.originalCanvasParent = this.game.canvas.parentNode;
+
+        // Setup Layout
+        this.editorRoot = document.createElement('div');
+        this.editorRoot.id = 'editor-root';
+        Object.assign(this.editorRoot.style, {
+            position: 'absolute',
+            top: '0',
+            left: '0',
+            width: '100%',
+            height: '100%',
+            display: 'flex',
+            overflow: 'hidden'
+        });
+
+        this.editorRoot.appendChild(this.sidebar.getElement());
+
+        this.canvasWrap = document.createElement('div');
+        this.canvasWrap.id = 'editor-canvas-wrap';
+        Object.assign(this.canvasWrap.style, {
+            flex: '1',
+            position: 'relative'
+        });
+
+        this.canvasWrap.appendChild(this.game.canvas);
+
+        this.statusBar = document.createElement('div');
+        this.statusBar.id = 'editor-statusbar';
+        Object.assign(this.statusBar.style, {
+            position: 'absolute',
+            bottom: '0',
+            width: '100%',
+            height: '24px',
+            background: 'rgba(0,0,0,0.8)',
+            color: '#fff',
+            display: 'flex',
+            alignItems: 'center',
+            padding: '0 10px',
+            fontSize: '12px',
+            zIndex: '1000'
+        });
+        this.canvasWrap.appendChild(this.statusBar);
+
+        this.editorRoot.appendChild(this.canvasWrap);
+        document.body.appendChild(this.editorRoot);
+        this.game.resize();
+
         this.mapsPanel.style.display = 'block';
 
         // Hide standard game UI
@@ -81,16 +136,30 @@ export class EditorScene extends BaseScene {
 
         // Setup hotkeys with automatic cleanup
         this.on(document, 'keydown', (e: Event) => this.handleGlobalKey(e as KeyboardEvent));
+        this.on(document, 'keyup', (e: Event) => {
+            const ke = e as KeyboardEvent;
+            if (ke.key === 'Alt') this.isAltDown = false;
+        });
+
+        // Prevent Alt key from getting stuck if window loses focus
+        this.on(window, 'blur', () => {
+            this.isAltDown = false;
+        });
     }
 
     protected onExitImpl() {
-        // Full DOM cleanup (EditorScene is recreated each time by Game.toEditor())
-        if (this.toolbar) {
-            this.toolbar.destroy();
+        // Restore Canvas
+        if (this.originalCanvasParent) {
+            this.originalCanvasParent.appendChild(this.game.canvas);
         }
-        if (this.controlsContainer && this.controlsContainer.parentNode) {
-            this.controlsContainer.parentNode.removeChild(this.controlsContainer);
+        if (this.editorRoot && this.editorRoot.parentNode) {
+            this.editorRoot.parentNode.removeChild(this.editorRoot);
         }
+        if (this.sidebar) {
+            this.sidebar.destroy();
+        }
+        this.game.resize();
+
         if (this.mapsPanel && this.mapsPanel.parentNode) {
             this.mapsPanel.parentNode.removeChild(this.mapsPanel);
         }
@@ -105,13 +174,14 @@ export class EditorScene extends BaseScene {
     }
 
     public update(dt: number) {
+        this.time += dt;
         // Don't update fog animation in editor - only static rendering
         const input = this.game.input;
 
         // Begin compound action on mouse down (for paint modes)
         if (input.isMouseDown && !this.prevMouseDown) {
-            if (this.isPaintMode(this.mode)) {
-                this.history.beginCompound(this.mode);
+            if (this.isPaintMode(this.state.mode)) {
+                this.history.beginCompound(this.state.mode);
             }
         }
 
@@ -124,11 +194,19 @@ export class EditorScene extends BaseScene {
                 this.lastClickedTile.row !== input.hoverRow;
 
             if (isDifferentTile) {
-                this.handleInput(input.hoverCol, input.hoverRow);
-                this.lastClickedTile = { col: input.hoverCol, row: input.hoverRow };
-
-                // Trigger fog re-render after data change (static, no animation)
-                this.fog.update(0);
+                if (this.isAltDown || this.state.mode === 'eyedropper') {
+                    // Eyedropper
+                    this.doEyedropper(input.hoverCol, input.hoverRow);
+                    // Do not mark lastClickedTile here so we can drag eyedropper if needed, but usually it's just one click.
+                    // Actually, let's mark it to avoid spamming eyedropper.
+                    this.lastClickedTile = { col: input.hoverCol, row: input.hoverRow };
+                } else {
+                    this.handleInput(input.hoverCol, input.hoverRow);
+                    this.lastClickedTile = { col: input.hoverCol, row: input.hoverRow };
+                    this._tileDirty = true;
+                    // Trigger fog re-render after data change (static, no animation)
+                    this.fog.update(0);
+                }
             }
         }
 
@@ -147,29 +225,92 @@ export class EditorScene extends BaseScene {
     }
 
     private handleInput(col: number, row: number) {
-        if (col >= this.map.cols || row >= this.map.rows) return;
+        if (this.state.mode === 'fill') {
+            alert('Fill mode active. Please select a paint mode (like grass/road) and press F to fill!');
+            return;
+        }
+
+        const isPaint = this.isPaintMode(this.state.mode);
+        const size = isPaint ? this.state.brushSize : 1;
+        const offset = Math.floor(size / 2); // e.g., size 3 -> offset 1 (draws -1, 0, +1)
+        // actually brush usually draws down-right or center. Let's do center: 
+        const startX = size === 1 ? col : col - offset;
+        const startY = size === 1 ? row : row - offset;
+
+        // If painting fog with a brush size > 1, we want to cycle ONLY ONCE based on the center tile,
+        // and apply that new density uniformly to all brushed tiles.
+        let targetFogDensity = -1;
+        if (this.state.mode === 'paint_fog') {
+            const oldCenter = this.fog.getFog(col, row);
+            targetFogDensity = (oldCenter + 1) % 6; // Cycle center's density
+        }
+
+        // For large brushes, we wrap in one compound action if not already wrapped
+        for (let dy = 0; dy < size; dy++) {
+            for (let dx = 0; dx < size; dx++) {
+                this.applyToolAt(startX + dx, startY + dy, targetFogDensity);
+            }
+        }
+    }
+
+    private applyToolAt(col: number, row: number, targetFogDensity: number = -1) {
+        if (col < 0 || col >= this.map.cols || row < 0 || row >= this.map.rows) return;
 
         const oldTileType = this.map.grid[row][col].type;
         const oldFogDensity = this.fog.getFog(col, row);
 
-        if (this.mode === 'paint_road') {
+        if (this.state.mode === 'paint_road') {
             console.log('[EditorScene] paint_road mode active, tile type:', oldTileType, '→ 1');
             if (oldTileType !== 1) {
                 this.history.pushInCompound(EditorActions.createTileAction(this.map.grid, col, row, oldTileType, 1));
                 this.map.grid[row][col].type = 1;
                 this.map.grid[row][col].decor = null;
                 Pathfinder.invalidateCache();
+                this._tileDirty = true;
                 console.log('[EditorScene] Road painted at', col, row);
             } else {
                 console.log('[EditorScene] Tile already road, skipping');
             }
-        } else if (this.mode === 'paint_grass') {
+        } else if (this.state.mode === 'paint_grass') {
             if (oldTileType !== 0) {
                 this.history.pushInCompound(EditorActions.createTileAction(this.map.grid, col, row, oldTileType, 0));
                 this.map.grid[row][col].type = 0;
                 Pathfinder.invalidateCache();
+                this._tileDirty = true;
             }
-        } else if (this.mode === 'eraser') {
+        } else if (this.state.mode === 'paint_water') {
+            if (oldTileType !== 2) {
+                this.history.pushInCompound(EditorActions.createTileAction(this.map.grid, col, row, oldTileType, 2));
+                this.map.grid[row][col].type = 2;
+                this.map.grid[row][col].decor = null;
+                Pathfinder.invalidateCache();
+                this._tileDirty = true;
+            }
+        } else if (this.state.mode === 'paint_sand') {
+            if (oldTileType !== 3) {
+                this.history.pushInCompound(EditorActions.createTileAction(this.map.grid, col, row, oldTileType, 3));
+                this.map.grid[row][col].type = 3;
+                this.map.grid[row][col].decor = null;
+                Pathfinder.invalidateCache();
+                this._tileDirty = true;
+            }
+        } else if (this.state.mode === 'paint_bridge') {
+            if (oldTileType !== 4) {
+                this.history.pushInCompound(EditorActions.createTileAction(this.map.grid, col, row, oldTileType, 4));
+                this.map.grid[row][col].type = 4;
+                this.map.grid[row][col].decor = null;
+                Pathfinder.invalidateCache();
+                this._tileDirty = true;
+            }
+        } else if (this.state.mode === 'paint_lava') {
+            if (oldTileType !== 5) {
+                this.history.pushInCompound(EditorActions.createTileAction(this.map.grid, col, row, oldTileType, 5));
+                this.map.grid[row][col].type = 5;
+                this.map.grid[row][col].decor = null;
+                Pathfinder.invalidateCache();
+                this._tileDirty = true;
+            }
+        } else if (this.state.mode === 'eraser') {
             // FEATURE: Eraser - reset to grass, remove fog, and remove objects
             const hasObject = this.map.objects.find(obj => {
                 const size = obj.size || 1;
@@ -184,6 +325,7 @@ export class EditorScene extends BaseScene {
                     this.map.grid[row][col].type = 0;
                     this.map.grid[row][col].decor = null;
                     Pathfinder.invalidateCache();
+                    this._tileDirty = true;
                 }
                 // Удаление тумана
                 if (oldFogDensity !== 0) {
@@ -198,9 +340,10 @@ export class EditorScene extends BaseScene {
                             row >= obj.y && row < obj.y + size;
                         return !overlaps;
                     });
+                    this._tileDirty = true;
                 }
             }
-        } else if (this.mode === 'set_start') {
+        } else if (this.state.mode === 'set_start') {
             const oldState = {
                 start: this.waypointMgr.getStart(),
                 end: this.waypointMgr.getEnd(),
@@ -209,7 +352,8 @@ export class EditorScene extends BaseScene {
             this.history.push(EditorActions.createWaypointAction(this.waypointMgr, 'setStart', { x: col, y: row }, oldState));
             this.waypointMgr.setStart({ x: col, y: row });
             this.map.grid[row][col].type = 1;
-        } else if (this.mode === 'set_end') {
+            this._tileDirty = true;
+        } else if (this.state.mode === 'set_end') {
             const oldState = {
                 start: this.waypointMgr.getStart(),
                 end: this.waypointMgr.getEnd(),
@@ -218,7 +362,8 @@ export class EditorScene extends BaseScene {
             this.history.push(EditorActions.createWaypointAction(this.waypointMgr, 'setEnd', { x: col, y: row }, oldState));
             this.waypointMgr.setEnd({ x: col, y: row });
             this.map.grid[row][col].type = 1;
-        } else if (this.mode === 'place_waypoint') {
+            this._tileDirty = true;
+        } else if (this.state.mode === 'place_waypoint') {
             if (this.waypointMgr.canAddWaypoint()) {
                 const oldState = {
                     start: this.waypointMgr.getStart(),
@@ -227,27 +372,124 @@ export class EditorScene extends BaseScene {
                 };
                 this.history.push(EditorActions.createWaypointAction(this.waypointMgr, 'addWaypoint', { x: col, y: row }, oldState));
                 this.waypointMgr.addWaypoint({ x: col, y: row });
+                this._tileDirty = true;
             }
-        } else if (this.mode === 'paint_fog') {
-            // Cycle fog density: 0 → 1 → 2 → 3 → 4 → 5 → 0
-            this.fog.cycleFogDensity(col, row);
-            const newFogDensity = this.fog.getFog(col, row);
-            if (oldFogDensity !== newFogDensity) {
-                this.history.pushInCompound(EditorActions.createFogAction(this.fog, col, row, oldFogDensity, newFogDensity));
-            }
-        } else if (this.mode === 'place_stone') {
+        } else if (this.state.mode === 'place_stone') {
             this.placeObject(col, row, 'stone', 1);
-        } else if (this.mode === 'place_rock') {
+        } else if (this.state.mode === 'place_rock') {
             // Скалы - рандомный размер 2-3 тайла
             const size = Math.random() > 0.5 ? 3 : 2;
             this.placeObject(col, row, 'rock', size);
-        } else if (this.mode === 'place_tree') {
+        } else if (this.state.mode === 'place_tree') {
             this.placeObject(col, row, 'tree', 1);
-        } else if (this.mode === 'place_wheat') {
+        } else if (this.state.mode === 'place_wheat') {
             this.placeObject(col, row, 'wheat', 1);
-        } else if (this.mode === 'place_flowers') {
+        } else if (this.state.mode === 'place_flowers') {
             this.placeObject(col, row, 'flowers', 1);
+        } else if (this.state.mode === 'place_bush') {
+            this.placeObject(col, row, 'bush', 1);
+        } else if (this.state.mode === 'place_pine') {
+            this.placeObject(col, row, 'pine', 1);
+        } else if (this.state.mode === 'place_crate') {
+            this.placeObject(col, row, 'crate', 1);
+        } else if (this.state.mode === 'place_barrel') {
+            this.placeObject(col, row, 'barrel', 1);
+        } else if (this.state.mode === 'place_torch_stand') {
+            this.placeObject(col, row, 'torch_stand', 1);
         }
+    }
+
+    private doEyedropper(col: number, row: number) {
+        if (col >= this.map.cols || row >= this.map.rows) return;
+
+        // Check objects first
+        const obj = this.map.objects.find(o => {
+            const size = o.size || 1;
+            return col >= o.x && col < o.x + size && row >= o.y && row < o.y + size;
+        });
+
+        if (obj) {
+            this.state.setMode(`place_${obj.type}` as EditorMode);
+            return;
+        }
+
+        // Then fog
+        const fog = this.fog.getFog(col, row);
+        if (fog > 0) {
+            this.state.setMode('paint_fog');
+            return;
+        }
+
+        // Then tiles
+        const type = this.map.grid[row][col].type;
+        switch (type) {
+            case 0: this.state.setMode('paint_grass'); break;
+            case 1: this.state.setMode('paint_road'); break;
+            case 2: this.state.setMode('paint_water'); break;
+            case 3: this.state.setMode('paint_sand'); break;
+            case 4: this.state.setMode('paint_bridge'); break;
+            case 5: this.state.setMode('paint_lava'); break;
+            default: this.state.setMode('paint_grass'); break;
+        }
+    }
+
+    private applyFill(startCol: number, startRow: number, fillMode: EditorMode) {
+        if (startCol < 0 || startCol >= this.map.cols || startRow < 0 || startRow >= this.map.rows) return;
+
+        // Parse target tile type from mode
+        let targetType = 0;
+        switch (fillMode) {
+            case 'paint_grass': targetType = 0; break;
+            case 'paint_road': targetType = 1; break;
+            case 'paint_water': targetType = 2; break;
+            case 'paint_sand': targetType = 3; break;
+            case 'paint_bridge': targetType = 4; break;
+            case 'paint_lava': targetType = 5; break;
+            default: return; // Can only fill with tile types, not objects
+        }
+
+        const originalType = this.map.grid[startRow][startCol].type;
+        if (originalType === targetType) return; // Nothing to do
+
+        // BFS
+        const queue: { c: number, r: number }[] = [{ c: startCol, r: startRow }];
+        const visited = new Set<string>();
+        visited.add(`${startCol},${startRow}`);
+
+        this.history.beginCompound('fill');
+
+        while (queue.length > 0) {
+            const currentObj = queue.shift();
+            if (!currentObj) break;
+            const { c, r } = currentObj;
+
+            // Apply fill
+            this.history.pushInCompound(EditorActions.createTileAction(this.map.grid, c, r, originalType, targetType));
+            this.map.grid[r][c].type = targetType;
+            this.map.grid[r][c].decor = null;
+
+            // Neighbors
+            const neighbors = [
+                { c: c, r: r - 1 },
+                { c: c, r: r + 1 },
+                { c: c - 1, r: r },
+                { c: c + 1, r: r }
+            ];
+
+            for (const n of neighbors) {
+                if (n.c >= 0 && n.c < this.map.cols && n.r >= 0 && n.r < this.map.rows) {
+                    const key = `${n.c},${n.r}`;
+                    if (!visited.has(key) && this.map.grid[n.r][n.c].type === originalType) {
+                        visited.add(key);
+                        queue.push(n);
+                    }
+                }
+            }
+        }
+
+        this.history.commitCompound();
+        Pathfinder.invalidateCache();
+        this._tileDirty = true;
     }
 
     /**
@@ -277,26 +519,74 @@ export class EditorScene extends BaseScene {
             size: size > 1 ? size : undefined
         };
         this.map.objects.push(newObj);
+        this._tileDirty = true;
     }
 
     public draw(ctx: CanvasRenderingContext2D) {
         ctx.fillStyle = '#222';
         ctx.fillRect(0, 0, this.game.width, this.game.height);
 
-        for (let y = 0; y < this.map.rows; y++) {
-            for (let x = 0; x < this.map.cols; x++) {
-                this.map.tiles[y][x] = this.map.grid[y][x].type;
+        if (this._tileDirty) {
+            for (let y = 0; y < this.map.rows; y++) {
+                for (let x = 0; x < this.map.cols; x++) {
+                    this.map.tiles[y][x] = this.map.grid[y][x].type;
+                }
             }
-        }
 
-        // CRITICAL FIX: Regenerate prerendered cache after tile changes
-        // The Map.draw() uses a cached canvas that must be updated when tiles change
-        this.map.prerender();
+            // CRITICAL FIX: Regenerate prerendered cache after tile changes
+            // The Map.draw() uses a cached canvas that must be updated when tiles change
+            this.map.prerender();
+            this._tileDirty = false;
+        }
 
         // We do NOT overwrite map.waypoints here every frame anymore.
         // It prevents saving them correctly.
         this.map.draw(ctx);
+        this.map.drawAnimatedTiles(ctx, this.time);
+
+        if (this.state.gridVisible) {
+            ctx.strokeStyle = 'rgba(255,255,255,0.08)';
+            ctx.lineWidth = 0.5;
+            const TS = 64; // Fallback, assuming CONFIG.TILE_SIZE=64 if not imported. Wait, CONFIG is imported!
+            // Let's check config import. EditorScene has CONFIG actually? Yes, it uses CONFIG.TILE_SIZE below.
+            const gridSize = 64; // We can use CONFIG.TILE_SIZE if we know it exists, but hardcoding 64 is safe as TS=64 is standard in this project. Wait, I see "CONFIG.TILE_SIZE" below so I will use it.
+            const w = this.map.cols * CONFIG.TILE_SIZE;
+            const h = this.map.rows * CONFIG.TILE_SIZE;
+            ctx.beginPath();
+            for (let x = 0; x <= w; x += CONFIG.TILE_SIZE) {
+                ctx.moveTo(x, 0);
+                ctx.lineTo(x, h);
+            }
+            for (let y = 0; y <= h; y += CONFIG.TILE_SIZE) {
+                ctx.moveTo(0, y);
+                ctx.lineTo(w, y);
+            }
+            ctx.stroke();
+        }
+
         this.fog.draw(ctx);
+
+        // --- Phase 5: Time of Day (Night Preview) ---
+        if (this.state.timeOfDay === 'night') {
+            if ((this.lighting as any).width !== this.game.width || (this.lighting as any).height !== this.game.height) {
+                this.lighting.resize(this.game.width, this.game.height);
+            }
+            this.lighting.clear();
+            this.lighting.ambientLight = 0.4;
+
+            // Draw torches as lights
+            const TS = CONFIG.TILE_SIZE;
+            for (let i = 0; i < this.map.objects.length; i++) {
+                const obj = this.map.objects[i];
+                if (obj.type === 'torch_stand') {
+                    this.lighting.addLight(obj.x * TS + TS / 2, obj.y * TS + TS / 2, 120, '#ff9800', 1.0);
+                }
+            }
+
+            this.lighting.render(ctx);
+            // Draw torches above darkness temporarily since we just preview lighting
+            this.map.drawTorches(ctx, this.time * 60);
+        }
 
         // Draw waypoints with WaypointManager
         this.waypointMgr.draw(ctx);
@@ -308,13 +598,13 @@ export class EditorScene extends BaseScene {
             const y = input.hoverRow * CONFIG.TILE_SIZE;
 
             ctx.strokeStyle = 'yellow';
-            if (this.mode === 'paint_grass') ctx.strokeStyle = 'red';
-            if (this.mode === 'eraser') ctx.strokeStyle = '#ff6600';
-            if (this.mode === 'set_start') ctx.strokeStyle = 'cyan';
-            if (this.mode === 'set_end') ctx.strokeStyle = 'magenta';
-            if (this.mode === 'place_waypoint') ctx.strokeStyle = '#00ff00';
+            if (this.state.mode === 'paint_grass') ctx.strokeStyle = 'red';
+            if (this.state.mode === 'eraser') ctx.strokeStyle = '#ff6600';
+            if (this.state.mode === 'set_start') ctx.strokeStyle = 'cyan';
+            if (this.state.mode === 'set_end') ctx.strokeStyle = 'magenta';
+            if (this.state.mode === 'place_waypoint') ctx.strokeStyle = '#00ff00';
 
-            if (this.mode === 'paint_fog') {
+            if (this.state.mode === 'paint_fog') {
                 // Show current fog density with color intensity
                 const density = this.fog.getFog(input.hoverCol, input.hoverRow);
                 const intensity = density * 40 + 80; // 80-280 range
@@ -336,6 +626,10 @@ export class EditorScene extends BaseScene {
 
             ctx.lineWidth = 2;
             ctx.strokeRect(x, y, CONFIG.TILE_SIZE, CONFIG.TILE_SIZE);
+        }
+
+        if (this.statusBar) {
+            this.statusBar.innerText = `📍 (${input.hoverCol}, ${input.hoverRow}) │ 🖌️ ${this.state.mode} │ Brush: ${this.state.brushSize}x${this.state.brushSize} │ Grid: ${this.state.gridVisible ? 'ON' : 'OFF'} │ ${this.state.timeOfDay === 'day' ? '☀️ Day' : '🌙 Night'} │ Obj: ${this.map.objects.length}`;
         }
     }
 
@@ -389,6 +683,7 @@ export class EditorScene extends BaseScene {
         const data = serializeMap(this.map);
         data.fogData = this.fog.getFogData();
         data.manualPath = this.waypointMgr.isValid(); // Using waypoint manager
+        data.timeOfDay = this.state.timeOfDay;
 
         const name = prompt('Enter map name:', this.currentMapName || 'MyMap');
         if (!name) return;
@@ -438,46 +733,11 @@ export class EditorScene extends BaseScene {
     }
 
     private createUI() {
-        // Create new modular toolbar
-        this.toolbar = new EditorToolbar((mode) => {
-            console.log('[EditorScene] Mode changed to:', mode);
-            this.mode = mode;
-        });
-
-        // Create controls container for additional buttons (WAVES, MENU, Clear Path)
-        this.controlsContainer = UIUtils.createContainer({
-            position: 'absolute',
-            top: '20px',
-            right: '20px',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '8px',
-            padding: '10px',
-            background: 'rgba(0,0,0,0.85)',
-            borderRadius: '8px',
-            zIndex: '1000'
-        });
-
-        const addBtn = (text: string, onClick: () => void, color: string = '#444') => {
-            UIUtils.createButton(this.controlsContainer, text, onClick, {
-                background: color,
-                border: '1px solid #666',
-                padding: '10px 16px',
-                borderRadius: '6px',
-                fontSize: '14px',
-                fontWeight: 'bold',
-                width: '100%'
-            });
-        };
-
-        addBtn('🗑️ Clear Path', () => {
-            this.waypointMgr.clearAll();
-        }, '#e91e63');
-
-        addBtn('⚙️ WAVES & SAVE', () => this.openWaveConfig(), '#ff9800');
-        addBtn('📥 Экспорт JSON', () => this.exportCurrentMap(), '#2196f3');
-        addBtn('📤 Импорт JSON', () => this.importMapFromFile(), '#9c27b0');
-        addBtn('🚪 MENU', () => this.game.toMenu(), '#d32f2f');
+        this.sidebar = new EditorSidebar(this.state);
+        this.sidebar.onSaveMode = () => this.openWaveConfig();
+        this.sidebar.onExport = () => this.exportCurrentMap();
+        this.sidebar.onImport = () => this.importMapFromFile();
+        this.sidebar.onMenu = () => this.game.toMenu();
 
         // Hidden file input for JSON import
         this._fileInput = document.createElement('input');
@@ -485,9 +745,8 @@ export class EditorScene extends BaseScene {
         this._fileInput.accept = '.json';
         this._fileInput.style.display = 'none';
         this._fileInput.onchange = () => this.handleFileImport();
-        this.controlsContainer.appendChild(this._fileInput);
-
-        document.body.appendChild(this.controlsContainer);
+        // Append input to sidebar container or body since it's hidden
+        this.sidebar.getElement().appendChild(this._fileInput);
     }
 
     // FEATURE: Create saved maps panel
@@ -767,6 +1026,13 @@ export class EditorScene extends BaseScene {
         this.map = new MapManager(mapData);
         this.fog = new FogSystem(mapData);
 
+        // Sync time of day
+        if (mapData.timeOfDay) {
+            this.state.setTimeOfDay(mapData.timeOfDay);
+        }
+
+        this._tileDirty = true;
+
         // Clear history on new map load
         this.history.clear();
 
@@ -808,6 +1074,7 @@ export class EditorScene extends BaseScene {
         if (e.ctrlKey && e.key === 'z' && !e.shiftKey) {
             e.preventDefault();
             if (this.history.undo()) {
+                this._tileDirty = true;
                 this.fog.update(0); // Re-render fog after undo
             }
             return; // Fixed: was return; in original? Yes
@@ -817,6 +1084,7 @@ export class EditorScene extends BaseScene {
         if (e.ctrlKey && e.shiftKey && e.key === 'Z') {
             e.preventDefault();
             if (this.history.redo()) {
+                this._tileDirty = true;
                 this.fog.update(0); // Re-render fog after redo
             }
             return;
@@ -831,23 +1099,56 @@ export class EditorScene extends BaseScene {
 
         // E - Eraser mode
         if (e.key === 'e' || e.key === 'E') {
-            this.mode = 'eraser';
-            // Also update toolbar UI if possible?
-            // current toolbar implementation relies on callback to update scene, not vice versa.
-            // Ideally we should sync toolbar state.
+            this.state.setMode('eraser');
             return;
         }
 
-        // 1-3 - Category selection
-        if (e.key >= '1' && e.key <= '3') {
-            const categoryIndex = parseInt(e.key) - 1;
-            this.toolbar.selectCategory(categoryIndex);
+        if (e.key === 'Alt') {
+            this.isAltDown = true;
             return;
         }
+
+        if (e.key === '[') {
+            const newSize = Math.max(1, this.state.brushSize - 1);
+            this.state.setBrushSize(newSize as 1 | 2 | 3);
+            return;
+        }
+
+        if (e.key === ']') {
+            const newSize = Math.min(3, this.state.brushSize + 1);
+            this.state.setBrushSize(newSize as 1 | 2 | 3);
+            return;
+        }
+
+        if (e.key === 'f' || e.key === 'F') {
+            // Hotkey F to fill with current paint mode
+            // Actually Fill is meant to fill the area with the current material.
+            // Let's implement real fill logic in applyFill!
+            if (this.isPaintMode(this.state.mode) && this.state.mode !== 'eraser' && this.state.mode !== 'paint_fog') {
+                const input = this.game.input;
+                if (input.hoverCol >= 0 && input.hoverRow >= 0) {
+                    this.applyFill(input.hoverCol, input.hoverRow, this.state.mode);
+                    this._tileDirty = true;
+                    this.fog.update(0);
+                }
+            } else {
+                this.state.setMode('fill');
+            }
+            return;
+        }
+
+        if (e.key === 'g' || e.key === 'G') {
+            this.state.setGridVisible(!this.state.gridVisible);
+            return;
+        }
+
+        // Removed 1-3 toolbar categories logic
     }
 
     private isPaintMode(mode: EditorMode): boolean {
         return mode === 'paint_road' || mode === 'paint_grass' ||
+            mode === 'paint_water' || mode === 'paint_sand' ||
+            mode === 'paint_bridge' || mode === 'paint_lava' ||
             mode === 'eraser' || mode === 'paint_fog';
     }
 }

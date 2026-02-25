@@ -109,6 +109,7 @@ src/InputSystem.ts
 src/InspectorSystem.ts
 src/Map.ts
 src/MapData.ts
+src/MapStorage.ts
 src/MetricsSystem.ts
 src/ObjectRenderer.ts
 src/Pathfinder.ts
@@ -2373,6 +2374,296 @@ export function buildFogStructures(
     }
 
     return structures;
+}
+</file>
+
+<file path="src/MapStorage.ts">
+import { IMapData, migrateMapData } from './MapData';
+import { validateMap, normalizeWaveConfig } from './Utils';
+
+// ============================================================
+// MapStorage — Гибридное хранение карт (bundled + localStorage)
+// ============================================================
+
+/** Метаданные карты для UI */
+export interface IMapEntry {
+    name: string;
+    data: IMapData;
+    source: 'bundled' | 'local';
+    overridesBundled: boolean;
+}
+
+const LOCAL_KEY = 'NEWTOWER_MAPS';
+
+export class MapStorage {
+
+    // === Кэш bundled карт (один fetch за сессию) ===
+    private static _bundledCache: Record<string, IMapData> | null = null;
+    private static _bundledFetchPromise: Promise<Record<string, IMapData>> | null = null;
+
+    // -----------------------------------------------
+    //  LOCAL MAPS (sync — localStorage, как раньше)
+    // -----------------------------------------------
+
+    /** Все карты из localStorage (sync). Нормализует волны для обратной совместимости. */
+    public static getLocalMaps(): Record<string, IMapData> {
+        try {
+            const raw = localStorage.getItem(LOCAL_KEY);
+            if (!raw) return {};
+
+            const maps = JSON.parse(raw);
+
+            // Нормализация волн (обратная совместимость)
+            Object.keys(maps).forEach(mapName => {
+                const mapData = maps[mapName];
+                if (mapData.waves && Array.isArray(mapData.waves)) {
+                    mapData.waves = mapData.waves.map(normalizeWaveConfig);
+                }
+            });
+
+            return maps;
+        } catch (e) {
+            console.error('[MapStorage] Failed to load local maps', e);
+            return {};
+        }
+    }
+
+    /** Сохранить карту в localStorage. */
+    public static saveLocal(name: string, data: IMapData): boolean {
+        try {
+            const maps = this.getLocalMaps();
+            maps[name] = data;
+            const json = JSON.stringify(maps);
+
+            // Safety check: предупредить при приближении к лимиту 5MB
+            const byteSize = new TextEncoder().encode(json).length;
+            if (byteSize > 4 * 1024 * 1024) {
+                console.warn(`[MapStorage] Approaching limit: ${(byteSize / 1024 / 1024).toFixed(1)}MB / 5MB`);
+            }
+
+            localStorage.setItem(LOCAL_KEY, json);
+            return true;
+        } catch (e) {
+            console.error('[MapStorage] Failed to save map', e);
+            return false;
+        }
+    }
+
+    /** Удалить карту из localStorage. */
+    public static deleteLocal(name: string): void {
+        try {
+            const maps = this.getLocalMaps();
+            delete maps[name];
+            localStorage.setItem(LOCAL_KEY, JSON.stringify(maps));
+        } catch (e) {
+            console.error('[MapStorage] Failed to delete map', e);
+        }
+    }
+
+    // -----------------------------------------------
+    //  BUNDLED MAPS (async — fetch из public/maps/)
+    // -----------------------------------------------
+
+    /** Получить base URL для fetch (поддержка SPA/роутинга). */
+    private static getBaseUrl(): string {
+        // import.meta.env.BASE_URL устанавливается Vite из config.base
+        // Fallback к './' для тестового окружения
+        try {
+            return (import.meta as any).env?.BASE_URL ?? './';
+        } catch {
+            return './';
+        }
+    }
+
+    /**
+     * Загрузить bundled карты из public/maps/.
+     * Кэширует результат — повторные вызовы не делают fetch.
+     * При ошибке (404, невалидный JSON) — возвращает {}, логирует warning.
+     */
+    public static async getBundledMaps(): Promise<Record<string, IMapData>> {
+        // Вернуть кэш если есть
+        if (this._bundledCache) return this._bundledCache;
+
+        // Дедупликация: если fetch уже в процессе, вернуть тот же промис
+        if (this._bundledFetchPromise) return this._bundledFetchPromise;
+
+        this._bundledFetchPromise = this._fetchBundledMaps();
+        try {
+            this._bundledCache = await this._bundledFetchPromise;
+            return this._bundledCache;
+        } catch (e) {
+            console.warn('[MapStorage] Failed to fetch bundled maps', e);
+            return {};
+        } finally {
+            this._bundledFetchPromise = null;
+        }
+    }
+
+    /** Внутренняя реализация загрузки bundled карт. */
+    private static async _fetchBundledMaps(): Promise<Record<string, IMapData>> {
+        const base = this.getBaseUrl();
+        const result: Record<string, IMapData> = {};
+
+        // 1. Загрузить manifest
+        let index: string[];
+        try {
+            const resp = await fetch(`${base}maps/_index.json`, { cache: 'no-cache' });
+            if (!resp.ok) {
+                console.warn(`[MapStorage] _index.json returned ${resp.status}`);
+                return result;
+            }
+            const parsed = await resp.json();
+            if (!Array.isArray(parsed)) {
+                console.warn('[MapStorage] _index.json is not an array');
+                return result;
+            }
+            index = parsed;
+        } catch (e) {
+            console.warn('[MapStorage] Failed to fetch _index.json', e);
+            return result;
+        }
+
+        if (index.length === 0) return result;
+
+        // 2. Загрузить каждую карту
+        const fetches = index.map(async (name: string) => {
+            try {
+                const resp = await fetch(`${base}maps/${name}.json`);
+                if (!resp.ok) {
+                    console.warn(`[MapStorage] Map "${name}" returned ${resp.status}, skipping`);
+                    return;
+                }
+                const raw = await resp.json();
+
+                // КРИТИЧНО: миграция + валидация bundled карт
+                const migrated = migrateMapData(raw);
+                if (!validateMap(migrated)) {
+                    console.warn(`[MapStorage] Bundled map "${name}" failed validation, skipping`);
+                    return;
+                }
+
+                result[name] = migrated;
+            } catch (e) {
+                console.warn(`[MapStorage] Failed to load bundled map "${name}"`, e);
+            }
+        });
+
+        await Promise.all(fetches);
+        return result;
+    }
+
+    /** Инвалидировать кэш bundled карт (для HMR). */
+    public static invalidateBundledCache(): void {
+        this._bundledCache = null;
+        this._bundledFetchPromise = null;
+    }
+
+    // -----------------------------------------------
+    //  UNIFIED API — единая точка правды
+    // -----------------------------------------------
+
+    /**
+     * Получить ВСЕ карты (bundled + local) с метаданными.
+     * Collision policy: Local Override — если имя совпадает, local побеждает.
+     * Порядок: bundled (по алфавиту), затем local (по алфавиту).
+     */
+    public static async getAllMaps(): Promise<IMapEntry[]> {
+        const local = this.getLocalMaps();
+        const bundled = await this.getBundledMaps();
+        const localNames = new Set(Object.keys(local));
+        const bundledNames = new Set(Object.keys(bundled));
+
+        const entries: IMapEntry[] = [];
+
+        // Bundled карты (только те, что НЕ перезаписаны локальными)
+        const sortedBundled = Object.keys(bundled).sort();
+        for (const name of sortedBundled) {
+            if (localNames.has(name)) {
+                // Local override — bundled не показываем, local покажем ниже с overridesBundled=true
+                continue;
+            }
+            entries.push({
+                name,
+                data: bundled[name],
+                source: 'bundled',
+                overridesBundled: false,
+            });
+        }
+
+        // Local карты
+        const sortedLocal = Object.keys(local).sort();
+        for (const name of sortedLocal) {
+            entries.push({
+                name,
+                data: local[name],
+                source: 'local',
+                overridesBundled: bundledNames.has(name),
+            });
+        }
+
+        return entries;
+    }
+
+    /**
+     * Проверить, является ли карта bundled (из проекта).
+     */
+    public static async isBundled(name: string): Promise<boolean> {
+        const bundled = await this.getBundledMaps();
+        return name in bundled;
+    }
+
+    // -----------------------------------------------
+    //  IMPORT / EXPORT (чистая логика, без UI)
+    // -----------------------------------------------
+
+    /**
+     * Импорт карты из File.
+     * Прогоняет через полный validation pipeline: JSON.parse → migrateMapData → validateMap.
+     * @throws Error при невалидных данных
+     */
+    public static async importFromFile(file: File): Promise<IMapData> {
+        const text = await file.text();
+
+        let raw: unknown;
+        try {
+            raw = JSON.parse(text);
+        } catch (e) {
+            throw new Error(`Невалидный JSON: ${(e as Error).message}`);
+        }
+
+        // Миграция (throws если нет tiles и т.д.)
+        const migrated = migrateMapData(raw);
+
+        // Валидация (waypoints ≥ 2 и т.д.)
+        if (!validateMap(migrated)) {
+            throw new Error('Карта не прошла валидацию (нет пути или waypoints < 2)');
+        }
+
+        return migrated;
+    }
+
+    /**
+     * Создать Blob для скачивания карты как JSON.
+     * Возвращает Blob — создание <a download> остаётся в UI-слое.
+     */
+    public static createExportBlob(data: IMapData): Blob {
+        const json = JSON.stringify(data, null, 2);
+        return new Blob([json], { type: 'application/json' });
+    }
+
+    /**
+     * Санитизация имени файла для экспорта.
+     * Пробелы → _, убраны спецсимволы, lowercase.
+     */
+    public static sanitizeFileName(name: string): string {
+        return name
+            .toLowerCase()
+            .replace(/\s+/g, '_')
+            .replace(/[^a-z0-9_\-]/g, '')
+            .replace(/_+/g, '_')         // collapse double underscores
+            .replace(/^_|_$/g, '')       // trim leading/trailing _
+            .substring(0, 50) || 'map';
+    }
 }
 </file>
 
@@ -22253,42 +22544,6 @@ export class EntityFactory {
 }
 </file>
 
-<file path="src/index.ts">
-import { Game } from './Game';
-import { getSavedMaps, deleteMapFromStorage } from './Utils';
-import { CONFIG } from './Config';
-import { CrashHandler } from './CrashHandler';
-
-// Expose utils to window for EditorScene
-(window as any).getSavedMaps = getSavedMaps;
-(window as any).deleteMapFromStorage = deleteMapFromStorage;
-
-window.addEventListener('DOMContentLoaded', () => {
-    new CrashHandler();
-
-    const canvas = document.getElementById('game-canvas');
-    if (!canvas) {
-        console.error('❌ ОШИБКА: Canvas не найден!');
-        return;
-    }
-
-    try {
-        const game = new Game('game-canvas');
-        game.start();
-
-        // Theme Switcher Logic Removed (Ink Mode deprecated)
-        const themeBtn = document.getElementById('theme-btn');
-        if (themeBtn) {
-            themeBtn.style.display = 'none'; // Hide the button
-        }
-
-        console.log('✅ Игра готова. Нажмите ⚔️, чтобы начать волну.');
-    } catch (e) {
-        console.error('Критическая ошибка:', e);
-    }
-});
-</file>
-
 <file path="src/InspectorSystem.ts">
 import { IGameScene } from './scenes/IGameScene';
 import { Tower } from './Tower';
@@ -23690,6 +23945,41 @@ export class WaveEditor {
         }
     }
 }
+</file>
+
+<file path="src/index.ts">
+import { Game } from './Game';
+import { MapStorage } from './MapStorage';
+import { CONFIG } from './Config';
+import { CrashHandler } from './CrashHandler';
+
+// Expose MapStorage to window for debugging
+(window as any).MapStorage = MapStorage;
+
+window.addEventListener('DOMContentLoaded', () => {
+    new CrashHandler();
+
+    const canvas = document.getElementById('game-canvas');
+    if (!canvas) {
+        console.error('❌ ОШИБКА: Canvas не найден!');
+        return;
+    }
+
+    try {
+        const game = new Game('game-canvas');
+        game.start();
+
+        // Theme Switcher Logic Removed (Ink Mode deprecated)
+        const themeBtn = document.getElementById('theme-btn');
+        if (themeBtn) {
+            themeBtn.style.display = 'none'; // Hide the button
+        }
+
+        console.log('✅ Игра готова. Нажмите ⚔️, чтобы начать волну.');
+    } catch (e) {
+        console.error('Критическая ошибка:', e);
+    }
+});
 </file>
 
 <file path="src/MapData.ts">
@@ -25506,365 +25796,6 @@ export class EntityManager {
     public getTowerAt(col: number, row: number): Tower | null {
         return this.state.towers.find((t) => t.col === col && t.row === row) || null;
     }
-}
-</file>
-
-<file path="src/scenes/MenuScene.ts">
-import { BaseScene } from '../BaseScene';
-import { Game } from '../Game';
-import { DEMO_MAP, IMapData } from '../MapData';
-import { validateMap, getSavedMaps } from '../Utils';
-import { MapManager } from '../Map';
-import { CONFIG } from '../Config';
-import { UIUtils } from '../UIUtils';
-import { Assets } from '../Assets';
-import { VISUALS } from '../VisualConfig';
-import { StressTestScene } from './StressTestScene';
-
-export class MenuScene extends BaseScene {
-    private game: Game;
-    private container!: HTMLElement;
-    private mapSelectionContainer!: HTMLElement;
-
-    constructor(game: Game) {
-        super();
-        this.game = game;
-        // UI creation moved to onEnterImpl
-    }
-
-    protected onEnterImpl() {
-        if (!this.container) {
-            this.createUI();
-        }
-        if (!this.mapSelectionContainer) {
-            this.createMapSelectionUI();
-        }
-
-        this.container.style.display = 'flex';
-        this.mapSelectionContainer.style.display = 'none';
-
-        // Hide game UI layers via UIRoot
-        this.game.uiRoot.hideGameUI();
-    }
-
-    protected onExitImpl() {
-        if (this.container) this.container.style.display = 'none';
-        if (this.mapSelectionContainer) this.mapSelectionContainer.style.display = 'none';
-
-        // Cleanup canvas elements to prevent memory leaks
-        this.clearMapPreviews();
-    }
-
-    public update(dt: number) { }
-
-    public draw(ctx: CanvasRenderingContext2D) {
-        // === Фоновое Изображение ===
-        const bgImage = Assets.get('menu_start');
-        if (bgImage) {
-            // Cover-fit с центрированием (масштабирует чтобы покрыть весь canvas)
-            const scale = Math.max(
-                this.game.width / bgImage.width,
-                this.game.height / bgImage.height
-            );
-            const x = (this.game.width - bgImage.width * scale) / 2;
-            const y = (this.game.height - bgImage.height * scale) / 2;
-
-            ctx.drawImage(bgImage, x, y, bgImage.width * scale, bgImage.height * scale);
-
-            // Затемнение для читабельности
-            ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
-            ctx.fillRect(0, 0, this.game.width, this.game.height);
-        } else {
-            // === Fallback - старый фон (сетка) ===
-            ctx.fillStyle = '#111';
-            ctx.fillRect(0, 0, this.game.width, this.game.height);
-
-            ctx.strokeStyle = '#222';
-            ctx.lineWidth = 2;
-            const s = 64;
-            const gridSize = 64;
-            for (let x = 0; x < this.game.width; x += gridSize) {
-                ctx.beginPath();
-                ctx.moveTo(x, 0);
-                ctx.lineTo(x, this.game.height);
-                ctx.stroke();
-            }
-            for (let y = 0; y < this.game.height; y += gridSize) {
-                ctx.beginPath();
-                ctx.moveTo(0, y);
-                ctx.lineTo(this.game.width, y);
-                ctx.stroke();
-            }
-        }
-
-        // === Заголовок ===
-        ctx.save();
-        ctx.fillStyle = '#fff';
-        ctx.font = 'bold 60px Segoe UI';
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-
-        // Двойная тень для глубины
-        ctx.shadowColor = 'rgba(0,0,0,0.9)';
-        ctx.shadowBlur = 15;
-        ctx.shadowOffsetY = 4;
-        ctx.fillText('NEW TOWER', this.game.width / 2, 150);
-
-        // Дополнительная подсветка
-        ctx.shadowColor = 'rgba(255,255,255,0.3)';
-        ctx.shadowBlur = 8;
-        ctx.shadowOffsetY = -2;
-        ctx.fillText('NEW TOWER', this.game.width / 2, 150);
-
-        ctx.restore();
-    }
-
-
-    private createUI() {
-        this.container = UIUtils.createContainer({
-            position: 'absolute',
-            top: '0',
-            left: '0',
-            width: '100%',
-            height: '100%',
-            display: 'none',
-            flexDirection: 'column',
-            alignItems: 'flex-start', // Сдвиг влево
-            justifyContent: 'center',
-            gap: '20px',
-            pointerEvents: 'none'
-        });
-        // Добавляем paddingLeft вручную
-        this.container.style.paddingLeft = '15%';
-
-        UIUtils.createButton(this.container, '▶ START GAME', () => {
-            this.showMapSelection();
-        }, { width: '300px', fontSize: '24px', padding: '15px 40px' });
-
-        UIUtils.createButton(this.container, '🛠 EDITOR', () => {
-            this.game.toEditor();
-        }, { width: '300px', fontSize: '24px', padding: '15px 40px' });
-
-        UIUtils.createButton(this.container, '🧪 STRESS TEST', () => {
-            // Dynamic import to avoid circular dependency if any, 
-            // but standard import is fine here as MenuScene -> StressTestScene is one way usually.
-            // However, to be safe let's use the import at top.
-            this.game.changeScene(new StressTestScene(this.game));
-        }, { width: '300px', fontSize: '24px', padding: '15px 40px', background: 'linear-gradient(135deg, #444, #222)' });
-
-        document.body.appendChild(this.container);
-    }
-
-    private createMapSelectionUI() {
-        this.mapSelectionContainer = UIUtils.createContainer({
-            position: 'absolute',
-            top: '0',
-            left: '0',
-            width: '100%',
-            height: '100%',
-            display: 'none',
-            flexDirection: 'column',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: '2000',
-            color: '#fff'
-        });
-        // Фоновое изображение вручную (из корня)
-        this.mapSelectionContainer.style.backgroundImage = 'url("../map.jpg")';
-        this.mapSelectionContainer.style.backgroundSize = 'cover';
-        this.mapSelectionContainer.style.backgroundPosition = 'center';
-        this.mapSelectionContainer.style.backgroundRepeat = 'no-repeat';
-
-        // Затемняющий overlay с градиентом для лучшего фокуса
-        const overlay = document.createElement('div');
-        Object.assign(overlay.style, {
-            position: 'absolute',
-            top: '0',
-            left: '0',
-            width: '100%',
-            height: '100%',
-            background: 'radial-gradient(circle at center, rgba(0, 0, 0, 0.4) 0%, rgba(0, 0, 0, 0.7) 100%)',
-            zIndex: '-1',
-            pointerEvents: 'none'
-        });
-        this.mapSelectionContainer.appendChild(overlay);
-
-        const title = document.createElement('h2');
-        title.innerText = 'SELECT MAP';
-        Object.assign(title.style, {
-            marginBottom: `${VISUALS.UI.SPACING.xl}px`,
-            fontSize: VISUALS.UI.FONTS.size.huge,
-            fontWeight: VISUALS.UI.FONTS.weight.bold,
-            textShadow: VISUALS.UI.SHADOWS.lg,
-            letterSpacing: '2px'
-        });
-        this.mapSelectionContainer.appendChild(title);
-
-        const listContainer = document.createElement('div');
-        Object.assign(listContainer.style, {
-            display: 'flex',
-            gap: `${VISUALS.UI.SPACING.lg}px`,
-            overflowX: 'auto',
-            overflowY: 'hidden',
-            maxWidth: '90%',
-            maxHeight: '70vh',
-            padding: `${VISUALS.UI.SPACING.xl}px`,
-            border: `${VISUALS.UI.BORDERS.width.normal} solid ${VISUALS.UI.COLORS.glass.border}`,
-            borderRadius: VISUALS.UI.BORDERS.radius.xl,
-            background: VISUALS.UI.COLORS.glass.bgLight,
-            backdropFilter: 'blur(10px)',
-            boxShadow: VISUALS.UI.SHADOWS.xl,
-            scrollbarWidth: 'thin',
-            scrollbarColor: `${VISUALS.UI.COLORS.glass.borderHover} ${VISUALS.UI.COLORS.glass.bgDark}`
-        });
-        this.mapSelectionContainer.appendChild(listContainer);
-
-        // Function to refresh list
-        (this.mapSelectionContainer as any).refreshList = () => {
-            listContainer.innerHTML = '';
-
-            // DEMO MAP
-            this.createMapCard(listContainer, 'Demo Map', DEMO_MAP);
-
-            // SAVED MAPS
-            const saved = getSavedMaps();
-            for (const key in saved) {
-                this.createMapCard(listContainer, key, saved[key]);
-            }
-        };
-
-        UIUtils.createButton(this.mapSelectionContainer, 'BACK', () => {
-            this.mapSelectionContainer.style.display = 'none';
-            this.container.style.display = 'flex';
-        }, {
-            background: `linear-gradient(135deg, ${VISUALS.UI.COLORS.danger}, #b71c1c)`,
-            fontSize: VISUALS.UI.FONTS.size.xl,
-            padding: `${VISUALS.UI.SPACING.md}px ${VISUALS.UI.SPACING.xxl}px`,
-            border: `${VISUALS.UI.BORDERS.width.normal} solid ${VISUALS.UI.COLORS.glass.border}`,
-            borderRadius: VISUALS.UI.BORDERS.radius.lg,
-            boxShadow: VISUALS.UI.SHADOWS.glow.danger,
-            width: 'auto'
-        });
-
-        document.body.appendChild(this.mapSelectionContainer);
-    }
-
-    private createMapCard(parent: HTMLElement, name: string, data: IMapData) {
-        try {
-            const card = document.createElement('div');
-            Object.assign(card.style, {
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                gap: `${VISUALS.UI.SPACING.sm}px`,
-                background: VISUALS.UI.COLORS.glass.bg,
-                padding: `${VISUALS.UI.SPACING.md}px`,
-                borderRadius: VISUALS.UI.BORDERS.radius.lg,
-                minWidth: '220px',
-                cursor: 'pointer',
-                border: `${VISUALS.UI.BORDERS.width.thick} solid ${VISUALS.UI.COLORS.glass.border}`,
-                backdropFilter: 'blur(5px)',
-                transition: VISUALS.UI.TRANSITIONS.presets.normal,
-                boxShadow: VISUALS.UI.SHADOWS.md,
-                transform: 'translateZ(0)' // GPU acceleration
-            });
-
-            // Preview Canvas
-            const canvas = document.createElement('canvas');
-            canvas.width = 200;
-            canvas.height = 150;
-            const ctx = canvas.getContext('2d')!;
-
-            // Render preview
-            // We need a temporary MapManager to draw
-            const tempMap = new MapManager(data);
-            // Scale context to fit
-            ctx.save();
-            const scale = Math.min(200 / (tempMap.cols * CONFIG.TILE_SIZE), 150 / (tempMap.rows * CONFIG.TILE_SIZE));
-            ctx.scale(scale, scale);
-            tempMap.draw(ctx);
-            ctx.restore();
-
-            card.appendChild(canvas);
-
-            const label = document.createElement('div');
-            label.innerText = name;
-            label.style.fontWeight = VISUALS.UI.FONTS.weight.bold;
-            label.style.fontSize = VISUALS.UI.FONTS.size.lg;
-            label.style.textShadow = VISUALS.UI.SHADOWS.md;
-            card.appendChild(label);
-
-            card.onmouseover = () => {
-                card.style.borderColor = VISUALS.UI.COLORS.primary;
-                card.style.transform = 'scale(1.05) translateY(-5px)';
-                card.style.boxShadow = VISUALS.UI.SHADOWS.glow.primary;
-            };
-            card.onmouseout = () => {
-                card.style.borderColor = VISUALS.UI.COLORS.glass.border;
-                card.style.transform = 'scale(1)';
-                card.style.boxShadow = VISUALS.UI.SHADOWS.md;
-            };
-            card.onclick = () => {
-                console.log('Map card clicked:', name);
-                console.log('Map data:', data);
-                const isValid = validateMap(data);
-                console.log('Map validation result:', isValid);
-                if (isValid) {
-                    console.log('Calling toGame...');
-                    this.game.toGame(data);
-                } else {
-                    console.error('Map is invalid!');
-                    alert('Map is invalid!');
-                }
-            };
-
-            parent.appendChild(card);
-        } catch (e) {
-            console.error(`Failed to render map card for ${name}`, e);
-            const errCard = document.createElement('div');
-            errCard.innerText = `❌ ${name} (Corrupted)`;
-            Object.assign(errCard.style, {
-                background: '#300',
-                color: '#f88',
-                padding: '10px',
-                borderRadius: '8px',
-                minWidth: '200px',
-                textAlign: 'center',
-            });
-            parent.appendChild(errCard);
-        }
-    }
-
-    /**
-     * Clears canvas previews to prevent memory leaks
-     */
-    private clearMapPreviews(): void {
-        // Find the list container with map cards
-        const listContainer = this.mapSelectionContainer.querySelector('div[style*="overflowX"]') as HTMLElement;
-        if (!listContainer) return;
-
-        // Clear all canvas contexts before removing from DOM
-        const canvases = listContainer.querySelectorAll('canvas');
-        canvases.forEach(canvas => {
-            const ctx = canvas.getContext('2d');
-            if (ctx) {
-                ctx.clearRect(0, 0, canvas.width, canvas.height);
-            }
-        });
-
-        // Remove all map cards to free memory
-        listContainer.innerHTML = '';
-    }
-
-    private showMapSelection() {
-        this.container.style.display = 'none';
-        this.mapSelectionContainer.style.display = 'flex';
-        if ((this.mapSelectionContainer as any).refreshList) {
-            (this.mapSelectionContainer as any).refreshList();
-        }
-    }
-
-    // createBtn removed - replaced by UIUtils.createButton
 }
 </file>
 
@@ -27890,6 +27821,510 @@ export class Assets {
 }
 </file>
 
+<file path="src/scenes/MenuScene.ts">
+import { BaseScene } from '../BaseScene';
+import { Game } from '../Game';
+import { DEMO_MAP, IMapData } from '../MapData';
+import { validateMap } from '../Utils';
+import { MapStorage } from '../MapStorage';
+import { MapManager } from '../Map';
+import { CONFIG } from '../Config';
+import { UIUtils } from '../UIUtils';
+import { Assets } from '../Assets';
+import { VISUALS } from '../VisualConfig';
+import { StressTestScene } from './StressTestScene';
+
+export class MenuScene extends BaseScene {
+    private game: Game;
+    private container!: HTMLElement;
+    private mapSelectionContainer!: HTMLElement;
+    private _refreshGeneration: number = 0;
+
+    constructor(game: Game) {
+        super();
+        this.game = game;
+        // UI creation moved to onEnterImpl
+    }
+
+    protected onEnterImpl() {
+        if (!this.container) {
+            this.createUI();
+        }
+        if (!this.mapSelectionContainer) {
+            this.createMapSelectionUI();
+        }
+
+        this.container.style.display = 'flex';
+        this.mapSelectionContainer.style.display = 'none';
+
+        // Hide game UI layers via UIRoot
+        this.game.uiRoot.hideGameUI();
+    }
+
+    protected onExitImpl() {
+        if (this.container) this.container.style.display = 'none';
+        if (this.mapSelectionContainer) this.mapSelectionContainer.style.display = 'none';
+
+        // Cleanup canvas elements to prevent memory leaks
+        this.clearMapPreviews();
+    }
+
+    public update(dt: number) { }
+
+    public draw(ctx: CanvasRenderingContext2D) {
+        // === Фоновое Изображение ===
+        const bgImage = Assets.get('menu_start');
+        if (bgImage) {
+            // Cover-fit с центрированием (масштабирует чтобы покрыть весь canvas)
+            const scale = Math.max(
+                this.game.width / bgImage.width,
+                this.game.height / bgImage.height
+            );
+            const x = (this.game.width - bgImage.width * scale) / 2;
+            const y = (this.game.height - bgImage.height * scale) / 2;
+
+            ctx.drawImage(bgImage, x, y, bgImage.width * scale, bgImage.height * scale);
+
+            // Затемнение для читабельности
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
+            ctx.fillRect(0, 0, this.game.width, this.game.height);
+        } else {
+            // === Fallback - старый фон (сетка) ===
+            ctx.fillStyle = '#111';
+            ctx.fillRect(0, 0, this.game.width, this.game.height);
+
+            ctx.strokeStyle = '#222';
+            ctx.lineWidth = 2;
+            const s = 64;
+            const gridSize = 64;
+            for (let x = 0; x < this.game.width; x += gridSize) {
+                ctx.beginPath();
+                ctx.moveTo(x, 0);
+                ctx.lineTo(x, this.game.height);
+                ctx.stroke();
+            }
+            for (let y = 0; y < this.game.height; y += gridSize) {
+                ctx.beginPath();
+                ctx.moveTo(0, y);
+                ctx.lineTo(this.game.width, y);
+                ctx.stroke();
+            }
+        }
+
+        // === Заголовок ===
+        ctx.save();
+        ctx.fillStyle = '#fff';
+        ctx.font = 'bold 60px Segoe UI';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+
+        // Двойная тень для глубины
+        ctx.shadowColor = 'rgba(0,0,0,0.9)';
+        ctx.shadowBlur = 15;
+        ctx.shadowOffsetY = 4;
+        ctx.fillText('NEW TOWER', this.game.width / 2, 150);
+
+        // Дополнительная подсветка
+        ctx.shadowColor = 'rgba(255,255,255,0.3)';
+        ctx.shadowBlur = 8;
+        ctx.shadowOffsetY = -2;
+        ctx.fillText('NEW TOWER', this.game.width / 2, 150);
+
+        ctx.restore();
+    }
+
+
+    private createUI() {
+        this.container = UIUtils.createContainer({
+            position: 'absolute',
+            top: '0',
+            left: '0',
+            width: '100%',
+            height: '100%',
+            display: 'none',
+            flexDirection: 'column',
+            alignItems: 'flex-start', // Сдвиг влево
+            justifyContent: 'center',
+            gap: '20px',
+            pointerEvents: 'none'
+        });
+        // Добавляем paddingLeft вручную
+        this.container.style.paddingLeft = '15%';
+
+        UIUtils.createButton(this.container, '▶ START GAME', () => {
+            this.showMapSelection();
+        }, { width: '300px', fontSize: '24px', padding: '15px 40px' });
+
+        UIUtils.createButton(this.container, '🛠 EDITOR', () => {
+            this.game.toEditor();
+        }, { width: '300px', fontSize: '24px', padding: '15px 40px' });
+
+        UIUtils.createButton(this.container, '🧪 STRESS TEST', () => {
+            // Dynamic import to avoid circular dependency if any, 
+            // but standard import is fine here as MenuScene -> StressTestScene is one way usually.
+            // However, to be safe let's use the import at top.
+            this.game.changeScene(new StressTestScene(this.game));
+        }, { width: '300px', fontSize: '24px', padding: '15px 40px', background: 'linear-gradient(135deg, #444, #222)' });
+
+        document.body.appendChild(this.container);
+    }
+
+    private createMapSelectionUI() {
+        this.mapSelectionContainer = UIUtils.createContainer({
+            position: 'absolute',
+            top: '0',
+            left: '0',
+            width: '100%',
+            height: '100%',
+            display: 'none',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: '2000',
+            color: '#fff'
+        });
+        // Фоновое изображение вручную (из корня)
+        this.mapSelectionContainer.style.backgroundImage = 'url("../map.jpg")';
+        this.mapSelectionContainer.style.backgroundSize = 'cover';
+        this.mapSelectionContainer.style.backgroundPosition = 'center';
+        this.mapSelectionContainer.style.backgroundRepeat = 'no-repeat';
+
+        // Затемняющий overlay с градиентом для лучшего фокуса
+        const overlay = document.createElement('div');
+        Object.assign(overlay.style, {
+            position: 'absolute',
+            top: '0',
+            left: '0',
+            width: '100%',
+            height: '100%',
+            background: 'radial-gradient(circle at center, rgba(0, 0, 0, 0.4) 0%, rgba(0, 0, 0, 0.7) 100%)',
+            zIndex: '-1',
+            pointerEvents: 'none'
+        });
+        this.mapSelectionContainer.appendChild(overlay);
+
+        const title = document.createElement('h2');
+        title.innerText = 'SELECT MAP';
+        Object.assign(title.style, {
+            marginBottom: `${VISUALS.UI.SPACING.xl}px`,
+            fontSize: VISUALS.UI.FONTS.size.huge,
+            fontWeight: VISUALS.UI.FONTS.weight.bold,
+            textShadow: VISUALS.UI.SHADOWS.lg,
+            letterSpacing: '2px'
+        });
+        this.mapSelectionContainer.appendChild(title);
+
+        const listContainer = document.createElement('div');
+        Object.assign(listContainer.style, {
+            display: 'flex',
+            gap: `${VISUALS.UI.SPACING.lg}px`,
+            overflowX: 'auto',
+            overflowY: 'hidden',
+            maxWidth: '90%',
+            maxHeight: '70vh',
+            padding: `${VISUALS.UI.SPACING.xl}px`,
+            border: `${VISUALS.UI.BORDERS.width.normal} solid ${VISUALS.UI.COLORS.glass.border}`,
+            borderRadius: VISUALS.UI.BORDERS.radius.xl,
+            background: VISUALS.UI.COLORS.glass.bgLight,
+            backdropFilter: 'blur(10px)',
+            boxShadow: VISUALS.UI.SHADOWS.xl,
+            scrollbarWidth: 'thin',
+            scrollbarColor: `${VISUALS.UI.COLORS.glass.borderHover} ${VISUALS.UI.COLORS.glass.bgDark}`
+        });
+        this.mapSelectionContainer.appendChild(listContainer);
+
+        // Function to refresh list
+        (this.mapSelectionContainer as any).refreshList = () => {
+            const gen = ++this._refreshGeneration;
+            listContainer.innerHTML = '';
+
+            // DEMO MAP
+            this.createMapCard(listContainer, 'Demo Map', DEMO_MAP);
+
+            // Фаза 1 (sync): local maps мгновенно
+            const local = MapStorage.getLocalMaps();
+            const localNames = new Set(Object.keys(local));
+            for (const key of localNames) {
+                this.createMapCard(listContainer, `💾 ${key}`, local[key]);
+            }
+
+            // Фаза 2 (async): bundled maps дописываются
+            MapStorage.getBundledMaps().then(bundled => {
+                if (gen !== this._refreshGeneration) return; // race condition guard
+
+                for (const name of Object.keys(bundled).sort()) {
+                    if (localNames.has(name)) continue; // local override
+                    this.createMapCard(listContainer, `📦 ${name}`, bundled[name]);
+                }
+            }).catch(e => {
+                console.warn('[MenuScene] Failed to load bundled maps', e);
+            });
+        };
+
+        UIUtils.createButton(this.mapSelectionContainer, 'BACK', () => {
+            this.mapSelectionContainer.style.display = 'none';
+            this.container.style.display = 'flex';
+        }, {
+            background: `linear-gradient(135deg, ${VISUALS.UI.COLORS.danger}, #b71c1c)`,
+            fontSize: VISUALS.UI.FONTS.size.xl,
+            padding: `${VISUALS.UI.SPACING.md}px ${VISUALS.UI.SPACING.xxl}px`,
+            border: `${VISUALS.UI.BORDERS.width.normal} solid ${VISUALS.UI.COLORS.glass.border}`,
+            borderRadius: VISUALS.UI.BORDERS.radius.lg,
+            boxShadow: VISUALS.UI.SHADOWS.glow.danger,
+            width: 'auto'
+        });
+
+        document.body.appendChild(this.mapSelectionContainer);
+    }
+
+    private createMapCard(parent: HTMLElement, name: string, data: IMapData) {
+        try {
+            const card = document.createElement('div');
+            Object.assign(card.style, {
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                gap: `${VISUALS.UI.SPACING.sm}px`,
+                background: VISUALS.UI.COLORS.glass.bg,
+                padding: `${VISUALS.UI.SPACING.md}px`,
+                borderRadius: VISUALS.UI.BORDERS.radius.lg,
+                minWidth: '220px',
+                cursor: 'pointer',
+                border: `${VISUALS.UI.BORDERS.width.thick} solid ${VISUALS.UI.COLORS.glass.border}`,
+                backdropFilter: 'blur(5px)',
+                transition: VISUALS.UI.TRANSITIONS.presets.normal,
+                boxShadow: VISUALS.UI.SHADOWS.md,
+                transform: 'translateZ(0)' // GPU acceleration
+            });
+
+            // Preview Canvas
+            const canvas = document.createElement('canvas');
+            canvas.width = 200;
+            canvas.height = 150;
+            const ctx = canvas.getContext('2d')!;
+
+            // Render preview
+            // We need a temporary MapManager to draw
+            const tempMap = new MapManager(data);
+            // Scale context to fit
+            ctx.save();
+            const scale = Math.min(200 / (tempMap.cols * CONFIG.TILE_SIZE), 150 / (tempMap.rows * CONFIG.TILE_SIZE));
+            ctx.scale(scale, scale);
+            tempMap.draw(ctx);
+            ctx.restore();
+
+            card.appendChild(canvas);
+
+            const label = document.createElement('div');
+            label.innerText = name;
+            label.style.fontWeight = VISUALS.UI.FONTS.weight.bold;
+            label.style.fontSize = VISUALS.UI.FONTS.size.lg;
+            label.style.textShadow = VISUALS.UI.SHADOWS.md;
+            card.appendChild(label);
+
+            card.onmouseover = () => {
+                card.style.borderColor = VISUALS.UI.COLORS.primary;
+                card.style.transform = 'scale(1.05) translateY(-5px)';
+                card.style.boxShadow = VISUALS.UI.SHADOWS.glow.primary;
+            };
+            card.onmouseout = () => {
+                card.style.borderColor = VISUALS.UI.COLORS.glass.border;
+                card.style.transform = 'scale(1)';
+                card.style.boxShadow = VISUALS.UI.SHADOWS.md;
+            };
+            card.onclick = () => {
+                console.log('Map card clicked:', name);
+                console.log('Map data:', data);
+                const isValid = validateMap(data);
+                console.log('Map validation result:', isValid);
+                if (isValid) {
+                    console.log('Calling toGame...');
+                    this.game.toGame(data);
+                } else {
+                    console.error('Map is invalid!');
+                    alert('Map is invalid!');
+                }
+            };
+
+            parent.appendChild(card);
+        } catch (e) {
+            console.error(`Failed to render map card for ${name}`, e);
+            const errCard = document.createElement('div');
+            errCard.innerText = `❌ ${name} (Corrupted)`;
+            Object.assign(errCard.style, {
+                background: '#300',
+                color: '#f88',
+                padding: '10px',
+                borderRadius: '8px',
+                minWidth: '200px',
+                textAlign: 'center',
+            });
+            parent.appendChild(errCard);
+        }
+    }
+
+    /**
+     * Clears canvas previews to prevent memory leaks
+     */
+    private clearMapPreviews(): void {
+        // Find the list container with map cards
+        const listContainer = this.mapSelectionContainer.querySelector('div[style*="overflowX"]') as HTMLElement;
+        if (!listContainer) return;
+
+        // Clear all canvas contexts before removing from DOM
+        const canvases = listContainer.querySelectorAll('canvas');
+        canvases.forEach(canvas => {
+            const ctx = canvas.getContext('2d');
+            if (ctx) {
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+            }
+        });
+
+        // Remove all map cards to free memory
+        listContainer.innerHTML = '';
+    }
+
+    private showMapSelection() {
+        this.container.style.display = 'none';
+        this.mapSelectionContainer.style.display = 'flex';
+        if ((this.mapSelectionContainer as any).refreshList) {
+            (this.mapSelectionContainer as any).refreshList();
+        }
+    }
+
+    // createBtn removed - replaced by UIUtils.createButton
+}
+</file>
+
+<file path="src/Projectile.ts">
+import { ICardEffect } from './cards';
+import { Assets } from './Assets';
+import { RendererFactory } from './RendererFactory';
+
+export interface IProjectileStats {
+    dmg: number;
+    speed: number;
+    color: string;
+    effects: ICardEffect[];
+    pierce: number;
+    critChance?: number;           // Critical hit chance (0-1)
+    isCrit?: boolean;               // Is this projectile a crit
+    explodeOnDeath?: boolean;       // Fire level 3 effect
+    explosionDamage?: number;       // Damage from explosion
+    explosionRadius?: number;       // Radius of explosion
+    projectileType?: string;        // Visual type: standard, ice, fire, sniper, split
+    towerLevel?: number;            // Tower's max card level (for trail effects)
+}
+
+export class Projectile {
+    public x: number = 0;
+    public y: number = 0;
+    public vx: number = 0;
+    public vy: number = 0;
+    public radius: number = 4;
+    public alive: boolean = false;
+
+    public damage: number = 0;
+    public life: number = 0;
+    public color: string = '#fff';
+    public effects: ICardEffect[] = [];
+    public pierce: number = 0;
+    public hitList: number[] = [];
+    public isCrit: boolean = false;           // Is this a critical hit
+    public explodeOnDeath: boolean = false;   // Should explode on enemy death
+    public explosionDamage: number = 0;       // Damage from explosion
+    public explosionRadius: number = 0;       // Radius of explosion
+    public projectileType: string = 'standard'; // Visual type
+    public towerLevel: number = 1;            // Tower's max card level (for trails)
+
+    private static readonly EMPTY_EFFECTS: ICardEffect[] = [];
+
+    // Конструктор пустой!
+    constructor() { }
+
+    // Метод инициализации (вызывается из пула)
+    public init(x: number, y: number, target: { x: number; y: number }, stats: IProjectileStats) {
+        this.x = x;
+        this.y = y;
+        this.alive = true;
+        this.damage = stats.dmg;
+        this.color = stats.color;
+        this.effects = stats.effects || Projectile.EMPTY_EFFECTS;
+        this.pierce = stats.pierce || 0;
+        this.hitList.length = 0; // PERF: Reuse array instead of allocating new
+        this.projectileType = stats.projectileType || 'standard';
+        this.towerLevel = stats.towerLevel || 1;
+        this.radius = 4; // Default radius
+
+        // Handle critical hits
+        const critChance = stats.critChance || 0;
+        this.isCrit = Math.random() < critChance;
+        if (this.isCrit) {
+            this.damage *= 2; // Critical hits deal 2x damage
+        }
+
+        // Handle explosion on death effect (Fire level 3)
+        const explodeEffect = this.effects.find((e: any) => e.type === 'explodeOnDeath');
+        if (explodeEffect) {
+            this.explodeOnDeath = true;
+            this.explosionDamage = stats.dmg * (explodeEffect.explosionDamagePercent || 0.5);
+            this.explosionRadius = explodeEffect.explosionRadius || 40;
+        } else {
+            this.explodeOnDeath = false;
+            this.explosionDamage = 0;
+            this.explosionRadius = 0;
+        }
+
+        const angle = Math.atan2(target.y - y, target.x - x);
+        this.vx = Math.cos(angle) * stats.speed;
+        this.vy = Math.sin(angle) * stats.speed;
+
+        this.life = 2.0; // 2 секунды жизни
+        // Adjust life for sniper (faster = less time needed)
+        if (this.projectileType === 'sniper') this.life = 1.0;
+    }
+
+    // Decoupled update: No effects dependency
+    public update(dt: number = 1) {
+        if (!this.alive) return;
+
+        this.x += this.vx * dt;
+        this.y += this.vy * dt;
+        this.life -= dt;
+
+        if (this.life <= 0 || this.x < -100 || this.x > 2000 || this.y < -100 || this.y > 2000) {
+            this.alive = false;
+        }
+    }
+
+    public draw(ctx: CanvasRenderingContext2D) {
+        RendererFactory.drawProjectile(ctx, this);
+    }
+
+    public reset() {
+        this.alive = false;
+        this.x = 0;
+        this.y = 0;
+        this.vx = 0;
+        this.vy = 0;
+        this.damage = 0;
+        this.life = 0;
+        this.effects = Projectile.EMPTY_EFFECTS; // Zero alloc reset
+        this.hitList.length = 0;
+
+        this.isCrit = false;
+        this.explodeOnDeath = false;
+        this.explosionDamage = 0;
+        this.explosionRadius = 0;
+        this.projectileType = 'standard';
+        this.towerLevel = 1;
+        this.pierce = 0;
+        this.radius = 4;
+        this.color = '#fff';
+    }
+}
+</file>
+
 <file path="src/Utils.ts">
 import { MapManager } from './Map';
 import { IMapData, IWaveConfig, IWaveGroupRaw, MAP_SCHEMA_VERSION } from './MapData';
@@ -28047,6 +28482,7 @@ export function validateMap(data: any): boolean {
 
 // --- STORAGE UTILS ---
 
+/** @deprecated Use MapStorage.getLocalMaps() instead */
 export function getSavedMaps(): Record<string, IMapData> {
     try {
         const raw = localStorage.getItem('NEWTOWER_MAPS');
@@ -28069,6 +28505,7 @@ export function getSavedMaps(): Record<string, IMapData> {
     }
 }
 
+/** @deprecated Use MapStorage.saveLocal() instead */
 export function saveMapToStorage(name: string, data: IMapData): boolean {
     try {
         const maps = getSavedMaps();
@@ -28088,6 +28525,7 @@ export function saveMapToStorage(name: string, data: IMapData): boolean {
 }
 
 
+/** @deprecated Use MapStorage.deleteLocal() instead */
 export function deleteMapFromStorage(name: string): void {
     const maps = getSavedMaps();
     delete maps[name];
@@ -28132,840 +28570,6 @@ export function loadSessionData(key: string): any {
         return data[key];
     } catch (e) {
         return null;
-    }
-}
-</file>
-
-<file path="src/Projectile.ts">
-import { ICardEffect } from './cards';
-import { Assets } from './Assets';
-import { RendererFactory } from './RendererFactory';
-
-export interface IProjectileStats {
-    dmg: number;
-    speed: number;
-    color: string;
-    effects: ICardEffect[];
-    pierce: number;
-    critChance?: number;           // Critical hit chance (0-1)
-    isCrit?: boolean;               // Is this projectile a crit
-    explodeOnDeath?: boolean;       // Fire level 3 effect
-    explosionDamage?: number;       // Damage from explosion
-    explosionRadius?: number;       // Radius of explosion
-    projectileType?: string;        // Visual type: standard, ice, fire, sniper, split
-    towerLevel?: number;            // Tower's max card level (for trail effects)
-}
-
-export class Projectile {
-    public x: number = 0;
-    public y: number = 0;
-    public vx: number = 0;
-    public vy: number = 0;
-    public radius: number = 4;
-    public alive: boolean = false;
-
-    public damage: number = 0;
-    public life: number = 0;
-    public color: string = '#fff';
-    public effects: ICardEffect[] = [];
-    public pierce: number = 0;
-    public hitList: number[] = [];
-    public isCrit: boolean = false;           // Is this a critical hit
-    public explodeOnDeath: boolean = false;   // Should explode on enemy death
-    public explosionDamage: number = 0;       // Damage from explosion
-    public explosionRadius: number = 0;       // Radius of explosion
-    public projectileType: string = 'standard'; // Visual type
-    public towerLevel: number = 1;            // Tower's max card level (for trails)
-
-    private static readonly EMPTY_EFFECTS: ICardEffect[] = [];
-
-    // Конструктор пустой!
-    constructor() { }
-
-    // Метод инициализации (вызывается из пула)
-    public init(x: number, y: number, target: { x: number; y: number }, stats: IProjectileStats) {
-        this.x = x;
-        this.y = y;
-        this.alive = true;
-        this.damage = stats.dmg;
-        this.color = stats.color;
-        this.effects = stats.effects || Projectile.EMPTY_EFFECTS;
-        this.pierce = stats.pierce || 0;
-        this.hitList.length = 0; // PERF: Reuse array instead of allocating new
-        this.projectileType = stats.projectileType || 'standard';
-        this.towerLevel = stats.towerLevel || 1;
-        this.radius = 4; // Default radius
-
-        // Handle critical hits
-        const critChance = stats.critChance || 0;
-        this.isCrit = Math.random() < critChance;
-        if (this.isCrit) {
-            this.damage *= 2; // Critical hits deal 2x damage
-        }
-
-        // Handle explosion on death effect (Fire level 3)
-        const explodeEffect = this.effects.find((e: any) => e.type === 'explodeOnDeath');
-        if (explodeEffect) {
-            this.explodeOnDeath = true;
-            this.explosionDamage = stats.dmg * (explodeEffect.explosionDamagePercent || 0.5);
-            this.explosionRadius = explodeEffect.explosionRadius || 40;
-        } else {
-            this.explodeOnDeath = false;
-            this.explosionDamage = 0;
-            this.explosionRadius = 0;
-        }
-
-        const angle = Math.atan2(target.y - y, target.x - x);
-        this.vx = Math.cos(angle) * stats.speed;
-        this.vy = Math.sin(angle) * stats.speed;
-
-        this.life = 2.0; // 2 секунды жизни
-        // Adjust life for sniper (faster = less time needed)
-        if (this.projectileType === 'sniper') this.life = 1.0;
-    }
-
-    // Decoupled update: No effects dependency
-    public update(dt: number = 1) {
-        if (!this.alive) return;
-
-        this.x += this.vx * dt;
-        this.y += this.vy * dt;
-        this.life -= dt;
-
-        if (this.life <= 0 || this.x < -100 || this.x > 2000 || this.y < -100 || this.y > 2000) {
-            this.alive = false;
-        }
-    }
-
-    public draw(ctx: CanvasRenderingContext2D) {
-        RendererFactory.drawProjectile(ctx, this);
-    }
-
-    public reset() {
-        this.alive = false;
-        this.x = 0;
-        this.y = 0;
-        this.vx = 0;
-        this.vy = 0;
-        this.damage = 0;
-        this.life = 0;
-        this.effects = Projectile.EMPTY_EFFECTS; // Zero alloc reset
-        this.hitList.length = 0;
-
-        this.isCrit = false;
-        this.explodeOnDeath = false;
-        this.explosionDamage = 0;
-        this.explosionRadius = 0;
-        this.projectileType = 'standard';
-        this.towerLevel = 1;
-        this.pierce = 0;
-        this.radius = 4;
-        this.color = '#fff';
-    }
-}
-</file>
-
-<file path="src/scenes/EditorScene.ts">
-import { BaseScene } from '../BaseScene';
-import { Game } from '../Game';
-import { MapManager } from '../Map';
-import { CONFIG } from '../Config';
-import { IMapData, IMapObject, migrateMapData } from '../MapData';
-import { serializeMap, saveMapToStorage, getSavedMaps, deleteMapFromStorage } from '../Utils';
-import { UIUtils } from '../UIUtils';
-import { Pathfinder } from '../Pathfinder';
-import { WaveEditor } from '../WaveEditor';
-import { FogSystem } from '../FogSystem';
-import { EditorToolbar, EditorMode } from '../editor/EditorToolbar';
-import { WaypointManager } from '../editor/WaypointManager';
-import { EditorHistory, EditorActions } from '../editor/EditorHistory';
-
-export class EditorScene extends BaseScene {
-    private game: Game;
-    private map: MapManager;
-    private fog: FogSystem;
-    private toolbar!: EditorToolbar;
-    private controlsContainer!: HTMLElement;
-    private waypointMgr!: WaypointManager;
-    private history!: EditorHistory;
-    private activeWaveEditor: WaveEditor | null = null;
-
-    private mode: EditorMode = 'paint_road';
-
-    // FEATURE: Saved maps panel
-    private mapsPanel!: HTMLElement;
-    private mapsPanelExpanded: boolean = false;
-    private currentMapName: string = '';
-
-    // Track previous mouse state for click detection (not hold)
-    private prevMouseDown: boolean = false;
-    private lastClickedTile: { col: number; row: number } | null = null;
-
-    constructor(game: Game) {
-        super();
-        this.game = game;
-
-        // Создаем пустую сетку
-        const cols = Math.ceil(game.width / CONFIG.TILE_SIZE);
-        const rows = Math.ceil(game.height / CONFIG.TILE_SIZE);
-        const emptyTiles = Array(rows)
-            .fill(0)
-            .map(() => Array(cols).fill(0));
-
-        const emptyData: IMapData = {
-            width: cols,
-            height: rows,
-            tiles: emptyTiles,
-            waypoints: [],
-            objects: [],
-        };
-
-        this.map = new MapManager(emptyData);
-        this.fog = new FogSystem(emptyData);
-        this.waypointMgr = new WaypointManager();
-        this.history = new EditorHistory();
-        this.createUI();
-        this.createMapsPanel();
-        // Hotkeys are now set up in onEnterImpl
-    }
-
-    protected onEnterImpl() {
-        this.toolbar.show();
-        this.controlsContainer.style.display = 'flex';
-        this.mapsPanel.style.display = 'block';
-
-        // Hide standard game UI
-        (this.game as any).uiRoot.hideGameUI(); // Cast as any if TS doesn't know yet
-
-        // Initial fog render
-        this.fog.update(0);
-
-        // Setup hotkeys with automatic cleanup
-        this.on(document, 'keydown', (e: Event) => this.handleGlobalKey(e as KeyboardEvent));
-    }
-
-    protected onExitImpl() {
-        // Full DOM cleanup (EditorScene is recreated each time by Game.toEditor())
-        if (this.toolbar) {
-            this.toolbar.destroy();
-        }
-        if (this.controlsContainer && this.controlsContainer.parentNode) {
-            this.controlsContainer.parentNode.removeChild(this.controlsContainer);
-        }
-        if (this.mapsPanel && this.mapsPanel.parentNode) {
-            this.mapsPanel.parentNode.removeChild(this.mapsPanel);
-        }
-        if (this.history) {
-            this.history.clear();
-        }
-        if (this.activeWaveEditor) {
-            this.activeWaveEditor.destroy();
-            this.activeWaveEditor = null;
-        }
-        // BaseScene.dispose() handles listener cleanup
-    }
-
-    public update(dt: number) {
-        // Don't update fog animation in editor - only static rendering
-        const input = this.game.input;
-
-        // Begin compound action on mouse down (for paint modes)
-        if (input.isMouseDown && !this.prevMouseDown) {
-            if (this.isPaintMode(this.mode)) {
-                this.history.beginCompound(this.mode);
-            }
-        }
-
-        // Handle mouse input - works on hold
-        if (input.isMouseDown && input.hoverCol >= 0 && input.hoverRow >= 0) {
-            // Check if clicked on a different tile
-            const isDifferentTile =
-                !this.lastClickedTile ||
-                this.lastClickedTile.col !== input.hoverCol ||
-                this.lastClickedTile.row !== input.hoverRow;
-
-            if (isDifferentTile) {
-                this.handleInput(input.hoverCol, input.hoverRow);
-                this.lastClickedTile = { col: input.hoverCol, row: input.hoverRow };
-
-                // Trigger fog re-render after data change (static, no animation)
-                this.fog.update(0);
-            }
-        }
-
-        // Mouse release -> Commit
-        if (!input.isMouseDown && this.prevMouseDown) {
-            this.history.commitCompound();
-        }
-
-        // Update previous state
-        this.prevMouseDown = input.isMouseDown;
-
-        // Reset last clicked tile when mouse is released
-        if (!input.isMouseDown) {
-            this.lastClickedTile = null;
-        }
-    }
-
-    private handleInput(col: number, row: number) {
-        if (col >= this.map.cols || row >= this.map.rows) return;
-
-        const oldTileType = this.map.grid[row][col].type;
-        const oldFogDensity = this.fog.getFog(col, row);
-
-        if (this.mode === 'paint_road') {
-            console.log('[EditorScene] paint_road mode active, tile type:', oldTileType, '→ 1');
-            if (oldTileType !== 1) {
-                this.history.pushInCompound(EditorActions.createTileAction(this.map.grid, col, row, oldTileType, 1));
-                this.map.grid[row][col].type = 1;
-                this.map.grid[row][col].decor = null;
-                Pathfinder.invalidateCache();
-                console.log('[EditorScene] Road painted at', col, row);
-            } else {
-                console.log('[EditorScene] Tile already road, skipping');
-            }
-        } else if (this.mode === 'paint_grass') {
-            if (oldTileType !== 0) {
-                this.history.pushInCompound(EditorActions.createTileAction(this.map.grid, col, row, oldTileType, 0));
-                this.map.grid[row][col].type = 0;
-                Pathfinder.invalidateCache();
-            }
-        } else if (this.mode === 'eraser') {
-            // FEATURE: Eraser - reset to grass, remove fog, and remove objects
-            const hasObject = this.map.objects.find(obj => {
-                const size = obj.size || 1;
-                return col >= obj.x && col < obj.x + size &&
-                    row >= obj.y && row < obj.y + size;
-            });
-
-            if (oldTileType !== 0 || oldFogDensity !== 0 || hasObject) {
-                // Сброс тайла в траву
-                if (oldTileType !== 0) {
-                    this.history.pushInCompound(EditorActions.createTileAction(this.map.grid, col, row, oldTileType, 0));
-                    this.map.grid[row][col].type = 0;
-                    this.map.grid[row][col].decor = null;
-                    Pathfinder.invalidateCache();
-                }
-                // Удаление тумана
-                if (oldFogDensity !== 0) {
-                    this.history.pushInCompound(EditorActions.createFogAction(this.fog, col, row, oldFogDensity, 0));
-                    this.fog.setFog(col, row, 0);
-                }
-                // Удаление объектов (все объекты, перекрывающие этот тайл)
-                if (hasObject) {
-                    this.map.objects = this.map.objects.filter(obj => {
-                        const size = obj.size || 1;
-                        const overlaps = col >= obj.x && col < obj.x + size &&
-                            row >= obj.y && row < obj.y + size;
-                        return !overlaps;
-                    });
-                }
-            }
-        } else if (this.mode === 'set_start') {
-            const oldState = {
-                start: this.waypointMgr.getStart(),
-                end: this.waypointMgr.getEnd(),
-                waypoints: this.waypointMgr.getWaypoints()
-            };
-            this.history.push(EditorActions.createWaypointAction(this.waypointMgr, 'setStart', { x: col, y: row }, oldState));
-            this.waypointMgr.setStart({ x: col, y: row });
-            this.map.grid[row][col].type = 1;
-        } else if (this.mode === 'set_end') {
-            const oldState = {
-                start: this.waypointMgr.getStart(),
-                end: this.waypointMgr.getEnd(),
-                waypoints: this.waypointMgr.getWaypoints()
-            };
-            this.history.push(EditorActions.createWaypointAction(this.waypointMgr, 'setEnd', { x: col, y: row }, oldState));
-            this.waypointMgr.setEnd({ x: col, y: row });
-            this.map.grid[row][col].type = 1;
-        } else if (this.mode === 'place_waypoint') {
-            if (this.waypointMgr.canAddWaypoint()) {
-                const oldState = {
-                    start: this.waypointMgr.getStart(),
-                    end: this.waypointMgr.getEnd(),
-                    waypoints: this.waypointMgr.getWaypoints()
-                };
-                this.history.push(EditorActions.createWaypointAction(this.waypointMgr, 'addWaypoint', { x: col, y: row }, oldState));
-                this.waypointMgr.addWaypoint({ x: col, y: row });
-            }
-        } else if (this.mode === 'paint_fog') {
-            // Cycle fog density: 0 → 1 → 2 → 3 → 4 → 5 → 0
-            this.fog.cycleFogDensity(col, row);
-            const newFogDensity = this.fog.getFog(col, row);
-            if (oldFogDensity !== newFogDensity) {
-                this.history.pushInCompound(EditorActions.createFogAction(this.fog, col, row, oldFogDensity, newFogDensity));
-            }
-        } else if (this.mode === 'place_stone') {
-            this.placeObject(col, row, 'stone', 1);
-        } else if (this.mode === 'place_rock') {
-            // Скалы - рандомный размер 2-3 тайла
-            const size = Math.random() > 0.5 ? 3 : 2;
-            this.placeObject(col, row, 'rock', size);
-        } else if (this.mode === 'place_tree') {
-            this.placeObject(col, row, 'tree', 1);
-        } else if (this.mode === 'place_wheat') {
-            this.placeObject(col, row, 'wheat', 1);
-        } else if (this.mode === 'place_flowers') {
-            this.placeObject(col, row, 'flowers', 1);
-        }
-    }
-
-    /**
-     * Place an object on the map
-     */
-    private placeObject(col: number, row: number, type: string, size: number): void {
-        // Проверка границ для больших объектов
-        if (col + size > this.map.cols || row + size > this.map.rows) {
-            return; // Выходит за границы
-        }
-
-        // Удалить существующие объекты в этой области
-        this.map.objects = this.map.objects.filter(obj => {
-            const objSize = obj.size || 1;
-            // Проверка пересечения
-            const overlaps = !(col + size <= obj.x || col >= obj.x + objSize ||
-                row + size <= obj.y || row >= obj.y + objSize);
-            return !overlaps;
-        });
-
-        // Добавить новый объект
-        const newObj = {
-            type,
-            x: col,
-            y: row,
-            properties: {},
-            size: size > 1 ? size : undefined
-        };
-        this.map.objects.push(newObj);
-    }
-
-    public draw(ctx: CanvasRenderingContext2D) {
-        ctx.fillStyle = '#222';
-        ctx.fillRect(0, 0, this.game.width, this.game.height);
-
-        for (let y = 0; y < this.map.rows; y++) {
-            for (let x = 0; x < this.map.cols; x++) {
-                this.map.tiles[y][x] = this.map.grid[y][x].type;
-            }
-        }
-
-        // CRITICAL FIX: Regenerate prerendered cache after tile changes
-        // The Map.draw() uses a cached canvas that must be updated when tiles change
-        this.map.prerender();
-
-        // We do NOT overwrite map.waypoints here every frame anymore.
-        // It prevents saving them correctly.
-        this.map.draw(ctx);
-        this.fog.draw(ctx);
-
-        // Draw waypoints with WaypointManager
-        this.waypointMgr.draw(ctx);
-
-
-        const input = this.game.input;
-        if (input.hoverCol >= 0) {
-            const x = input.hoverCol * CONFIG.TILE_SIZE;
-            const y = input.hoverRow * CONFIG.TILE_SIZE;
-
-            ctx.strokeStyle = 'yellow';
-            if (this.mode === 'paint_grass') ctx.strokeStyle = 'red';
-            if (this.mode === 'eraser') ctx.strokeStyle = '#ff6600';
-            if (this.mode === 'set_start') ctx.strokeStyle = 'cyan';
-            if (this.mode === 'set_end') ctx.strokeStyle = 'magenta';
-            if (this.mode === 'place_waypoint') ctx.strokeStyle = '#00ff00';
-
-            if (this.mode === 'paint_fog') {
-                // Show current fog density with color intensity
-                const density = this.fog.getFog(input.hoverCol, input.hoverRow);
-                const intensity = density * 40 + 80; // 80-280 range
-                ctx.strokeStyle = `rgb(${intensity}, ${intensity + 30}, ${intensity + 50})`;
-
-                // Draw density indicator
-                ctx.fillStyle = `rgba(200, 215, 230, ${density * 0.15})`;
-                ctx.fillRect(x, y, CONFIG.TILE_SIZE, CONFIG.TILE_SIZE);
-
-                // Draw density number
-                if (density > 0) {
-                    ctx.fillStyle = '#fff';
-                    ctx.font = 'bold 16px Arial';
-                    ctx.textAlign = 'center';
-                    ctx.textBaseline = 'middle';
-                    ctx.fillText(density.toString(), x + CONFIG.TILE_SIZE / 2, y + CONFIG.TILE_SIZE / 2);
-                }
-            }
-
-            ctx.lineWidth = 2;
-            ctx.strokeRect(x, y, CONFIG.TILE_SIZE, CONFIG.TILE_SIZE);
-        }
-    }
-
-    private openWaveConfig() {
-        // Resolve sparse editor waypoints → dense BFS path
-        if (this.waypointMgr.isValid()) {
-            const resolved = this.resolveFullPath();
-            if (!resolved) return; // Error already shown to user
-            this.map.waypoints = resolved;
-        } else {
-            alert('Set Start and End points first!');
-            return;
-        }
-
-        const currentWaves = this.map.waves || [];
-
-        this.activeWaveEditor = new WaveEditor(
-            currentWaves,
-            (waves) => {
-                this.saveMap(waves);
-                this.activeWaveEditor = null;
-            },
-            () => {
-                // Cancelled
-                this.activeWaveEditor = null;
-            },
-        );
-    }
-
-    private saveMap(waves: any[]) {
-        // [FIX] Ensure map waves are updated before serialization
-        this.map.waves = waves;
-
-        // Resolve sparse editor waypoints → dense BFS path for validation
-        if (this.waypointMgr.isValid()) {
-            const resolved = this.resolveFullPath();
-            if (!resolved) return; // BFS failed — error already shown
-            this.map.waypoints = resolved;
-            this.map.waypointsMode = 'FULLPATH';
-        }
-
-        // Validate before save
-        Pathfinder.invalidateCache(); // Ensure fresh BFS
-        const errors = this.map.validatePath();
-        if (errors.length > 0) {
-            const reasons = errors.map(e => `  (${e.x},${e.y}): ${e.reason}`).join('\n');
-            alert(`Cannot save map — path validation failed:\n${reasons}`);
-            return;
-        }
-
-        const data = serializeMap(this.map);
-        data.fogData = this.fog.getFogData();
-        data.manualPath = this.waypointMgr.isValid(); // Using waypoint manager
-
-        const name = prompt('Enter map name:', this.currentMapName || 'MyMap');
-        if (!name) return;
-
-        if (saveMapToStorage(name, data)) {
-            this.currentMapName = name; // Update current name
-            alert(`Map "${name}" saved successfully!`);
-            this.refreshMapsPanel(); // Refresh UI
-        } else {
-            alert('Failed to save map (Storage full?)');
-        }
-    }
-
-    /**
-     * Resolve sparse editor waypoints (Start, WP1, WP2, ..., End)
-     * into a dense tile-by-tile BFS path.
-     * Returns null if any segment is unreachable.
-     */
-    private resolveFullPath(): { x: number; y: number }[] | null {
-        const sparse = this.waypointMgr.getFullPath();
-        if (sparse.length < 2) {
-            alert('Need at least Start and End points!');
-            return null;
-        }
-
-        Pathfinder.invalidateCache();
-        const fullPath: { x: number; y: number }[] = [];
-
-        for (let i = 0; i < sparse.length - 1; i++) {
-            const from = sparse[i];
-            const to = sparse[i + 1];
-            const segment = Pathfinder.findPath(this.map.grid, from, to);
-
-            if (segment.length === 0) {
-                alert(`No path between (${from.x},${from.y}) → (${to.x},${to.y}).\nCheck that road tiles connect these points.`);
-                return null;
-            }
-
-            // Append segment, skip first point on subsequent segments to avoid duplicates
-            const startIdx = (i === 0) ? 0 : 1;
-            for (let j = startIdx; j < segment.length; j++) {
-                fullPath.push(segment[j]);
-            }
-        }
-
-        return fullPath;
-    }
-
-    private createUI() {
-        // Create new modular toolbar
-        this.toolbar = new EditorToolbar((mode) => {
-            console.log('[EditorScene] Mode changed to:', mode);
-            this.mode = mode;
-        });
-
-        // Create controls container for additional buttons (WAVES, MENU, Clear Path)
-        this.controlsContainer = UIUtils.createContainer({
-            position: 'absolute',
-            top: '20px',
-            right: '20px',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '8px',
-            padding: '10px',
-            background: 'rgba(0,0,0,0.85)',
-            borderRadius: '8px',
-            zIndex: '1000'
-        });
-
-        const addBtn = (text: string, onClick: () => void, color: string = '#444') => {
-            UIUtils.createButton(this.controlsContainer, text, onClick, {
-                background: color,
-                border: '1px solid #666',
-                padding: '10px 16px',
-                borderRadius: '6px',
-                fontSize: '14px',
-                fontWeight: 'bold',
-                width: '100%'
-            });
-        };
-
-        addBtn('🗑️ Clear Path', () => {
-            this.waypointMgr.clearAll();
-        }, '#e91e63');
-
-        addBtn('⚙️ WAVES & SAVE', () => this.openWaveConfig(), '#ff9800');
-        addBtn('🚪 MENU', () => this.game.toMenu(), '#d32f2f');
-
-        document.body.appendChild(this.controlsContainer);
-    }
-
-    // FEATURE: Create saved maps panel
-    private createMapsPanel() {
-        this.mapsPanel = UIUtils.createContainer({
-            position: 'absolute',
-            top: '20px',
-            left: '20px',
-            background: 'rgba(0, 0, 0, 0.9)',
-            borderRadius: '8px',
-            padding: '10px',
-            maxWidth: '300px',
-            maxHeight: '80vh',
-            overflowY: 'auto',
-            display: 'none',
-            zIndex: '2000'
-        });
-
-        const header = document.createElement('div');
-        Object.assign(header.style, {
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            marginBottom: '10px',
-            cursor: 'pointer',
-            color: '#fff',
-            fontWeight: 'bold',
-        });
-
-        header.innerHTML = `
-            <span>📁 SAVED MAPS</span>
-            <span style="font-size: 20px;">${this.mapsPanelExpanded ? '▼' : '▶'}</span>
-        `;
-
-        header.onclick = () => {
-            this.mapsPanelExpanded = !this.mapsPanelExpanded;
-            this.refreshMapsPanel();
-        };
-
-        this.mapsPanel.appendChild(header);
-        document.body.appendChild(this.mapsPanel);
-        this.refreshMapsPanel();
-    }
-
-    private refreshMapsPanel() {
-        const maps = getSavedMaps();
-
-        // Clear current content except header
-        while (this.mapsPanel.children.length > 1) {
-            this.mapsPanel.removeChild(this.mapsPanel.lastChild!);
-        }
-
-        // Update toggle icon
-        const header = this.mapsPanel.children[0] as HTMLElement;
-        header.innerHTML = `
-            <span>📁 SAVED MAPS</span>
-            <span style="font-size: 20px;">${this.mapsPanelExpanded ? '▼' : '▶'}</span>
-        `;
-
-        if (!this.mapsPanelExpanded) return;
-
-
-        const mapNames = Object.keys(maps);
-
-        if (mapNames.length === 0) {
-            const empty = document.createElement('div');
-            empty.style.color = '#888';
-            empty.style.padding = '10px';
-            empty.innerText = 'No saved maps';
-            this.mapsPanel.appendChild(empty);
-            return;
-        }
-
-        mapNames.forEach((name) => {
-            const item = document.createElement('div');
-            Object.assign(item.style, {
-                background: '#222',
-                padding: '10px',
-                marginBottom: '5px',
-                borderRadius: '4px',
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-            });
-
-            const nameSpan = document.createElement('span');
-            nameSpan.style.color = '#fff';
-            nameSpan.style.flex = '1';
-            nameSpan.innerText = name;
-
-            const btnContainer = document.createElement('div');
-            btnContainer.style.display = 'flex';
-            btnContainer.style.gap = '5px';
-
-            const loadBtn = document.createElement('button');
-            loadBtn.innerText = '📂 Load';
-            Object.assign(loadBtn.style, {
-                background: '#4caf50',
-                color: '#fff',
-                border: 'none',
-                padding: '5px 10px',
-                borderRadius: '4px',
-                cursor: 'pointer',
-                fontSize: '12px',
-            });
-            loadBtn.onclick = () => this.loadMap(name, maps[name]);
-
-            const delBtn = document.createElement('button');
-            delBtn.innerText = '🗑️';
-            Object.assign(delBtn.style, {
-                background: '#f44336',
-                color: '#fff',
-                border: 'none',
-                padding: '5px 10px',
-                borderRadius: '4px',
-                cursor: 'pointer',
-                fontSize: '12px',
-            });
-            delBtn.onclick = () => this.deleteMap(name);
-
-            btnContainer.appendChild(loadBtn);
-            btnContainer.appendChild(delBtn);
-
-            item.appendChild(nameSpan);
-            item.appendChild(btnContainer);
-            this.mapsPanel.appendChild(item);
-        });
-    }
-
-    private loadMap(name: string, data: any) {
-        if (!confirm(`Load map "${name}"? Current work will be lost.`)) return;
-
-        let mapData: IMapData;
-        try {
-            mapData = migrateMapData(data);
-        } catch (e) {
-            alert(`Failed to load map "${name}": ${(e as Error).message}`);
-            return;
-        }
-
-        // Load map data into editor
-        this.currentMapName = name;
-        this.map = new MapManager(mapData);
-        this.fog = new FogSystem(mapData);
-
-        // Clear history on new map load
-        this.history.clear();
-
-        // Load waypoints into WaypointManager
-        this.waypointMgr.clearAll();
-        if (mapData.waypoints && mapData.waypoints.length > 0) {
-            // First point is always Start
-            this.waypointMgr.setStart(mapData.waypoints[0]);
-
-            // Last point is always End (if more than 1)
-            if (mapData.waypoints.length > 1) {
-                this.waypointMgr.setEnd(mapData.waypoints[mapData.waypoints.length - 1]);
-            }
-
-            // Middle points are waypoints
-            for (let i = 1; i < mapData.waypoints.length - 1; i++) {
-                this.waypointMgr.addWaypoint(mapData.waypoints[i]);
-            }
-        }
-
-        // Render loaded fog
-        this.fog.update(0);
-    }
-
-    private deleteMap(name: string) {
-        if (!confirm(`Delete map "${name}"? This cannot be undone.`)) return;
-
-        deleteMapFromStorage(name);
-        this.refreshMapsPanel();
-    }
-
-    private handleGlobalKey(e: KeyboardEvent) {
-        // Ignore if typing in input fields
-        if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
-            return;
-        }
-
-        // Ctrl+Z - Undo
-        if (e.ctrlKey && e.key === 'z' && !e.shiftKey) {
-            e.preventDefault();
-            if (this.history.undo()) {
-                this.fog.update(0); // Re-render fog after undo
-            }
-            return; // Fixed: was return; in original? Yes
-        }
-
-        // Ctrl+Shift+Z - Redo
-        if (e.ctrlKey && e.shiftKey && e.key === 'Z') {
-            e.preventDefault();
-            if (this.history.redo()) {
-                this.fog.update(0); // Re-render fog after redo
-            }
-            return;
-        }
-
-        // Ctrl+S - Save
-        if (e.ctrlKey && e.key === 's') {
-            e.preventDefault();
-            this.openWaveConfig();
-            return;
-        }
-
-        // E - Eraser mode
-        if (e.key === 'e' || e.key === 'E') {
-            this.mode = 'eraser';
-            // Also update toolbar UI if possible?
-            // current toolbar implementation relies on callback to update scene, not vice versa.
-            // Ideally we should sync toolbar state.
-            return;
-        }
-
-        // 1-3 - Category selection
-        if (e.key >= '1' && e.key <= '3') {
-            const categoryIndex = parseInt(e.key) - 1;
-            this.toolbar.selectCategory(categoryIndex);
-            return;
-        }
-    }
-
-    private isPaintMode(mode: EditorMode): boolean {
-        return mode === 'paint_road' || mode === 'paint_grass' ||
-            mode === 'eraser' || mode === 'paint_fog';
     }
 }
 </file>
@@ -29994,6 +29598,862 @@ export class MapManager {
         }
 
         return errors;
+    }
+}
+</file>
+
+<file path="src/scenes/EditorScene.ts">
+import { BaseScene } from '../BaseScene';
+import { Game } from '../Game';
+import { MapManager } from '../Map';
+import { CONFIG } from '../Config';
+import { IMapData, IMapObject, migrateMapData } from '../MapData';
+import { serializeMap } from '../Utils';
+import { MapStorage } from '../MapStorage';
+import { UIUtils } from '../UIUtils';
+import { Pathfinder } from '../Pathfinder';
+import { WaveEditor } from '../WaveEditor';
+import { FogSystem } from '../FogSystem';
+import { EditorToolbar, EditorMode } from '../editor/EditorToolbar';
+import { WaypointManager } from '../editor/WaypointManager';
+import { EditorHistory, EditorActions } from '../editor/EditorHistory';
+
+export class EditorScene extends BaseScene {
+    private game: Game;
+    private map: MapManager;
+    private fog: FogSystem;
+    private toolbar!: EditorToolbar;
+    private controlsContainer!: HTMLElement;
+    private waypointMgr!: WaypointManager;
+    private history!: EditorHistory;
+    private activeWaveEditor: WaveEditor | null = null;
+
+    private mode: EditorMode = 'paint_road';
+
+    // FEATURE: Saved maps panel
+    private mapsPanel!: HTMLElement;
+    private mapsPanelExpanded: boolean = false;
+    private currentMapName: string = '';
+
+    // Race condition guard для async refreshMapsPanel
+    private _refreshGeneration: number = 0;
+
+    // Hidden file input for JSON import
+    private _fileInput!: HTMLInputElement;
+
+    // Track previous mouse state for click detection (not hold)
+    private prevMouseDown: boolean = false;
+    private lastClickedTile: { col: number; row: number } | null = null;
+
+    constructor(game: Game) {
+        super();
+        this.game = game;
+
+        // Создаем пустую сетку
+        const cols = Math.ceil(game.width / CONFIG.TILE_SIZE);
+        const rows = Math.ceil(game.height / CONFIG.TILE_SIZE);
+        const emptyTiles = Array(rows)
+            .fill(0)
+            .map(() => Array(cols).fill(0));
+
+        const emptyData: IMapData = {
+            width: cols,
+            height: rows,
+            tiles: emptyTiles,
+            waypoints: [],
+            objects: [],
+        };
+
+        this.map = new MapManager(emptyData);
+        this.fog = new FogSystem(emptyData);
+        this.waypointMgr = new WaypointManager();
+        this.history = new EditorHistory();
+        this.createUI();
+        this.createMapsPanel();
+        // Hotkeys are now set up in onEnterImpl
+    }
+
+    protected onEnterImpl() {
+        this.toolbar.show();
+        this.controlsContainer.style.display = 'flex';
+        this.mapsPanel.style.display = 'block';
+
+        // Hide standard game UI
+        (this.game as any).uiRoot.hideGameUI(); // Cast as any if TS doesn't know yet
+
+        // Initial fog render
+        this.fog.update(0);
+
+        // Setup hotkeys with automatic cleanup
+        this.on(document, 'keydown', (e: Event) => this.handleGlobalKey(e as KeyboardEvent));
+    }
+
+    protected onExitImpl() {
+        // Full DOM cleanup (EditorScene is recreated each time by Game.toEditor())
+        if (this.toolbar) {
+            this.toolbar.destroy();
+        }
+        if (this.controlsContainer && this.controlsContainer.parentNode) {
+            this.controlsContainer.parentNode.removeChild(this.controlsContainer);
+        }
+        if (this.mapsPanel && this.mapsPanel.parentNode) {
+            this.mapsPanel.parentNode.removeChild(this.mapsPanel);
+        }
+        if (this.history) {
+            this.history.clear();
+        }
+        if (this.activeWaveEditor) {
+            this.activeWaveEditor.destroy();
+            this.activeWaveEditor = null;
+        }
+        // BaseScene.dispose() handles listener cleanup
+    }
+
+    public update(dt: number) {
+        // Don't update fog animation in editor - only static rendering
+        const input = this.game.input;
+
+        // Begin compound action on mouse down (for paint modes)
+        if (input.isMouseDown && !this.prevMouseDown) {
+            if (this.isPaintMode(this.mode)) {
+                this.history.beginCompound(this.mode);
+            }
+        }
+
+        // Handle mouse input - works on hold
+        if (input.isMouseDown && input.hoverCol >= 0 && input.hoverRow >= 0) {
+            // Check if clicked on a different tile
+            const isDifferentTile =
+                !this.lastClickedTile ||
+                this.lastClickedTile.col !== input.hoverCol ||
+                this.lastClickedTile.row !== input.hoverRow;
+
+            if (isDifferentTile) {
+                this.handleInput(input.hoverCol, input.hoverRow);
+                this.lastClickedTile = { col: input.hoverCol, row: input.hoverRow };
+
+                // Trigger fog re-render after data change (static, no animation)
+                this.fog.update(0);
+            }
+        }
+
+        // Mouse release -> Commit
+        if (!input.isMouseDown && this.prevMouseDown) {
+            this.history.commitCompound();
+        }
+
+        // Update previous state
+        this.prevMouseDown = input.isMouseDown;
+
+        // Reset last clicked tile when mouse is released
+        if (!input.isMouseDown) {
+            this.lastClickedTile = null;
+        }
+    }
+
+    private handleInput(col: number, row: number) {
+        if (col >= this.map.cols || row >= this.map.rows) return;
+
+        const oldTileType = this.map.grid[row][col].type;
+        const oldFogDensity = this.fog.getFog(col, row);
+
+        if (this.mode === 'paint_road') {
+            console.log('[EditorScene] paint_road mode active, tile type:', oldTileType, '→ 1');
+            if (oldTileType !== 1) {
+                this.history.pushInCompound(EditorActions.createTileAction(this.map.grid, col, row, oldTileType, 1));
+                this.map.grid[row][col].type = 1;
+                this.map.grid[row][col].decor = null;
+                Pathfinder.invalidateCache();
+                console.log('[EditorScene] Road painted at', col, row);
+            } else {
+                console.log('[EditorScene] Tile already road, skipping');
+            }
+        } else if (this.mode === 'paint_grass') {
+            if (oldTileType !== 0) {
+                this.history.pushInCompound(EditorActions.createTileAction(this.map.grid, col, row, oldTileType, 0));
+                this.map.grid[row][col].type = 0;
+                Pathfinder.invalidateCache();
+            }
+        } else if (this.mode === 'eraser') {
+            // FEATURE: Eraser - reset to grass, remove fog, and remove objects
+            const hasObject = this.map.objects.find(obj => {
+                const size = obj.size || 1;
+                return col >= obj.x && col < obj.x + size &&
+                    row >= obj.y && row < obj.y + size;
+            });
+
+            if (oldTileType !== 0 || oldFogDensity !== 0 || hasObject) {
+                // Сброс тайла в траву
+                if (oldTileType !== 0) {
+                    this.history.pushInCompound(EditorActions.createTileAction(this.map.grid, col, row, oldTileType, 0));
+                    this.map.grid[row][col].type = 0;
+                    this.map.grid[row][col].decor = null;
+                    Pathfinder.invalidateCache();
+                }
+                // Удаление тумана
+                if (oldFogDensity !== 0) {
+                    this.history.pushInCompound(EditorActions.createFogAction(this.fog, col, row, oldFogDensity, 0));
+                    this.fog.setFog(col, row, 0);
+                }
+                // Удаление объектов (все объекты, перекрывающие этот тайл)
+                if (hasObject) {
+                    this.map.objects = this.map.objects.filter(obj => {
+                        const size = obj.size || 1;
+                        const overlaps = col >= obj.x && col < obj.x + size &&
+                            row >= obj.y && row < obj.y + size;
+                        return !overlaps;
+                    });
+                }
+            }
+        } else if (this.mode === 'set_start') {
+            const oldState = {
+                start: this.waypointMgr.getStart(),
+                end: this.waypointMgr.getEnd(),
+                waypoints: this.waypointMgr.getWaypoints()
+            };
+            this.history.push(EditorActions.createWaypointAction(this.waypointMgr, 'setStart', { x: col, y: row }, oldState));
+            this.waypointMgr.setStart({ x: col, y: row });
+            this.map.grid[row][col].type = 1;
+        } else if (this.mode === 'set_end') {
+            const oldState = {
+                start: this.waypointMgr.getStart(),
+                end: this.waypointMgr.getEnd(),
+                waypoints: this.waypointMgr.getWaypoints()
+            };
+            this.history.push(EditorActions.createWaypointAction(this.waypointMgr, 'setEnd', { x: col, y: row }, oldState));
+            this.waypointMgr.setEnd({ x: col, y: row });
+            this.map.grid[row][col].type = 1;
+        } else if (this.mode === 'place_waypoint') {
+            if (this.waypointMgr.canAddWaypoint()) {
+                const oldState = {
+                    start: this.waypointMgr.getStart(),
+                    end: this.waypointMgr.getEnd(),
+                    waypoints: this.waypointMgr.getWaypoints()
+                };
+                this.history.push(EditorActions.createWaypointAction(this.waypointMgr, 'addWaypoint', { x: col, y: row }, oldState));
+                this.waypointMgr.addWaypoint({ x: col, y: row });
+            }
+        } else if (this.mode === 'paint_fog') {
+            // Cycle fog density: 0 → 1 → 2 → 3 → 4 → 5 → 0
+            this.fog.cycleFogDensity(col, row);
+            const newFogDensity = this.fog.getFog(col, row);
+            if (oldFogDensity !== newFogDensity) {
+                this.history.pushInCompound(EditorActions.createFogAction(this.fog, col, row, oldFogDensity, newFogDensity));
+            }
+        } else if (this.mode === 'place_stone') {
+            this.placeObject(col, row, 'stone', 1);
+        } else if (this.mode === 'place_rock') {
+            // Скалы - рандомный размер 2-3 тайла
+            const size = Math.random() > 0.5 ? 3 : 2;
+            this.placeObject(col, row, 'rock', size);
+        } else if (this.mode === 'place_tree') {
+            this.placeObject(col, row, 'tree', 1);
+        } else if (this.mode === 'place_wheat') {
+            this.placeObject(col, row, 'wheat', 1);
+        } else if (this.mode === 'place_flowers') {
+            this.placeObject(col, row, 'flowers', 1);
+        }
+    }
+
+    /**
+     * Place an object on the map
+     */
+    private placeObject(col: number, row: number, type: string, size: number): void {
+        // Проверка границ для больших объектов
+        if (col + size > this.map.cols || row + size > this.map.rows) {
+            return; // Выходит за границы
+        }
+
+        // Удалить существующие объекты в этой области
+        this.map.objects = this.map.objects.filter(obj => {
+            const objSize = obj.size || 1;
+            // Проверка пересечения
+            const overlaps = !(col + size <= obj.x || col >= obj.x + objSize ||
+                row + size <= obj.y || row >= obj.y + objSize);
+            return !overlaps;
+        });
+
+        // Добавить новый объект
+        const newObj = {
+            type,
+            x: col,
+            y: row,
+            properties: {},
+            size: size > 1 ? size : undefined
+        };
+        this.map.objects.push(newObj);
+    }
+
+    public draw(ctx: CanvasRenderingContext2D) {
+        ctx.fillStyle = '#222';
+        ctx.fillRect(0, 0, this.game.width, this.game.height);
+
+        for (let y = 0; y < this.map.rows; y++) {
+            for (let x = 0; x < this.map.cols; x++) {
+                this.map.tiles[y][x] = this.map.grid[y][x].type;
+            }
+        }
+
+        // CRITICAL FIX: Regenerate prerendered cache after tile changes
+        // The Map.draw() uses a cached canvas that must be updated when tiles change
+        this.map.prerender();
+
+        // We do NOT overwrite map.waypoints here every frame anymore.
+        // It prevents saving them correctly.
+        this.map.draw(ctx);
+        this.fog.draw(ctx);
+
+        // Draw waypoints with WaypointManager
+        this.waypointMgr.draw(ctx);
+
+
+        const input = this.game.input;
+        if (input.hoverCol >= 0) {
+            const x = input.hoverCol * CONFIG.TILE_SIZE;
+            const y = input.hoverRow * CONFIG.TILE_SIZE;
+
+            ctx.strokeStyle = 'yellow';
+            if (this.mode === 'paint_grass') ctx.strokeStyle = 'red';
+            if (this.mode === 'eraser') ctx.strokeStyle = '#ff6600';
+            if (this.mode === 'set_start') ctx.strokeStyle = 'cyan';
+            if (this.mode === 'set_end') ctx.strokeStyle = 'magenta';
+            if (this.mode === 'place_waypoint') ctx.strokeStyle = '#00ff00';
+
+            if (this.mode === 'paint_fog') {
+                // Show current fog density with color intensity
+                const density = this.fog.getFog(input.hoverCol, input.hoverRow);
+                const intensity = density * 40 + 80; // 80-280 range
+                ctx.strokeStyle = `rgb(${intensity}, ${intensity + 30}, ${intensity + 50})`;
+
+                // Draw density indicator
+                ctx.fillStyle = `rgba(200, 215, 230, ${density * 0.15})`;
+                ctx.fillRect(x, y, CONFIG.TILE_SIZE, CONFIG.TILE_SIZE);
+
+                // Draw density number
+                if (density > 0) {
+                    ctx.fillStyle = '#fff';
+                    ctx.font = 'bold 16px Arial';
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillText(density.toString(), x + CONFIG.TILE_SIZE / 2, y + CONFIG.TILE_SIZE / 2);
+                }
+            }
+
+            ctx.lineWidth = 2;
+            ctx.strokeRect(x, y, CONFIG.TILE_SIZE, CONFIG.TILE_SIZE);
+        }
+    }
+
+    private openWaveConfig() {
+        // Resolve sparse editor waypoints → dense BFS path
+        if (this.waypointMgr.isValid()) {
+            const resolved = this.resolveFullPath();
+            if (!resolved) return; // Error already shown to user
+            this.map.waypoints = resolved;
+        } else {
+            alert('Set Start and End points first!');
+            return;
+        }
+
+        const currentWaves = this.map.waves || [];
+
+        this.activeWaveEditor = new WaveEditor(
+            currentWaves,
+            (waves) => {
+                this.saveMap(waves);
+                this.activeWaveEditor = null;
+            },
+            () => {
+                // Cancelled
+                this.activeWaveEditor = null;
+            },
+        );
+    }
+
+    private saveMap(waves: any[]) {
+        // [FIX] Ensure map waves are updated before serialization
+        this.map.waves = waves;
+
+        // Resolve sparse editor waypoints → dense BFS path for validation
+        if (this.waypointMgr.isValid()) {
+            const resolved = this.resolveFullPath();
+            if (!resolved) return; // BFS failed — error already shown
+            this.map.waypoints = resolved;
+            this.map.waypointsMode = 'FULLPATH';
+        }
+
+        // Validate before save
+        Pathfinder.invalidateCache(); // Ensure fresh BFS
+        const errors = this.map.validatePath();
+        if (errors.length > 0) {
+            const reasons = errors.map(e => `  (${e.x},${e.y}): ${e.reason}`).join('\n');
+            alert(`Cannot save map — path validation failed:\n${reasons}`);
+            return;
+        }
+
+        const data = serializeMap(this.map);
+        data.fogData = this.fog.getFogData();
+        data.manualPath = this.waypointMgr.isValid(); // Using waypoint manager
+
+        const name = prompt('Enter map name:', this.currentMapName || 'MyMap');
+        if (!name) return;
+
+        if (MapStorage.saveLocal(name, data)) {
+            this.currentMapName = name; // Update current name
+            alert(`Map "${name}" saved successfully!`);
+            this.refreshMapsPanel(); // Refresh UI
+        } else {
+            alert('Failed to save map (Storage full?)');
+        }
+    }
+
+    /**
+     * Resolve sparse editor waypoints (Start, WP1, WP2, ..., End)
+     * into a dense tile-by-tile BFS path.
+     * Returns null if any segment is unreachable.
+     */
+    private resolveFullPath(): { x: number; y: number }[] | null {
+        const sparse = this.waypointMgr.getFullPath();
+        if (sparse.length < 2) {
+            alert('Need at least Start and End points!');
+            return null;
+        }
+
+        Pathfinder.invalidateCache();
+        const fullPath: { x: number; y: number }[] = [];
+
+        for (let i = 0; i < sparse.length - 1; i++) {
+            const from = sparse[i];
+            const to = sparse[i + 1];
+            const segment = Pathfinder.findPath(this.map.grid, from, to);
+
+            if (segment.length === 0) {
+                alert(`No path between (${from.x},${from.y}) → (${to.x},${to.y}).\nCheck that road tiles connect these points.`);
+                return null;
+            }
+
+            // Append segment, skip first point on subsequent segments to avoid duplicates
+            const startIdx = (i === 0) ? 0 : 1;
+            for (let j = startIdx; j < segment.length; j++) {
+                fullPath.push(segment[j]);
+            }
+        }
+
+        return fullPath;
+    }
+
+    private createUI() {
+        // Create new modular toolbar
+        this.toolbar = new EditorToolbar((mode) => {
+            console.log('[EditorScene] Mode changed to:', mode);
+            this.mode = mode;
+        });
+
+        // Create controls container for additional buttons (WAVES, MENU, Clear Path)
+        this.controlsContainer = UIUtils.createContainer({
+            position: 'absolute',
+            top: '20px',
+            right: '20px',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '8px',
+            padding: '10px',
+            background: 'rgba(0,0,0,0.85)',
+            borderRadius: '8px',
+            zIndex: '1000'
+        });
+
+        const addBtn = (text: string, onClick: () => void, color: string = '#444') => {
+            UIUtils.createButton(this.controlsContainer, text, onClick, {
+                background: color,
+                border: '1px solid #666',
+                padding: '10px 16px',
+                borderRadius: '6px',
+                fontSize: '14px',
+                fontWeight: 'bold',
+                width: '100%'
+            });
+        };
+
+        addBtn('🗑️ Clear Path', () => {
+            this.waypointMgr.clearAll();
+        }, '#e91e63');
+
+        addBtn('⚙️ WAVES & SAVE', () => this.openWaveConfig(), '#ff9800');
+        addBtn('📥 Экспорт JSON', () => this.exportCurrentMap(), '#2196f3');
+        addBtn('📤 Импорт JSON', () => this.importMapFromFile(), '#9c27b0');
+        addBtn('🚪 MENU', () => this.game.toMenu(), '#d32f2f');
+
+        // Hidden file input for JSON import
+        this._fileInput = document.createElement('input');
+        this._fileInput.type = 'file';
+        this._fileInput.accept = '.json';
+        this._fileInput.style.display = 'none';
+        this._fileInput.onchange = () => this.handleFileImport();
+        this.controlsContainer.appendChild(this._fileInput);
+
+        document.body.appendChild(this.controlsContainer);
+    }
+
+    // FEATURE: Create saved maps panel
+    private createMapsPanel() {
+        this.mapsPanel = UIUtils.createContainer({
+            position: 'absolute',
+            top: '20px',
+            left: '20px',
+            background: 'rgba(0, 0, 0, 0.9)',
+            borderRadius: '8px',
+            padding: '10px',
+            maxWidth: '300px',
+            maxHeight: '80vh',
+            overflowY: 'auto',
+            display: 'none',
+            zIndex: '2000'
+        });
+
+        const header = document.createElement('div');
+        Object.assign(header.style, {
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            marginBottom: '10px',
+            cursor: 'pointer',
+            color: '#fff',
+            fontWeight: 'bold',
+        });
+
+        header.innerHTML = `
+            <span>📁 SAVED MAPS</span>
+            <span style="font-size: 20px;">${this.mapsPanelExpanded ? '▼' : '▶'}</span>
+        `;
+
+        header.onclick = () => {
+            this.mapsPanelExpanded = !this.mapsPanelExpanded;
+            this.refreshMapsPanel();
+        };
+
+        this.mapsPanel.appendChild(header);
+        document.body.appendChild(this.mapsPanel);
+        this.refreshMapsPanel();
+    }
+
+    private refreshMapsPanel() {
+        const gen = ++this._refreshGeneration;
+
+        // Clear current content except header
+        while (this.mapsPanel.children.length > 1) {
+            this.mapsPanel.removeChild(this.mapsPanel.lastChild!);
+        }
+
+        // Update toggle icon
+        const header = this.mapsPanel.children[0] as HTMLElement;
+        header.innerHTML = `
+            <span>📁 SAVED MAPS</span>
+            <span style="font-size: 20px;">${this.mapsPanelExpanded ? '▼' : '▶'}</span>
+        `;
+
+        if (!this.mapsPanelExpanded) return;
+
+        // Фаза 1 (sync): показать local карты мгновенно
+        const localMaps = MapStorage.getLocalMaps();
+        const localNames = Object.keys(localMaps);
+
+        if (localNames.length === 0) {
+            const empty = document.createElement('div');
+            empty.style.color = '#888';
+            empty.style.padding = '10px';
+            empty.innerText = 'No saved maps';
+            empty.id = 'maps-panel-empty';
+            this.mapsPanel.appendChild(empty);
+        } else {
+            localNames.forEach((name) => {
+                this.createMapPanelItem(name, localMaps[name], 'local', false);
+            });
+        }
+
+        // Фаза 2 (async): дописать bundled карты
+        MapStorage.getBundledMaps().then(bundled => {
+            if (gen !== this._refreshGeneration) return; // race condition guard
+
+            const bundledNames = Object.keys(bundled).sort();
+            if (bundledNames.length === 0) return;
+
+            // Удалить "No saved maps" если он был
+            const emptyEl = this.mapsPanel.querySelector('#maps-panel-empty');
+            if (emptyEl) emptyEl.remove();
+
+            // Обновить local карты: пометить overridesBundled
+            for (const name of localNames) {
+                if (name in bundled) {
+                    const existingItem = this.mapsPanel.querySelector(`[data-map-name="${name}"]`) as HTMLElement;
+                    if (existingItem) {
+                        const nameSpan = existingItem.querySelector('.map-name') as HTMLElement;
+                        if (nameSpan && !nameSpan.innerText.includes('⚡')) {
+                            nameSpan.innerText = `💾 ${name} ⚡`;
+                        }
+                        // Добавить кнопку Restore
+                        this.addRestoreButton(existingItem, name);
+                    }
+                }
+            }
+
+            // Добавить bundled карты (только те, что не перезаписаны)
+            for (const name of bundledNames) {
+                if (localNames.includes(name)) continue; // local override — уже показана
+                this.createMapPanelItem(name, bundled[name], 'bundled', false);
+            }
+        }).catch(e => {
+            console.warn('[EditorScene] Failed to load bundled maps', e);
+        });
+    }
+
+    /** Создать элемент карты в панели */
+    private createMapPanelItem(name: string, data: IMapData, source: 'bundled' | 'local', overridesBundled: boolean) {
+        const item = document.createElement('div');
+        item.setAttribute('data-map-name', name);
+        Object.assign(item.style, {
+            background: source === 'bundled' ? '#1a2a3a' : '#222',
+            padding: '10px',
+            marginBottom: '5px',
+            borderRadius: '4px',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+        });
+
+        const nameSpan = document.createElement('span');
+        nameSpan.className = 'map-name';
+        nameSpan.style.color = '#fff';
+        nameSpan.style.flex = '1';
+        const icon = source === 'bundled' ? '📦' : '💾';
+        const suffix = overridesBundled ? ' ⚡' : '';
+        nameSpan.innerText = `${icon} ${name}${suffix}`;
+
+        const btnContainer = document.createElement('div');
+        btnContainer.style.display = 'flex';
+        btnContainer.style.gap = '5px';
+
+        // Load button — always available
+        const loadBtn = document.createElement('button');
+        loadBtn.innerText = '📂';
+        loadBtn.title = 'Load';
+        Object.assign(loadBtn.style, {
+            background: '#4caf50',
+            color: '#fff',
+            border: 'none',
+            padding: '5px 10px',
+            borderRadius: '4px',
+            cursor: 'pointer',
+            fontSize: '12px',
+        });
+        loadBtn.onclick = () => this.loadMap(name, data);
+        btnContainer.appendChild(loadBtn);
+
+        // Delete button — only for local maps
+        if (source === 'local') {
+            const delBtn = document.createElement('button');
+            delBtn.innerText = '🗑️';
+            delBtn.title = 'Delete';
+            Object.assign(delBtn.style, {
+                background: '#f44336',
+                color: '#fff',
+                border: 'none',
+                padding: '5px 10px',
+                borderRadius: '4px',
+                cursor: 'pointer',
+                fontSize: '12px',
+            });
+            delBtn.onclick = () => this.deleteMap(name);
+            btnContainer.appendChild(delBtn);
+        }
+
+        // Restore button for overridden
+        if (overridesBundled) {
+            this.addRestoreButton(item, name);
+        }
+
+        item.appendChild(nameSpan);
+        item.appendChild(btnContainer);
+        this.mapsPanel.appendChild(item);
+    }
+
+    /** Добавить кнопку «Восстановить оригинал» */
+    private addRestoreButton(item: HTMLElement, name: string) {
+        const btnContainer = item.querySelector('div') as HTMLElement;
+        if (!btnContainer) return;
+        // Не добавлять дважды
+        if (btnContainer.querySelector('.restore-btn')) return;
+
+        const restoreBtn = document.createElement('button');
+        restoreBtn.innerText = '⟳';
+        restoreBtn.title = 'Восстановить оригинал';
+        restoreBtn.className = 'restore-btn';
+        Object.assign(restoreBtn.style, {
+            background: '#ff9800',
+            color: '#fff',
+            border: 'none',
+            padding: '5px 10px',
+            borderRadius: '4px',
+            cursor: 'pointer',
+            fontSize: '12px',
+        });
+        restoreBtn.onclick = () => {
+            if (!confirm(`Восстановить оригинал карты "${name}"? Локальные изменения будут удалены.`)) return;
+            MapStorage.deleteLocal(name);
+            this.refreshMapsPanel();
+        };
+        btnContainer.appendChild(restoreBtn);
+    }
+
+    /** Экспорт текущей карты как JSON-файл */
+    private exportCurrentMap() {
+        const localMaps = MapStorage.getLocalMaps();
+        if (!this.currentMapName || !localMaps[this.currentMapName]) {
+            alert('Сначала сохраните карту через WAVES & SAVE');
+            return;
+        }
+
+        const data = localMaps[this.currentMapName];
+        const blob = MapStorage.createExportBlob(data);
+        const fileName = MapStorage.sanitizeFileName(this.currentMapName) + '.json';
+
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = fileName;
+        a.click();
+        URL.revokeObjectURL(a.href);
+    }
+
+    /** Инициировать импорт через hidden file input */
+    private importMapFromFile() {
+        this._fileInput.value = ''; // Reset для повторного выбора того же файла
+        this._fileInput.click();
+    }
+
+    /** Обработка выбранного файла */
+    private async handleFileImport() {
+        const file = this._fileInput.files?.[0];
+        if (!file) return;
+
+        try {
+            const data = await MapStorage.importFromFile(file);
+            const defaultName = file.name.replace(/\.json$/i, '');
+            const name = prompt('Имя карты:', defaultName);
+            if (!name) return;
+
+            // Проверить конфликт имён
+            const existing = MapStorage.getLocalMaps();
+            if (name in existing) {
+                if (!confirm(`Карта "${name}" уже существует. Перезаписать?`)) return;
+            }
+
+            MapStorage.saveLocal(name, data);
+            this.loadMap(name, data);
+            this.refreshMapsPanel();
+            alert(`Карта "${name}" импортирована!`);
+        } catch (e) {
+            alert(`Ошибка импорта: ${(e as Error).message}`);
+        }
+    }
+
+    private loadMap(name: string, data: any) {
+        if (!confirm(`Load map "${name}"? Current work will be lost.`)) return;
+
+        let mapData: IMapData;
+        try {
+            mapData = migrateMapData(data);
+        } catch (e) {
+            alert(`Failed to load map "${name}": ${(e as Error).message}`);
+            return;
+        }
+
+        // Load map data into editor
+        this.currentMapName = name;
+        this.map = new MapManager(mapData);
+        this.fog = new FogSystem(mapData);
+
+        // Clear history on new map load
+        this.history.clear();
+
+        // Load waypoints into WaypointManager
+        this.waypointMgr.clearAll();
+        if (mapData.waypoints && mapData.waypoints.length > 0) {
+            // First point is always Start
+            this.waypointMgr.setStart(mapData.waypoints[0]);
+
+            // Last point is always End (if more than 1)
+            if (mapData.waypoints.length > 1) {
+                this.waypointMgr.setEnd(mapData.waypoints[mapData.waypoints.length - 1]);
+            }
+
+            // Middle points are waypoints
+            for (let i = 1; i < mapData.waypoints.length - 1; i++) {
+                this.waypointMgr.addWaypoint(mapData.waypoints[i]);
+            }
+        }
+
+        // Render loaded fog
+        this.fog.update(0);
+    }
+
+    private deleteMap(name: string) {
+        if (!confirm(`Delete map "${name}"? This cannot be undone.`)) return;
+
+        MapStorage.deleteLocal(name);
+        this.refreshMapsPanel();
+    }
+
+    private handleGlobalKey(e: KeyboardEvent) {
+        // Ignore if typing in input fields
+        if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
+            return;
+        }
+
+        // Ctrl+Z - Undo
+        if (e.ctrlKey && e.key === 'z' && !e.shiftKey) {
+            e.preventDefault();
+            if (this.history.undo()) {
+                this.fog.update(0); // Re-render fog after undo
+            }
+            return; // Fixed: was return; in original? Yes
+        }
+
+        // Ctrl+Shift+Z - Redo
+        if (e.ctrlKey && e.shiftKey && e.key === 'Z') {
+            e.preventDefault();
+            if (this.history.redo()) {
+                this.fog.update(0); // Re-render fog after redo
+            }
+            return;
+        }
+
+        // Ctrl+S - Save
+        if (e.ctrlKey && e.key === 's') {
+            e.preventDefault();
+            this.openWaveConfig();
+            return;
+        }
+
+        // E - Eraser mode
+        if (e.key === 'e' || e.key === 'E') {
+            this.mode = 'eraser';
+            // Also update toolbar UI if possible?
+            // current toolbar implementation relies on callback to update scene, not vice versa.
+            // Ideally we should sync toolbar state.
+            return;
+        }
+
+        // 1-3 - Category selection
+        if (e.key >= '1' && e.key <= '3') {
+            const categoryIndex = parseInt(e.key) - 1;
+            this.toolbar.selectCategory(categoryIndex);
+            return;
+        }
+    }
+
+    private isPaintMode(mode: EditorMode): boolean {
+        return mode === 'paint_road' || mode === 'paint_grass' ||
+            mode === 'eraser' || mode === 'paint_fog';
     }
 }
 </file>

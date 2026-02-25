@@ -8,7 +8,7 @@ import { ProceduralGrass } from './renderers/ProceduralGrass';
  * Designed to be easily replaced with asset-based rendering later
  */
 
-export type ObjectType = 'stone' | 'rock' | 'tree' | 'wheat' | 'flowers';
+export type ObjectType = 'stone' | 'rock' | 'tree' | 'wheat' | 'flowers' | 'bush' | 'pine' | 'crate' | 'barrel' | 'torch_stand';
 
 export class ObjectRenderer {
     /**
@@ -37,6 +37,21 @@ export class ObjectRenderer {
                 break;
             case 'flowers':
                 this.drawFlowers(ctx, x, y, TS);
+                break;
+            case 'bush':
+                this.drawBush(ctx, x, y, TS);
+                break;
+            case 'pine':
+                this.drawPine(ctx, x, y, TS);
+                break;
+            case 'crate':
+                this.drawCrate(ctx, x, y, TS);
+                break;
+            case 'barrel':
+                this.drawBarrel(ctx, x, y, TS);
+                break;
+            case 'torch_stand':
+                this.drawTorchStand(ctx, x, y, TS);
                 break;
         }
     }
@@ -297,5 +312,191 @@ export class ObjectRenderer {
             ctx.arc(fx, fy, flowerSize * 0.5, 0, Math.PI * 2);
             ctx.fill();
         }
+    }
+
+    /**
+     * Draw small bush (1 tile)
+     * Soft, rounded, low height
+     */
+    private static drawBush(ctx: CanvasRenderingContext2D, x: number, y: number, TS: number): void {
+        const centerX = x + TS / 2;
+        const centerY = y + TS / 2;
+
+        // Shadow
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.25)';
+        ctx.beginPath();
+        ctx.ellipse(
+            centerX + VISUALS.LIGHTING.SHADOW_OFFSET_X,
+            centerY + VISUALS.LIGHTING.SHADOW_OFFSET_Y + 5,
+            16, 12, 0, 0, Math.PI * 2
+        );
+        ctx.fill();
+
+        // Base bush
+        ctx.fillStyle = '#4caf50';
+        ctx.beginPath();
+        ctx.arc(centerX - 6, centerY + 4, 12, 0, Math.PI * 2);
+        ctx.arc(centerX + 6, centerY + 4, 12, 0, Math.PI * 2);
+        ctx.arc(centerX, centerY - 6, 14, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Darker low spots
+        ctx.fillStyle = '#388e3c';
+        ctx.beginPath();
+        ctx.arc(centerX - 6, centerY + 8, 8, 0, Math.PI * 2);
+        ctx.arc(centerX + 6, centerY + 8, 8, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Highlight
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.2)';
+        ctx.beginPath();
+        ctx.arc(centerX - 4, centerY - 10, 6, 0, Math.PI * 2);
+        ctx.fill();
+    }
+
+    /**
+     * Draw pine tree (1 tile)
+     * Conical top, dark green
+     */
+    private static drawPine(ctx: CanvasRenderingContext2D, x: number, y: number, TS: number): void {
+        const centerX = x + TS / 2;
+        const bottomY = y + TS - 8;
+
+        // Trunk shadow
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
+        ctx.fillRect(centerX - 4, bottomY - 30, 8, 30);
+
+        // Trunk
+        ctx.fillStyle = '#4e342e';
+        ctx.fillRect(centerX - 3, bottomY - 30, 6, 30);
+
+        // Foliage shadow on floor
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.2)';
+        ctx.beginPath();
+        ctx.ellipse(centerX, bottomY, 18, 10, 0, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Conical foliage layers
+        const layers = [
+            { y: bottomY - 10, w: 20 },
+            { y: bottomY - 22, w: 16 },
+            { y: bottomY - 34, w: 12 },
+            { y: bottomY - 46, w: 8 }
+        ];
+
+        layers.forEach((layer, i) => {
+            // Shadow side
+            ctx.fillStyle = '#1b5e20';
+            ctx.beginPath();
+            ctx.moveTo(centerX, layer.y - 12);
+            ctx.lineTo(centerX + layer.w, layer.y);
+            ctx.lineTo(centerX - layer.w, layer.y);
+            ctx.fill();
+
+            // Light side
+            ctx.fillStyle = '#2e7d32';
+            ctx.beginPath();
+            ctx.moveTo(centerX, layer.y - 12);
+            ctx.lineTo(centerX - layer.w * 0.2, layer.y);
+            ctx.lineTo(centerX - layer.w, layer.y);
+            ctx.fill();
+        });
+    }
+
+    /**
+     * Draw wooden crate (1 tile)
+     */
+    private static drawCrate(ctx: CanvasRenderingContext2D, x: number, y: number, TS: number): void {
+        const centerX = x + TS / 2;
+        const centerY = y + TS / 2;
+        const w = 24;
+
+        // Shadow
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
+        ctx.fillRect(centerX - w / 2 + 2, centerY - w / 2 + 2, w, w);
+
+        // Base box
+        ctx.fillStyle = '#795548';
+        ctx.fillRect(centerX - w / 2, centerY - w / 2, w, w);
+
+        // Planks
+        ctx.fillStyle = '#8d6e63';
+        ctx.fillRect(centerX - w / 2 + 2, centerY - w / 2 + 2, w - 4, w - 4);
+
+        // Crossing planks (X)
+        ctx.strokeStyle = '#5d4037';
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.moveTo(centerX - w / 2 + 2, centerY - w / 2 + 2);
+        ctx.lineTo(centerX + w / 2 - 2, centerY + w / 2 - 2);
+        ctx.moveTo(centerX + w / 2 - 2, centerY - w / 2 + 2);
+        ctx.lineTo(centerX - w / 2 + 2, centerY + w / 2 - 2);
+        ctx.stroke();
+
+        // Frame
+        ctx.strokeRect(centerX - w / 2, centerY - w / 2, w, w);
+    }
+
+    /**
+     * Draw barrel (1 tile)
+     */
+    private static drawBarrel(ctx: CanvasRenderingContext2D, x: number, y: number, TS: number): void {
+        const centerX = x + TS / 2;
+        const centerY = y + TS / 2;
+
+        // Shadow
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
+        ctx.beginPath();
+        ctx.ellipse(centerX + 2, centerY + 2, 12, 12, 0, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Barrel body (warm wood)
+        ctx.fillStyle = '#8d6e63';
+        ctx.beginPath();
+        ctx.arc(centerX, centerY, 12, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Top lid
+        ctx.fillStyle = '#a1887f';
+        ctx.beginPath();
+        ctx.arc(centerX, centerY - 2, 9, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Metal Hoops
+        ctx.strokeStyle = '#424242';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(centerX, centerY, 12, Math.PI * 0.1, Math.PI * 0.9);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.arc(centerX, centerY, 12, Math.PI * 1.1, Math.PI * 1.9);
+        ctx.stroke();
+    }
+
+    /**
+     * Draw torch stand (1 tile) 
+     * Base mesh only, flame is generic drawn via Map.drawTorches or static equivalent if not night
+     */
+    private static drawTorchStand(ctx: CanvasRenderingContext2D, x: number, y: number, TS: number): void {
+        const centerX = x + TS / 2;
+        const centerY = y + TS / 2;
+
+        // Shadow
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
+        ctx.fillRect(centerX - 2, centerY, 6, 10);
+
+        // Stick
+        ctx.fillStyle = '#5d4037';
+        ctx.fillRect(centerX - 2, centerY - 10, 4, 20);
+
+        // Metal base at bottom
+        ctx.fillStyle = '#757575';
+        ctx.beginPath();
+        ctx.ellipse(centerX, centerY + 10, 8, 4, 0, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Metal holder at top
+        ctx.fillStyle = '#424242';
+        ctx.fillRect(centerX - 4, centerY - 12, 8, 4);
     }
 }

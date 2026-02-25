@@ -3,6 +3,7 @@ import { VISUALS } from './VisualConfig';
 import { ProceduralPatterns } from './ProceduralPatterns';
 import { ProceduralRoad } from './renderers/ProceduralRoad';
 import { ProceduralGrass } from './renderers/ProceduralGrass';
+import { TileRenderers } from './renderers/TileRenderers';
 import { SpriteBaker } from './utils/SpriteBaker';
 import { OrcUnitRenderer } from './renderers/units/OrcUnitRenderer';
 import { SkeletonUnitRenderer } from './renderers/units/SkeletonUnitRenderer';
@@ -316,6 +317,18 @@ export class Assets {
         // Добавляем props
         requiredAssets.push('prop_shield', 'prop_helmet', 'prop_weapon', 'prop_barrier');
 
+        // Phase 2: Water, Lava, Sand, Bridge
+        for (let bitmask = 0; bitmask < 16; bitmask++) {
+            for (let frame = 0; frame < 4; frame++) {
+                requiredAssets.push(`water_${bitmask}_f${frame}`);
+                requiredAssets.push(`lava_${bitmask}_f${frame}`);
+            }
+        }
+        for (let i = 0; i < 4; i++) {
+            requiredAssets.push(`sand_${i}`);
+        }
+        requiredAssets.push('bridge_h', 'bridge_v');
+
         // Генерируем недостающие
         requiredAssets.forEach(assetName => {
             if (!this.images[assetName]) {
@@ -386,6 +399,39 @@ export class Assets {
                 this.generateEnemyTexture(enemy.id, enemy.color);
                 this.loadStats.procedural++;
             }
+        } else if (name.startsWith('water_')) {
+            const parts = name.split('_');
+            const bitmask = parseInt(parts[1]);
+            const frame = parseInt(parts[2].replace('f', ''));
+            this.generateTexture(name, CONFIG.TILE_SIZE, (ctx, w, h) => {
+                TileRenderers.drawWaterFrame(ctx, w, h, bitmask, frame);
+            });
+            this.loadStats.procedural++;
+        } else if (name.startsWith('lava_')) {
+            const parts = name.split('_');
+            const bitmask = parseInt(parts[1]);
+            const frame = parseInt(parts[2].replace('f', ''));
+            this.generateTexture(name, CONFIG.TILE_SIZE, (ctx, w, h) => {
+                TileRenderers.drawLavaFrame(ctx, w, h, bitmask, frame);
+            });
+            this.loadStats.procedural++;
+        } else if (name.startsWith('sand_')) {
+            const idx = parseInt(name.replace('sand_', ''));
+            this.generateTexture(name, CONFIG.TILE_SIZE, (ctx, w, h) => {
+                TileRenderers.drawSandTile(ctx, w, h, idx * 100);
+            });
+            if (!this.variants['sand']) this.variants['sand'] = [];
+            if (this.images[name] instanceof HTMLCanvasElement) {
+                this.variants['sand'].push(this.images[name] as HTMLCanvasElement);
+            }
+            if (name === 'sand_0') this.images['sand'] = this.images[name];
+            this.loadStats.procedural++;
+        } else if (name.startsWith('bridge_')) {
+            const isVertical = name === 'bridge_v';
+            this.generateTexture(name, CONFIG.TILE_SIZE, (ctx, w, h) => {
+                TileRenderers.drawBridgeTile(ctx, w, h, isVertical);
+            });
+            this.loadStats.procedural++;
         } else {
             // Для всех остальных ассетов генерируем через старую систему
             // НО ТОЛЬКО ЕСЛИ они ещё не загружены!
