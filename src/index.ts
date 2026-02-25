@@ -1,11 +1,10 @@
 import { Game } from './Game';
-import { getSavedMaps, deleteMapFromStorage } from './Utils';
+import { MapStorage } from './MapStorage';
 import { CONFIG } from './Config';
 import { CrashHandler } from './CrashHandler';
 
-// Expose utils to window for EditorScene
-(window as any).getSavedMaps = getSavedMaps;
-(window as any).deleteMapFromStorage = deleteMapFromStorage;
+// Expose MapStorage to window for debugging
+(window as any).MapStorage = MapStorage;
 
 window.addEventListener('DOMContentLoaded', () => {
     new CrashHandler();

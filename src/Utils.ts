@@ -154,6 +154,7 @@ export function validateMap(data: any): boolean {
 
 // --- STORAGE UTILS ---
 
+/** @deprecated Use MapStorage.getLocalMaps() instead */
 export function getSavedMaps(): Record<string, IMapData> {
     try {
         const raw = localStorage.getItem('NEWTOWER_MAPS');
@@ -176,6 +177,7 @@ export function getSavedMaps(): Record<string, IMapData> {
     }
 }
 
+/** @deprecated Use MapStorage.saveLocal() instead */
 export function saveMapToStorage(name: string, data: IMapData): boolean {
     try {
         const maps = getSavedMaps();
@@ -195,6 +197,7 @@ export function saveMapToStorage(name: string, data: IMapData): boolean {
 }
 
 
+/** @deprecated Use MapStorage.deleteLocal() instead */
 export function deleteMapFromStorage(name: string): void {
     const maps = getSavedMaps();
     delete maps[name];

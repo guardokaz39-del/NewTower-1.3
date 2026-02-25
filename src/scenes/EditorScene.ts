@@ -3,7 +3,8 @@ import { Game } from '../Game';
 import { MapManager } from '../Map';
 import { CONFIG } from '../Config';
 import { IMapData, IMapObject, migrateMapData } from '../MapData';
-import { serializeMap, saveMapToStorage, getSavedMaps, deleteMapFromStorage } from '../Utils';
+import { serializeMap } from '../Utils';
+import { MapStorage } from '../MapStorage';
 import { UIUtils } from '../UIUtils';
 import { Pathfinder } from '../Pathfinder';
 import { WaveEditor } from '../WaveEditor';
@@ -28,6 +29,12 @@ export class EditorScene extends BaseScene {
     private mapsPanel!: HTMLElement;
     private mapsPanelExpanded: boolean = false;
     private currentMapName: string = '';
+
+    // Race condition guard для async refreshMapsPanel
+    private _refreshGeneration: number = 0;
+
+    // Hidden file input for JSON import
+    private _fileInput!: HTMLInputElement;
 
     // Track previous mouse state for click detection (not hold)
     private prevMouseDown: boolean = false;
@@ -386,7 +393,7 @@ export class EditorScene extends BaseScene {
         const name = prompt('Enter map name:', this.currentMapName || 'MyMap');
         if (!name) return;
 
-        if (saveMapToStorage(name, data)) {
+        if (MapStorage.saveLocal(name, data)) {
             this.currentMapName = name; // Update current name
             alert(`Map "${name}" saved successfully!`);
             this.refreshMapsPanel(); // Refresh UI
@@ -468,7 +475,17 @@ export class EditorScene extends BaseScene {
         }, '#e91e63');
 
         addBtn('⚙️ WAVES & SAVE', () => this.openWaveConfig(), '#ff9800');
+        addBtn('📥 Экспорт JSON', () => this.exportCurrentMap(), '#2196f3');
+        addBtn('📤 Импорт JSON', () => this.importMapFromFile(), '#9c27b0');
         addBtn('🚪 MENU', () => this.game.toMenu(), '#d32f2f');
+
+        // Hidden file input for JSON import
+        this._fileInput = document.createElement('input');
+        this._fileInput.type = 'file';
+        this._fileInput.accept = '.json';
+        this._fileInput.style.display = 'none';
+        this._fileInput.onchange = () => this.handleFileImport();
+        this.controlsContainer.appendChild(this._fileInput);
 
         document.body.appendChild(this.controlsContainer);
     }
@@ -516,7 +533,7 @@ export class EditorScene extends BaseScene {
     }
 
     private refreshMapsPanel() {
-        const maps = getSavedMaps();
+        const gen = ++this._refreshGeneration;
 
         // Clear current content except header
         while (this.mapsPanel.children.length > 1) {
@@ -532,54 +549,106 @@ export class EditorScene extends BaseScene {
 
         if (!this.mapsPanelExpanded) return;
 
+        // Фаза 1 (sync): показать local карты мгновенно
+        const localMaps = MapStorage.getLocalMaps();
+        const localNames = Object.keys(localMaps);
 
-        const mapNames = Object.keys(maps);
-
-        if (mapNames.length === 0) {
+        if (localNames.length === 0) {
             const empty = document.createElement('div');
             empty.style.color = '#888';
             empty.style.padding = '10px';
             empty.innerText = 'No saved maps';
+            empty.id = 'maps-panel-empty';
             this.mapsPanel.appendChild(empty);
-            return;
+        } else {
+            localNames.forEach((name) => {
+                this.createMapPanelItem(name, localMaps[name], 'local', false);
+            });
         }
 
-        mapNames.forEach((name) => {
-            const item = document.createElement('div');
-            Object.assign(item.style, {
-                background: '#222',
-                padding: '10px',
-                marginBottom: '5px',
-                borderRadius: '4px',
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-            });
+        // Фаза 2 (async): дописать bundled карты
+        MapStorage.getBundledMaps().then(bundled => {
+            if (gen !== this._refreshGeneration) return; // race condition guard
 
-            const nameSpan = document.createElement('span');
-            nameSpan.style.color = '#fff';
-            nameSpan.style.flex = '1';
-            nameSpan.innerText = name;
+            const bundledNames = Object.keys(bundled).sort();
+            if (bundledNames.length === 0) return;
 
-            const btnContainer = document.createElement('div');
-            btnContainer.style.display = 'flex';
-            btnContainer.style.gap = '5px';
+            // Удалить "No saved maps" если он был
+            const emptyEl = this.mapsPanel.querySelector('#maps-panel-empty');
+            if (emptyEl) emptyEl.remove();
 
-            const loadBtn = document.createElement('button');
-            loadBtn.innerText = '📂 Load';
-            Object.assign(loadBtn.style, {
-                background: '#4caf50',
-                color: '#fff',
-                border: 'none',
-                padding: '5px 10px',
-                borderRadius: '4px',
-                cursor: 'pointer',
-                fontSize: '12px',
-            });
-            loadBtn.onclick = () => this.loadMap(name, maps[name]);
+            // Обновить local карты: пометить overridesBundled
+            for (const name of localNames) {
+                if (name in bundled) {
+                    const existingItem = this.mapsPanel.querySelector(`[data-map-name="${name}"]`) as HTMLElement;
+                    if (existingItem) {
+                        const nameSpan = existingItem.querySelector('.map-name') as HTMLElement;
+                        if (nameSpan && !nameSpan.innerText.includes('⚡')) {
+                            nameSpan.innerText = `💾 ${name} ⚡`;
+                        }
+                        // Добавить кнопку Restore
+                        this.addRestoreButton(existingItem, name);
+                    }
+                }
+            }
 
+            // Добавить bundled карты (только те, что не перезаписаны)
+            for (const name of bundledNames) {
+                if (localNames.includes(name)) continue; // local override — уже показана
+                this.createMapPanelItem(name, bundled[name], 'bundled', false);
+            }
+        }).catch(e => {
+            console.warn('[EditorScene] Failed to load bundled maps', e);
+        });
+    }
+
+    /** Создать элемент карты в панели */
+    private createMapPanelItem(name: string, data: IMapData, source: 'bundled' | 'local', overridesBundled: boolean) {
+        const item = document.createElement('div');
+        item.setAttribute('data-map-name', name);
+        Object.assign(item.style, {
+            background: source === 'bundled' ? '#1a2a3a' : '#222',
+            padding: '10px',
+            marginBottom: '5px',
+            borderRadius: '4px',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+        });
+
+        const nameSpan = document.createElement('span');
+        nameSpan.className = 'map-name';
+        nameSpan.style.color = '#fff';
+        nameSpan.style.flex = '1';
+        const icon = source === 'bundled' ? '📦' : '💾';
+        const suffix = overridesBundled ? ' ⚡' : '';
+        nameSpan.innerText = `${icon} ${name}${suffix}`;
+
+        const btnContainer = document.createElement('div');
+        btnContainer.style.display = 'flex';
+        btnContainer.style.gap = '5px';
+
+        // Load button — always available
+        const loadBtn = document.createElement('button');
+        loadBtn.innerText = '📂';
+        loadBtn.title = 'Load';
+        Object.assign(loadBtn.style, {
+            background: '#4caf50',
+            color: '#fff',
+            border: 'none',
+            padding: '5px 10px',
+            borderRadius: '4px',
+            cursor: 'pointer',
+            fontSize: '12px',
+        });
+        loadBtn.onclick = () => this.loadMap(name, data);
+        btnContainer.appendChild(loadBtn);
+
+        // Delete button — only for local maps
+        if (source === 'local') {
             const delBtn = document.createElement('button');
             delBtn.innerText = '🗑️';
+            delBtn.title = 'Delete';
             Object.assign(delBtn.style, {
                 background: '#f44336',
                 color: '#fff',
@@ -590,14 +659,96 @@ export class EditorScene extends BaseScene {
                 fontSize: '12px',
             });
             delBtn.onclick = () => this.deleteMap(name);
-
-            btnContainer.appendChild(loadBtn);
             btnContainer.appendChild(delBtn);
+        }
 
-            item.appendChild(nameSpan);
-            item.appendChild(btnContainer);
-            this.mapsPanel.appendChild(item);
+        // Restore button for overridden
+        if (overridesBundled) {
+            this.addRestoreButton(item, name);
+        }
+
+        item.appendChild(nameSpan);
+        item.appendChild(btnContainer);
+        this.mapsPanel.appendChild(item);
+    }
+
+    /** Добавить кнопку «Восстановить оригинал» */
+    private addRestoreButton(item: HTMLElement, name: string) {
+        const btnContainer = item.querySelector('div') as HTMLElement;
+        if (!btnContainer) return;
+        // Не добавлять дважды
+        if (btnContainer.querySelector('.restore-btn')) return;
+
+        const restoreBtn = document.createElement('button');
+        restoreBtn.innerText = '⟳';
+        restoreBtn.title = 'Восстановить оригинал';
+        restoreBtn.className = 'restore-btn';
+        Object.assign(restoreBtn.style, {
+            background: '#ff9800',
+            color: '#fff',
+            border: 'none',
+            padding: '5px 10px',
+            borderRadius: '4px',
+            cursor: 'pointer',
+            fontSize: '12px',
         });
+        restoreBtn.onclick = () => {
+            if (!confirm(`Восстановить оригинал карты "${name}"? Локальные изменения будут удалены.`)) return;
+            MapStorage.deleteLocal(name);
+            this.refreshMapsPanel();
+        };
+        btnContainer.appendChild(restoreBtn);
+    }
+
+    /** Экспорт текущей карты как JSON-файл */
+    private exportCurrentMap() {
+        const localMaps = MapStorage.getLocalMaps();
+        if (!this.currentMapName || !localMaps[this.currentMapName]) {
+            alert('Сначала сохраните карту через WAVES & SAVE');
+            return;
+        }
+
+        const data = localMaps[this.currentMapName];
+        const blob = MapStorage.createExportBlob(data);
+        const fileName = MapStorage.sanitizeFileName(this.currentMapName) + '.json';
+
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = fileName;
+        a.click();
+        URL.revokeObjectURL(a.href);
+    }
+
+    /** Инициировать импорт через hidden file input */
+    private importMapFromFile() {
+        this._fileInput.value = ''; // Reset для повторного выбора того же файла
+        this._fileInput.click();
+    }
+
+    /** Обработка выбранного файла */
+    private async handleFileImport() {
+        const file = this._fileInput.files?.[0];
+        if (!file) return;
+
+        try {
+            const data = await MapStorage.importFromFile(file);
+            const defaultName = file.name.replace(/\.json$/i, '');
+            const name = prompt('Имя карты:', defaultName);
+            if (!name) return;
+
+            // Проверить конфликт имён
+            const existing = MapStorage.getLocalMaps();
+            if (name in existing) {
+                if (!confirm(`Карта "${name}" уже существует. Перезаписать?`)) return;
+            }
+
+            MapStorage.saveLocal(name, data);
+            this.loadMap(name, data);
+            this.refreshMapsPanel();
+            alert(`Карта "${name}" импортирована!`);
+        } catch (e) {
+            alert(`Ошибка импорта: ${(e as Error).message}`);
+        }
     }
 
     private loadMap(name: string, data: any) {
@@ -643,7 +794,7 @@ export class EditorScene extends BaseScene {
     private deleteMap(name: string) {
         if (!confirm(`Delete map "${name}"? This cannot be undone.`)) return;
 
-        deleteMapFromStorage(name);
+        MapStorage.deleteLocal(name);
         this.refreshMapsPanel();
     }
 

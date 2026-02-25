@@ -1,7 +1,8 @@
 import { BaseScene } from '../BaseScene';
 import { Game } from '../Game';
 import { DEMO_MAP, IMapData } from '../MapData';
-import { validateMap, getSavedMaps } from '../Utils';
+import { validateMap } from '../Utils';
+import { MapStorage } from '../MapStorage';
 import { MapManager } from '../Map';
 import { CONFIG } from '../Config';
 import { UIUtils } from '../UIUtils';
@@ -13,6 +14,7 @@ export class MenuScene extends BaseScene {
     private game: Game;
     private container!: HTMLElement;
     private mapSelectionContainer!: HTMLElement;
+    private _refreshGeneration: number = 0;
 
     constructor(game: Game) {
         super();
@@ -209,16 +211,30 @@ export class MenuScene extends BaseScene {
 
         // Function to refresh list
         (this.mapSelectionContainer as any).refreshList = () => {
+            const gen = ++this._refreshGeneration;
             listContainer.innerHTML = '';
 
             // DEMO MAP
             this.createMapCard(listContainer, 'Demo Map', DEMO_MAP);
 
-            // SAVED MAPS
-            const saved = getSavedMaps();
-            for (const key in saved) {
-                this.createMapCard(listContainer, key, saved[key]);
+            // Фаза 1 (sync): local maps мгновенно
+            const local = MapStorage.getLocalMaps();
+            const localNames = new Set(Object.keys(local));
+            for (const key of localNames) {
+                this.createMapCard(listContainer, `💾 ${key}`, local[key]);
             }
+
+            // Фаза 2 (async): bundled maps дописываются
+            MapStorage.getBundledMaps().then(bundled => {
+                if (gen !== this._refreshGeneration) return; // race condition guard
+
+                for (const name of Object.keys(bundled).sort()) {
+                    if (localNames.has(name)) continue; // local override
+                    this.createMapCard(listContainer, `📦 ${name}`, bundled[name]);
+                }
+            }).catch(e => {
+                console.warn('[MenuScene] Failed to load bundled maps', e);
+            });
         };
 
         UIUtils.createButton(this.mapSelectionContainer, 'BACK', () => {

@@ -72,14 +72,21 @@ src/design/spacing.ts
 src/design/transitions.ts
 src/editor/components/BaseComponent.ts
 src/editor/components/EnemyGroupRow.ts
+src/editor/components/SpawnTimingControl.ts
 src/editor/components/ThreatMeter.ts
+src/editor/components/ValidationPanel.ts
 src/editor/components/WaveList.ts
+src/editor/components/WavePresetPanel.ts
+src/editor/components/WaveSettingsPanel.ts
+src/editor/components/WaveTimeline.ts
 src/editor/editor.css
 src/editor/EditorHistory.ts
 src/editor/EditorToolbar.ts
 src/editor/EnemyRegistry.ts
 src/editor/ThreatService.ts
+src/editor/WaveEditorHistory.ts
 src/editor/WaveModel.ts
+src/editor/WavePresets.ts
 src/editor/WaypointManager.ts
 src/effects/animators/README.md
 src/effects/DeathAnimations.ts
@@ -1213,6 +1220,85 @@ export abstract class BaseComponent<T = any> {
 }
 </file>
 
+<file path="src/editor/components/SpawnTimingControl.ts">
+import { BaseComponent } from './BaseComponent';
+
+interface SpawnTimingProps {
+    value: number;
+    min: number;
+    max: number;
+    step: number;
+    label: string;
+    suffix: string;
+    onChange: (value: number) => void;
+}
+
+/**
+ * Reusable range slider + number input for precise numeric control.
+ * Both inputs stay synchronized.
+ */
+export class SpawnTimingControl extends BaseComponent<SpawnTimingProps> {
+
+    protected createRootElement(): HTMLElement {
+        return this.createElement('div', 'we-timing-control');
+    }
+
+    public render(): void {
+        this.element.innerHTML = '';
+
+        // Label
+        const label = this.createElement('span', 'we-timing-label', this.data.label);
+        this.element.appendChild(label);
+
+        // Range slider
+        const range = document.createElement('input');
+        range.type = 'range';
+        range.min = this.data.min.toString();
+        range.max = this.data.max.toString();
+        range.step = this.data.step.toString();
+        range.value = this.data.value.toString();
+        range.className = 'we-timing-range';
+
+        // Number input
+        const numInput = document.createElement('input');
+        numInput.type = 'number';
+        numInput.min = this.data.min.toString();
+        numInput.max = this.data.max.toString();
+        numInput.step = this.data.step.toString();
+        numInput.value = this.data.value.toString();
+        numInput.className = 'we-timing-number';
+
+        // Suffix
+        const suffix = this.createElement('span', 'we-timing-suffix', this.data.suffix);
+
+        // Synchronize both controls
+        // IMPORTANT: use onchange (not oninput) on range to avoid flooding undo stack
+        range.onchange = () => {
+            const val = parseFloat(range.value);
+            numInput.value = val.toString();
+            this.data.onChange(val);
+        };
+
+        // Live visual feedback while dragging (doesn't trigger onChange/history)
+        range.oninput = () => {
+            numInput.value = range.value;
+        };
+
+        numInput.onchange = () => {
+            let val = parseFloat(numInput.value) || this.data.min;
+            val = Math.max(this.data.min, Math.min(this.data.max, val));
+            numInput.value = val.toString();
+            range.value = val.toString();
+            this.data.onChange(val);
+        };
+
+        this.element.appendChild(range);
+        this.element.appendChild(numInput);
+        this.element.appendChild(suffix);
+    }
+}
+</file>
+
 <file path="src/editor/components/ThreatMeter.ts">
 import { BaseComponent } from './BaseComponent';
 import { ThreatService } from '../ThreatService';
@@ -1296,329 +1382,606 @@ export class ThreatMeter extends BaseComponent<ThreatMeterProps> {
 }
 </file>
 
-<file path="src/editor/components/WaveList.ts">
+<file path="src/editor/components/ValidationPanel.ts">
 import { BaseComponent } from './BaseComponent';
-import { WaveModel } from '../WaveModel';
-import { EnemyGroupRow } from './EnemyGroupRow';
-import { ThreatMeter } from './ThreatMeter';
+import { IValidationResult } from '../WaveModel';
 
-export class WaveList extends BaseComponent<WaveModel> {
-    private expandedWaveIndex: number = 0; // Default open first wave
-
+export class ValidationPanel extends BaseComponent<IValidationResult | null> {
     public render(): void {
         this.element.innerHTML = '';
-        this.element.className = 'we-wave-list';
+        this.element.className = 'we-validation-panel';
+
+        if (!this.data) {
+            this.element.style.display = 'none';
+            return;
+        }
+
+        const { isValid, errors, warnings } = this.data;
+
+        if (errors.length === 0 && warnings.length === 0) {
+            this.element.style.display = 'none';
+            return;
+        }
+
         this.element.style.display = 'flex';
         this.element.style.flexDirection = 'column';
-        this.element.style.gap = '10px';
+        this.element.style.gap = '4px';
+        this.element.style.padding = '8px';
+        this.element.style.margin = '8px';
+        this.element.style.borderRadius = '4px';
+        this.element.style.fontSize = '12px';
 
-        const waves = this.data.getWaves();
+        if (errors.length > 0) {
+            this.element.style.background = 'rgba(244, 67, 54, 0.2)';
+            this.element.style.border = '1px solid rgba(244, 67, 54, 0.5)';
+        } else {
+            this.element.style.background = 'rgba(255, 152, 0, 0.2)';
+            this.element.style.border = '1px solid rgba(255, 152, 0, 0.5)';
+        }
 
-        waves.forEach((wave, index) => {
-            this.renderWaveItem(index);
+        [...errors, ...warnings].forEach(msg => {
+            const isError = errors.includes(msg);
+            const item = this.createElement('div', isError ? 'we-validation-error' : 'we-validation-warning');
+            item.style.color = isError ? '#ff8a80' : '#ffd180';
+
+            let text = '';
+            if (msg.waveIndex >= 0) {
+                text += `Волна ${msg.waveIndex + 1}`;
+                if (msg.groupIndex !== undefined) {
+                    text += `, Группа ${msg.groupIndex + 1}`;
+                }
+                text += ': ';
+            }
+            text += msg.message;
+            if (msg.field) {
+                text += ` [${msg.field}]`;
+            }
+            item.textContent = (isError ? '🔴 ' : '🟡 ') + text;
+            this.element.appendChild(item);
         });
-
-        // Add Wave Button
-        const addBtn = this.createElement('button', 'we-btn we-btn-secondary we-btn-full', '+ Add Wave');
-        addBtn.onclick = () => this.data.addWave();
-        this.element.appendChild(addBtn);
     }
 
-    private renderWaveItem(index: number) {
-        const wave = this.data.getWave(index);
-        const threat = this.data.getThreat(index);
-
-        const container = this.createElement('div', 'we-wave-item');
-
-        // --- Header ---
-        const header = this.createElement('div', 'we-wave-header');
-        header.onclick = (e) => {
-            // Prevent toggling if clicking delete button
-            if ((e.target as HTMLElement).tagName === 'BUTTON') return;
-
-            if (this.expandedWaveIndex === index) {
-                this.expandedWaveIndex = -1; // Collapse
-            } else {
-                this.expandedWaveIndex = index; // Expand
-            }
-            this.render(); // Re-render to update view
-        };
-
-        const title = this.createElement('span', 'we-wave-title', `Wave ${index + 1}`);
-        header.appendChild(title);
-
-        // Preview of threat in header if collapsed
-        if (this.expandedWaveIndex !== index) {
-            const threatPreview = this.createElement('span', '', `${Math.round(threat)} 💀`);
-            threatPreview.style.fontSize = '12px';
-            threatPreview.style.color = '#888';
-            threatPreview.style.marginLeft = 'auto'; // Right align
-            threatPreview.style.marginRight = '10px';
-            header.appendChild(threatPreview);
-        }
-
-        const delBtn = this.createElement('button', 'we-btn we-btn-icon', '✕');
-        delBtn.style.marginLeft = this.expandedWaveIndex !== index ? '0' : 'auto';
-        delBtn.onclick = () => this.data.removeWave(index);
-        header.appendChild(delBtn);
-
-        container.appendChild(header);
-
-        // --- Content (if expanded) ---
-        if (this.expandedWaveIndex === index) {
-            const content = this.createElement('div', 'we-wave-content');
-
-            // 1. Threat Meter
-            const meter = new ThreatMeter({ threat });
-            meter.mount(content);
-
-            // 2. Enemy Groups
-            const groupsContainer = this.createElement('div');
-            groupsContainer.style.marginTop = '10px';
-
-            wave.enemies.forEach((group, gIndex) => {
-                const row = new EnemyGroupRow({
-                    type: group.type,
-                    count: group.count,
-                    spawnPattern: group.spawnPattern || 'normal',
-                    onChange: (updates) => {
-                        this.data.updateEnemyGroup(index, gIndex, updates);
-                    },
-                    onRemove: () => {
-                        this.data.removeEnemyGroup(index, gIndex);
-                    }
-                });
-                row.mount(groupsContainer);
-            });
-            content.appendChild(groupsContainer);
-
-            // 3. Add Enemy Button
-            const addEnemyBtn = this.createElement('button', 'we-btn we-btn-secondary', '+ Add Enemy Group');
-            addEnemyBtn.style.marginTop = '8px';
-            addEnemyBtn.style.fontSize = '12px';
-            addEnemyBtn.style.padding = '4px 8px';
-            addEnemyBtn.style.width = '100%';
-            addEnemyBtn.onclick = () => this.data.addEnemyGroup(index);
-            content.appendChild(addEnemyBtn);
-
-            container.appendChild(content);
-        }
-
-        this.element.appendChild(container);
+    public updateResult(result: IValidationResult) {
+        this.data = result;
+        this.render();
     }
 }
 </file>
 
-<file path="src/editor/editor.css">
-/* Wave Editor Core Styles */
+<file path="src/editor/components/WavePresetPanel.ts">
+import { BaseComponent } from './BaseComponent';
+import { WaveModel } from '../WaveModel';
+import { getBuiltinPresets, loadCustomPresets, saveCustomPreset, deleteCustomPreset, IWavePreset } from '../WavePresets';
 
-.wave-editor-overlay {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100vw;
-    height: 100vh;
-    background: rgba(0, 0, 0, 0.5);
-    z-index: 2000;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    backdrop-filter: blur(2px);
-}
+export class WavePresetPanel extends BaseComponent<WaveModel> {
+    private select!: HTMLSelectElement;
 
-.wave-editor-container {
-    width: 500px;
-    max-height: 85vh;
-    background: rgba(30, 30, 35, 0.95);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
-    border-radius: 12px;
-    display: flex;
-    flex-direction: column;
-    color: #eee;
-    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-    overflow: hidden;
-}
+    protected createRootElement(): HTMLElement {
+        const el = document.createElement('div');
+        el.className = 'we-preset-panel';
+        return el;
+    }
 
-/* Header */
-.we-header {
-    padding: 16px;
-    background: rgba(255, 255, 255, 0.05);
-    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-}
+    public render(): void {
+        this.element.innerHTML = '';
+        this.element.style.display = 'flex';
+        this.element.style.gap = '8px';
+        this.element.style.alignItems = 'center';
+        this.element.style.padding = '8px 16px';
+        this.element.style.background = 'rgba(0, 0, 0, 0.2)';
+        this.element.style.borderBottom = '1px solid rgba(255, 255, 255, 0.1)';
 
-.we-header h2 {
-    margin: 0;
-    font-size: 18px;
-    font-weight: 600;
-    color: #fff;
-    letter-spacing: 0.5px;
-}
+        const builtinPresets = getBuiltinPresets();
+        let customPresets = loadCustomPresets();
 
-/* Content Area */
-.we-content {
-    flex: 1;
-    overflow-y: auto;
-    padding: 16px;
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
-}
+        this.select = this.createElement('select', 'we-settings-input') as HTMLSelectElement;
+        this.select.style.flex = '1';
 
-/* Scrollbar */
-.we-content::-webkit-scrollbar {
-    width: 8px;
-}
-.we-content::-webkit-scrollbar-track {
-    background: rgba(0,0,0,0.2);
-}
-.we-content::-webkit-scrollbar-thumb {
-    background: rgba(255,255,255,0.2);
-    border-radius: 4px;
-}
+        const defaultOption = this.createElement('option', '', 'Выберите пресет...');
+        defaultOption.value = '';
+        this.select.appendChild(defaultOption);
 
-/* Footer */
-.we-footer {
-    padding: 16px;
-    border-top: 1px solid rgba(255, 255, 255, 0.1);
-    display: flex;
-    gap: 12px;
-    background: rgba(20, 20, 25, 0.95);
-}
+        const builtinGroup = this.createElement('optgroup') as HTMLOptGroupElement;
+        builtinGroup.label = 'Встроенные';
+        builtinPresets.forEach(p => {
+            const option = this.createElement('option', '', `${p.name} — ${p.description}`);
+            option.value = p.id;
+            builtinGroup.appendChild(option);
+        });
+        this.select.appendChild(builtinGroup);
 
-/* Buttons */
-.we-btn {
-    padding: 8px 16px;
-    border: none;
-    border-radius: 6px;
-    cursor: pointer;
-    font-weight: 500;
-    transition: all 0.2s;
-    font-size: 14px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 6px;
-}
+        if (customPresets.length > 0) {
+            const customGroup = this.createElement('optgroup') as HTMLOptGroupElement;
+            customGroup.label = 'Пользовательские';
+            customPresets.forEach(p => {
+                const option = this.createElement('option', '', `${p.name} — ${p.description}`);
+                option.value = p.id;
+                customGroup.appendChild(option);
+            });
+            this.select.appendChild(customGroup);
+        }
 
-.we-btn-primary {
-    background: #4caf50;
-    color: white;
-}
-.we-btn-primary:hover { background: #43a047; }
+        const applyBtn = this.createElement('button', 'we-btn we-btn-primary', 'Применить');
+        applyBtn.disabled = true;
+        applyBtn.onclick = () => {
+            const id = this.select.value;
+            if (!id) return;
+            const preset = builtinPresets.find(p => p.id === id) || customPresets.find(p => p.id === id);
+            if (preset) {
+                if (confirm(`Заменить текущие волны на пресет "${preset.name}"?`)) {
+                    this.data.replaceAllWaves(preset.waves);
+                }
+            }
+        };
 
-.we-btn-danger {
-    background: #f44336;
-    color: white;
-}
-.we-btn-danger:hover { background: #e53935; }
+        const saveAsBtn = this.createElement('button', 'we-btn we-btn-secondary', '💾 Сохранить как пресет');
+        saveAsBtn.onclick = () => {
+            const name = prompt('Введите название нового пресета:');
+            if (name && name.trim() !== '') {
+                saveCustomPreset(name.trim(), this.data.getWaves());
+                this.render(); // Re-render to update select list
+            }
+        };
 
-.we-btn-secondary {
-    background: rgba(255,255,255,0.1);
-    color: #eee;
-}
-.we-btn-secondary:hover { background: rgba(255,255,255,0.2); }
+        this.element.appendChild(this.select);
+        this.element.appendChild(applyBtn);
+        this.element.appendChild(saveAsBtn);
 
-.we-btn-icon {
-    padding: 4px;
-    width: 24px;
-    height: 24px;
-    border-radius: 4px;
-    background: transparent;
-    color: #aaa;
+        // Кнопка удаления для кастомного
+        const deleteBtn = this.createElement('button', 'we-btn we-btn-danger we-btn-icon', '🗑️');
+        deleteBtn.title = 'Удалить кастомный пресет';
+        deleteBtn.style.display = 'none';
+
+        this.select.onchange = () => {
+            const id = this.select.value;
+            applyBtn.disabled = !id;
+            const isCustom = customPresets.some(p => p.id === id);
+            deleteBtn.style.display = isCustom ? 'flex' : 'none';
+        };
+
+        deleteBtn.onclick = () => {
+            const id = this.select.value;
+            if (id && confirm('Удалить этот пресет?')) {
+                deleteCustomPreset(id);
+                this.render();
+            }
+        };
+
+        this.element.appendChild(deleteBtn);
+    }
 }
-.we-btn-icon:hover {
-    background: rgba(255,255,255,0.1);
-    color: #fff;
+</file>
+
+<file path="src/editor/components/WaveSettingsPanel.ts">
+import { BaseComponent } from './BaseComponent';
+import { WaveModel } from '../WaveModel';
+import { SpawnTimingControl } from './SpawnTimingControl';
+
+interface WaveSettingsProps {
+    waveIndex: number;
+    model: WaveModel;
 }
 
-.we-btn-full {
-    width: 100%;
+/**
+ * Panel for wave-level metadata:
+ * Name, Start Delay, Wait for Clear, Shuffle Mode, Bonus Reward, Summary.
+ */
+export class WaveSettingsPanel extends BaseComponent<WaveSettingsProps> {
+
+    protected createRootElement(): HTMLElement {
+        return this.createElement('div', 'we-settings-panel');
+    }
+
+    public render(): void {
+        this.element.innerHTML = '';
+        const { waveIndex, model } = this.data;
+        const wave = model.getWave(waveIndex);
+        if (!wave) return;
+
+        // 1. Name input
+        const nameRow = this.createElement('div', 'we-settings-row');
+        const nameLabel = this.createElement('span', 'we-settings-label', '📝 Название');
+        const nameInput = document.createElement('input');
+        nameInput.type = 'text';
+        nameInput.className = 'we-settings-input';
+        nameInput.placeholder = 'напр. Волна Босса!';
+        nameInput.value = wave.name || '';
+        nameInput.onchange = () => {
+            model.updateWaveSettings(waveIndex, { name: nameInput.value.trim() || undefined });
+        };
+        nameRow.appendChild(nameLabel);
+        nameRow.appendChild(nameInput);
+        this.element.appendChild(nameRow);
+
+        // 2. Start Delay
+        const delayControl = new SpawnTimingControl({
+            value: wave.startDelay ?? 0,
+            min: 0,
+            max: 60,
+            step: 0.5,
+            label: '⏱️ Задержка старта',
+            suffix: 'с',
+            onChange: (val) => model.updateWaveSettings(waveIndex, { startDelay: val }),
+        });
+        delayControl.mount(this.element);
+
+        // 3. Wait for Clear (checkbox)
+        const clearRow = this.createElement('div', 'we-settings-row');
+        const clearLabel = this.createElement('span', 'we-settings-label', '⏹️ Ждать зачистки');
+        const clearCheck = document.createElement('input');
+        clearCheck.type = 'checkbox';
+        clearCheck.checked = wave.waitForClear ?? false;
+        clearCheck.onchange = () => {
+            model.updateWaveSettings(waveIndex, { waitForClear: clearCheck.checked });
+        };
+        clearRow.appendChild(clearLabel);
+        clearRow.appendChild(clearCheck);
+        this.element.appendChild(clearRow);
+
+        // 4. Shuffle Mode (select)
+        const shuffleRow = this.createElement('div', 'we-settings-row');
+        const shuffleLabel = this.createElement('span', 'we-settings-label', '🔀 Перемешивание');
+        const shuffleSelect = document.createElement('select');
+        shuffleSelect.className = 'we-settings-input';
+        const shuffleOptions: { value: string; label: string }[] = [
+            { value: 'none', label: 'Нет (по порядку)' },
+            { value: 'within_group', label: 'Внутри группы' },
+            { value: 'all', label: 'Все (старые карты)' },
+        ];
+        shuffleOptions.forEach(opt => {
+            const option = document.createElement('option');
+            option.value = opt.value;
+            option.textContent = opt.label;
+            if (opt.value === (wave.shuffleMode ?? 'none')) option.selected = true;
+            shuffleSelect.appendChild(option);
+        });
+        shuffleSelect.onchange = () => {
+            model.updateWaveSettings(waveIndex, {
+                shuffleMode: shuffleSelect.value as 'none' | 'within_group' | 'all',
+            });
+        };
+        shuffleRow.appendChild(shuffleLabel);
+        shuffleRow.appendChild(shuffleSelect);
+        this.element.appendChild(shuffleRow);
+
+        // 5. Bonus Reward
+        const rewardRow = this.createElement('div', 'we-settings-row');
+        const rewardLabel = this.createElement('span', 'we-settings-label', '💰 Бонус');
+        const rewardInput = document.createElement('input');
+        rewardInput.type = 'number';
+        rewardInput.className = 'we-settings-input';
+        rewardInput.min = '0';
+        rewardInput.max = '1000';
+        rewardInput.value = (wave.bonusReward ?? 0).toString();
+        rewardInput.style.width = '70px';
+        rewardInput.onchange = () => {
+            const val = Math.max(0, parseInt(rewardInput.value) || 0);
+            model.updateWaveSettings(waveIndex, { bonusReward: val || undefined });
+        };
+        rewardRow.appendChild(rewardLabel);
+        rewardRow.appendChild(rewardInput);
+        this.element.appendChild(rewardRow);
+
+        // 6. Auto-Summary (read-only)
+        const totalEnemies = wave.enemies.reduce((sum, g) => sum + g.count, 0);
+        const duration = model.getEstimatedDuration(waveIndex);
+        const threat = model.getThreat(waveIndex);
+        const summary = this.createElement('div', 'we-settings-summary',
+            `${totalEnemies} врагов • ~${duration.toFixed(1)}с • Угроза: ${Math.round(threat)}`
+        );
+        this.element.appendChild(summary);
+    }
+}
+</file>
+
+<file path="src/editor/components/WaveTimeline.ts">
+import { BaseComponent } from './BaseComponent';
+import { WaveModel } from '../WaveModel';
+import { EnemyRegistry } from '../EnemyRegistry';
+
+interface WaveTimelineProps {
+    waveIndex: number;
+    model: WaveModel;
 }
 
-/* Wave Item */
-.we-wave-item {
-    background: rgba(255, 255, 255, 0.03);
-    border: 1px solid rgba(255, 255, 255, 0.05);
-    border-radius: 8px;
-    overflow: hidden;
-    transition: background 0.2s;
+/**
+ * Canvas-based timeline visualization for a wave.
+ * Shows colored blocks per group, gray gaps for delays,
+ * and a time scale.
+ *
+ * NOTE: We do NOT store a separate `canvas` field because
+ * ES2022 class field initializers run AFTER super() returns,
+ * which would overwrite anything set in createRootElement().
+ * Instead we use `this.element` (which IS the canvas) and cast it.
+ */
+export class WaveTimeline extends BaseComponent<WaveTimelineProps> {
+
+    protected createRootElement(): HTMLElement {
+        const canvas = document.createElement('canvas');
+        canvas.className = 'we-timeline-canvas';
+        canvas.height = 40;
+        return canvas;
+    }
+
+    public render(): void {
+        const canvas = this.element as HTMLCanvasElement;
+        const { waveIndex, model } = this.data;
+        const wave = model.getWave(waveIndex);
+        if (!wave) return;
+
+        // Measure actual width from CSS layout
+        // On first mount the element may not be in DOM yet, so fallback to a safe default
+        const rect = canvas.getBoundingClientRect();
+        const canvasWidth = rect.width > 0 ? rect.width : 600;
+        const dpr = window.devicePixelRatio || 1;
+        const canvasH = 40;
+
+        canvas.width = canvasWidth * dpr;
+        canvas.height = canvasH * dpr;
+        canvas.style.width = canvasWidth + 'px';
+        canvas.style.height = canvasH + 'px';
+
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return;
+
+        ctx.scale(dpr, dpr);
+
+        // Calculate total duration
+        const totalDuration = model.getEstimatedDuration(waveIndex);
+        if (totalDuration <= 0) return;
+
+        const pxPerSec = canvasWidth / totalDuration;
+        let x = 0;
+        const barH = 24;
+        const barY = 4;
+
+        // Clear
+        ctx.clearRect(0, 0, canvasWidth, canvasH);
+
+        // Start delay
+        const startDelay = wave.startDelay ?? 0;
+        if (startDelay > 0) {
+            const w = startDelay * pxPerSec;
+            ctx.fillStyle = 'rgba(100, 100, 100, 0.3)';
+            ctx.fillRect(x, barY, w, barH);
+            ctx.fillStyle = '#666';
+            ctx.font = '9px sans-serif';
+            ctx.textAlign = 'center';
+            ctx.fillText(`⏱${startDelay}s`, x + w / 2, barY + barH / 2 + 3);
+            x += w;
+        }
+
+        // Each group
+        wave.enemies.forEach(group => {
+            // Delay before
+            const delay = group.delayBefore ?? 0;
+            if (delay > 0) {
+                const w = delay * pxPerSec;
+                ctx.fillStyle = 'rgba(100, 100, 100, 0.25)';
+                ctx.fillRect(x, barY, w, barH);
+                x += w;
+            }
+
+            // Group block
+            const interval = group.baseInterval ?? 0.66;
+            const groupDuration = group.count * interval;
+            const w = groupDuration * pxPerSec;
+
+            // Color from EnemyRegistry
+            const typeConfig = EnemyRegistry.getType(group.type);
+            const color = typeConfig?.color || '#888';
+            ctx.fillStyle = color;
+            ctx.globalAlpha = 0.7;
+            ctx.fillRect(x, barY, Math.max(w, 2), barH);
+            ctx.globalAlpha = 1;
+
+            // Border
+            ctx.strokeStyle = 'rgba(255,255,255,0.2)';
+            ctx.lineWidth = 1;
+            ctx.strokeRect(x, barY, Math.max(w, 2), barH);
+
+            // Label inside
+            if (w > 30) {
+                const symbol = typeConfig?.symbol || '?';
+                ctx.fillStyle = '#fff';
+                ctx.font = 'bold 10px sans-serif';
+                ctx.textAlign = 'center';
+                ctx.fillText(`${symbol} ×${group.count}`, x + w / 2, barY + barH / 2 + 4);
+            }
+
+            x += w;
+        });
+
+        // Time scale at bottom
+        ctx.fillStyle = '#555';
+        ctx.font = '8px sans-serif';
+        ctx.textAlign = 'center';
+        const interval = totalDuration > 20 ? 5 : totalDuration > 10 ? 2 : 1;
+        for (let t = 0; t <= totalDuration; t += interval) {
+            const tx = t * pxPerSec;
+            ctx.fillRect(tx, barY + barH + 2, 1, 4);
+            ctx.fillText(`${t}s`, tx, canvasH - 1);
+        }
+    }
+}
+</file>
+
+<file path="src/editor/WaveEditorHistory.ts">
+import { IWaveConfig } from '../MapData';
+
+/**
+ * Undo/Redo history for the Wave Editor.
+ * Uses JSON snapshots of the full IWaveConfig[] array.
+ * Compact diff is unnecessary — wave arrays are small.
+ */
+export class WaveEditorHistory {
+    private undoStack: { label: string; snapshot: string }[] = [];
+    private redoStack: { label: string; snapshot: string }[] = [];
+    private readonly maxSize = 30;
+
+    /** Save current state before mutation. Call BEFORE modifying data. */
+    public push(label: string, waves: IWaveConfig[]): void {
+        this.undoStack.push({ label, snapshot: JSON.stringify(waves) });
+        this.redoStack = []; // New action invalidates redo
+        if (this.undoStack.length > this.maxSize) {
+            this.undoStack.shift();
+        }
+    }
+
+    /** Undo last change. Returns previous state or null. */
+    public undo(currentWaves: IWaveConfig[]): IWaveConfig[] | null {
+        const entry = this.undoStack.pop();
+        if (!entry) return null;
+
+        // Save current state to redo stack
+        this.redoStack.push({ label: entry.label, snapshot: JSON.stringify(currentWaves) });
+
+        return JSON.parse(entry.snapshot);
+    }
+
+    /** Redo last undone change. Returns next state or null. */
+    public redo(currentWaves: IWaveConfig[]): IWaveConfig[] | null {
+        const entry = this.redoStack.pop();
+        if (!entry) return null;
+
+        // Save current state to undo stack
+        this.undoStack.push({ label: entry.label, snapshot: JSON.stringify(currentWaves) });
+
+        return JSON.parse(entry.snapshot);
+    }
+
+    public canUndo(): boolean { return this.undoStack.length > 0; }
+    public canRedo(): boolean { return this.redoStack.length > 0; }
+    public getUndoLabel(): string | null {
+        return this.undoStack.length > 0 ? this.undoStack[this.undoStack.length - 1].label : null;
+    }
+
+    public clear(): void {
+        this.undoStack = [];
+        this.redoStack = [];
+    }
+}
+</file>
+
+<file path="src/editor/WavePresets.ts">
+import { IWaveConfig } from '../MapData';
+
+export interface IWavePreset {
+    id: string;
+    name: string;
+    description: string;
+    waves: IWaveConfig[];
 }
 
-.we-wave-item:hover {
-    background: rgba(255, 255, 255, 0.06);
-    border-color: rgba(255, 255, 255, 0.1);
+const BUILTIN_PRESETS: IWavePreset[] = [
+    {
+        id: 'early_game',
+        name: '🌱 Ранняя игра',
+        description: '3 лёгкие волны',
+        waves: [
+            { enemies: [{ type: 'GRUNT', count: 5, pattern: 'normal', baseInterval: 0.8 }] },
+            { enemies: [{ type: 'GRUNT', count: 7, pattern: 'normal', baseInterval: 0.7 }] },
+            { enemies: [{ type: 'GRUNT', count: 8, pattern: 'normal', baseInterval: 0.6 }] }
+        ]
+    },
+    {
+        id: 'mid_game',
+        name: '⚔️ Средняя игра',
+        description: '5 волн, микс типов',
+        waves: [
+            { enemies: [{ type: 'GRUNT', count: 10, pattern: 'normal', baseInterval: 0.6 }] },
+            { enemies: [{ type: 'SCOUT', count: 5, pattern: 'normal', baseInterval: 0.5 }] },
+            { enemies: [{ type: 'GRUNT', count: 8, pattern: 'normal', baseInterval: 0.5 }, { type: 'SCOUT', count: 4, pattern: 'normal', baseInterval: 0.5, delayBefore: 2 }] },
+            { enemies: [{ type: 'TANK', count: 2, pattern: 'normal', baseInterval: 0.8 }] },
+            { enemies: [{ type: 'GRUNT', count: 15, pattern: 'swarm', baseInterval: 0.4 }] }
+        ]
+    },
+    {
+        id: 'boss_rush',
+        name: '👑 Босс-раш',
+        description: '3 волны с боссами',
+        waves: [
+            { waitForClear: true, bonusReward: 50, enemies: [{ type: 'boss', count: 1, pattern: 'normal', baseInterval: 1 }] },
+            { waitForClear: true, bonusReward: 100, enemies: [{ type: 'TANK', count: 3, pattern: 'normal', baseInterval: 1 }, { type: 'boss', count: 1, pattern: 'normal', baseInterval: 1, delayBefore: 2 }] },
+            { waitForClear: true, bonusReward: 200, enemies: [{ type: 'boss', count: 2, pattern: 'normal', baseInterval: 1.5 }] }
+        ]
+    },
+    {
+        id: 'swarm',
+        name: '🐝 Рой',
+        description: '4 волны быстрых врагов',
+        waves: [
+            { enemies: [{ type: 'SCOUT', count: 10, pattern: 'swarm', baseInterval: 0.15 }] },
+            { enemies: [{ type: 'SCOUT', count: 15, pattern: 'swarm', baseInterval: 0.15 }] },
+            { startDelay: 3, enemies: [{ type: 'SCOUT', count: 20, pattern: 'swarm', baseInterval: 0.15 }] },
+            { startDelay: 3, enemies: [{ type: 'SCOUT', count: 25, pattern: 'swarm', baseInterval: 0.15 }] }
+        ]
+    },
+    {
+        id: 'endurance',
+        name: '💀 Выживание',
+        description: '8 нарастающих волн',
+        waves: [
+            { shuffleMode: 'none', enemies: [{ type: 'GRUNT', count: 10, pattern: 'normal', baseInterval: 0.6 }] },
+            { shuffleMode: 'none', enemies: [{ type: 'SCOUT', count: 5, pattern: 'normal', baseInterval: 0.5 }] },
+            { shuffleMode: 'none', enemies: [{ type: 'GRUNT', count: 15, pattern: 'normal', baseInterval: 0.5 }] },
+            { shuffleMode: 'none', enemies: [{ type: 'TANK', count: 3, pattern: 'normal', baseInterval: 0.8 }] },
+            { startDelay: 5, shuffleMode: 'none', enemies: [{ type: 'SCOUT', count: 15, pattern: 'swarm', baseInterval: 0.2 }] },
+            { shuffleMode: 'none', enemies: [{ type: 'TANK', count: 5, pattern: 'normal', baseInterval: 0.7 }] },
+            { shuffleMode: 'none', enemies: [{ type: 'boss', count: 1, pattern: 'normal', baseInterval: 1 }] },
+            { shuffleMode: 'none', enemies: [{ type: 'GRUNT', count: 30, pattern: 'swarm', baseInterval: 0.2 }] }
+        ]
+    }
+];
+
+const CUSTOM_PRESETS_KEY = 'NEWTOWER_WAVE_PRESETS';
+
+export function getBuiltinPresets(): IWavePreset[] {
+    return JSON.parse(JSON.stringify(BUILTIN_PRESETS));
 }
 
-.we-wave-header {
-    padding: 10px 12px;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    background: rgba(0,0,0,0.2);
-    cursor: pointer;
+export function loadCustomPresets(): IWavePreset[] {
+    try {
+        const data = localStorage.getItem(CUSTOM_PRESETS_KEY);
+        if (data) {
+            const parsed = JSON.parse(data);
+            if (Array.isArray(parsed)) {
+                return parsed;
+            }
+        }
+    } catch (e) {
+        console.warn('Failed to load custom presets', e);
+    }
+    return [];
 }
 
-.we-wave-title {
-    font-weight: 600;
-    font-size: 14px;
-    color: #bbb;
+export function saveCustomPreset(name: string, waves: IWaveConfig[]): void {
+    const custom = loadCustomPresets();
+    const id = 'custom_' + Date.now();
+
+    // Ограничиваем длину имени
+    const safeName = name.substring(0, 50);
+
+    const preset: IWavePreset = {
+        id,
+        name: safeName,
+        description: `Кастомный пресет (${waves.length} волн)`,
+        waves: JSON.parse(JSON.stringify(waves))
+    };
+    custom.push(preset);
+
+    try {
+        localStorage.setItem(CUSTOM_PRESETS_KEY, JSON.stringify(custom));
+    } catch (e) {
+        console.error('Failed to save to localStorage (quota exceeded?)', e);
+        alert('Не удалось сохранить пресет. Не хватает памяти в localStorage.');
+    }
 }
 
-.we-wave-content {
-    padding: 10px;
-    border-top: 1px solid rgba(255,255,255,0.05);
-}
-
-/* Enemy Row */
-.we-enemy-row {
-    display: flex;
-    gap: 8px;
-    align-items: center;
-    margin-bottom: 8px;
-    padding: 4px;
-    border-radius: 4px;
-    background: rgba(0,0,0,0.2);
-}
-
-.we-enemy-row select, .we-enemy-row input {
-    background: rgba(0,0,0,0.3);
-    border: 1px solid rgba(255,255,255,0.1);
-    color: #fff;
-    padding: 4px 8px;
-    border-radius: 4px;
-    font-size: 13px;
-}
-
-.we-enemy-row select:focus, .we-enemy-row input:focus {
-    border-color: #2196f3;
-    outline: none;
-}
-
-/* Threat Meter */
-.we-threat-meter {
-    height: 4px;
-    background: rgba(255,255,255,0.1);
-    border-radius: 2px;
-    overflow: hidden;
-    margin-top: 4px;
-    width: 100px;
-}
-
-.we-threat-fill {
-    height: 100%;
-    transition: width 0.3s ease, background-color 0.3s ease;
-}
-
-.we-threat-badge {
-    font-size: 10px;
-    padding: 2px 6px;
-    border-radius: 10px;
-    background: rgba(0,0,0,0.4);
-    font-weight: bold;
+export function deleteCustomPreset(id: string): void {
+    const custom = loadCustomPresets();
+    const filtered = custom.filter(p => p.id !== id);
+    localStorage.setItem(CUSTOM_PRESETS_KEY, JSON.stringify(filtered));
 }
 </file>
 
@@ -4125,142 +4488,6 @@ export class DayNightCycle {
 }
 </file>
 
-<file path="src/editor/components/EnemyGroupRow.ts">
-import { BaseComponent } from './BaseComponent';
-import { SpawnPattern } from '../../MapData';
-import { EnemyRegistry } from '../EnemyRegistry';
-import { ThreatService } from '../ThreatService';
-import { IEnemyTypeConfig } from '../../types';
-
-interface EnemyGroupProps {
-    type: string;
-    count: number;
-    spawnPattern: SpawnPattern;
-    onChange: (updates: { type?: string; count?: number; spawnPattern?: SpawnPattern }) => void;
-    onRemove: () => void;
-}
-
-export class EnemyGroupRow extends BaseComponent<EnemyGroupProps> {
-
-    protected createRootElement(): HTMLElement {
-        return this.createElement('div', 'we-enemy-row');
-    }
-
-    public render(): void {
-        this.element.innerHTML = '';
-
-        // 1. Enemy Type Selector
-        const typeSelect = document.createElement('select');
-        typeSelect.title = 'Enemy Type';
-        typeSelect.style.maxWidth = '150px';
-
-        // ИСПРАВЛЕНО: используем статический метод getVisibleForEditor()
-        const types: IEnemyTypeConfig[] = EnemyRegistry.getVisibleForEditor();
-
-        types.forEach((config: IEnemyTypeConfig) => {
-            const opt = document.createElement('option');
-            // Используем ID как value (например 'grunt', 'boss')
-            opt.value = config.id;
-            opt.textContent = `${config.symbol} ${config.name}`;
-
-            // BACKWARDS COMPATIBILITY: Проверяем и ID (lowercase) и KEY (UPPERCASE)
-            // Старые карты используют 'GRUNT', 'BOSS', новые - 'grunt', 'boss'
-            const currentType = this.data.type;
-            const isMatch = config.id === currentType ||
-                config.id === currentType.toLowerCase() ||
-                config.id.toUpperCase() === currentType;
-
-            if (isMatch) {
-                opt.selected = true;
-                // Нормализуем данные к lowercase ID при первом рендере
-                if (currentType !== config.id) {
-                    this.data.onChange({ type: config.id });
-                }
-            }
-
-            typeSelect.appendChild(opt);
-        });
-
-        typeSelect.onchange = (e) => {
-            this.data.onChange({ type: (e.target as HTMLSelectElement).value });
-        };
-        this.element.appendChild(typeSelect);
-
-        // 2. Multiplier Label
-        const xLabel = document.createElement('span');
-        xLabel.textContent = 'x';
-        xLabel.style.color = '#888';
-        this.element.appendChild(xLabel);
-
-        // 3. Count Input
-        const countInput = document.createElement('input');
-        countInput.type = 'number';
-        countInput.min = '1';
-        countInput.max = '100';
-        countInput.value = this.data.count.toString();
-        countInput.style.width = '40px';
-
-        countInput.onchange = (e) => {
-            const val = parseInt((e.target as HTMLInputElement).value) || 1;
-            this.data.onChange({ count: val });
-        };
-        this.element.appendChild(countInput);
-
-        // 4. Pattern Selector
-        const patternSelect = document.createElement('select');
-        patternSelect.title = 'Spawn Pattern';
-        // FIXED: Removed restrictive width, added minWidth and pointer
-        patternSelect.style.minWidth = '50px';
-        patternSelect.style.cursor = 'pointer';
-
-        const patterns: Array<{ value: SpawnPattern; label: string }> = [
-            { value: 'normal', label: '⏱️ Norm' },
-            { value: 'random', label: '🎲 Rand' },
-            { value: 'swarm', label: '🐝 Swrm' }
-        ];
-
-        patterns.forEach(p => {
-            const opt = document.createElement('option');
-            opt.value = p.value;
-            opt.textContent = p.label;
-            opt.title = p.value; // Tooltip
-            if (p.value === (this.data.spawnPattern || 'normal')) opt.selected = true;
-            patternSelect.appendChild(opt);
-        });
-
-        patternSelect.onchange = (e) => {
-            this.data.onChange({ spawnPattern: (e.target as HTMLSelectElement).value as SpawnPattern });
-        };
-        this.element.appendChild(patternSelect);
-
-        // 5. Threat Indicator (Mini)
-        // Recalculate threat based on possibly updated type (if we had a mismatch)
-        // Actually threat service should handle ID lookup safely too, but let's just pass data.
-        const threat = ThreatService.calculateGroupThreat({
-            type: this.data.type,
-            count: this.data.count,
-            spawnPattern: this.data.spawnPattern
-        });
-
-        const threatDot = document.createElement('div');
-        threatDot.style.width = '10px';
-        threatDot.style.height = '10px';
-        threatDot.style.borderRadius = '50%';
-        threatDot.style.marginLeft = '4px';
-        threatDot.style.flexShrink = '0';
-        threatDot.style.background = ThreatService.getThreatColor(threat);
-        threatDot.title = `Threat: ${Math.round(threat)}`;
-        this.element.appendChild(threatDot);
-
-        // 6. Delete Button
-        const delBtn = this.createElement('button', 'we-btn we-btn-icon', '✕');
-        delBtn.style.marginLeft = 'auto'; // Push to right
-        delBtn.onclick = () => this.data.onRemove();
-        this.element.appendChild(delBtn);
-    }
-}
-</file>
-
 <file path="src/editor/EditorHistory.ts">
 interface IEditorAction {
     type: 'tile' | 'waypoint' | 'fog';
@@ -4529,144 +4756,6 @@ export class ThreatService {
         if (threat < 1500) return 'DANGEROUS';
         if (threat < 2500) return 'LETHAL';
         return 'NIGHTMARE';
-    }
-}
-</file>
-
-<file path="src/editor/WaveModel.ts">
-import { IWaveConfig, SpawnPattern, IWaveGroupRaw } from '../MapData';
-import { ThreatService } from './ThreatService';
-
-type ChangeListener = () => void;
-
-/**
- * Model class for the Wave Editor.
- * Manages the data state and ensures we work on a draft copy.
- */
-export class WaveModel {
-    private waves: IWaveConfig[];
-    private listeners: ChangeListener[] = [];
-
-    constructor(initialWaves: IWaveConfig[]) {
-        // Deep copy to ensure we hold a draft state
-        this.waves = JSON.parse(JSON.stringify(initialWaves || []));
-
-        // Ensure at least one wave if empty
-        if (this.waves.length === 0) {
-            this.addWave();
-        }
-    }
-
-    // --- Data Access ---
-
-    public getWaves(): IWaveConfig[] {
-        return this.waves;
-    }
-
-    public getWave(index: number): IWaveConfig {
-        return this.waves[index];
-    }
-
-    public getWaveCount(): number {
-        return this.waves.length;
-    }
-
-    public getThreat(waveIndex: number): number {
-        return ThreatService.calculateWaveThreat(this.waves[waveIndex]);
-    }
-
-    // --- Mutation Methods ---
-
-    public addWave() {
-        this.waves.push({
-            enemies: [{
-                type: 'GRUNT',
-                count: 5,
-                pattern: 'normal',
-                spawnRate: 'medium' // Default for new waves
-            }]
-        });
-        this.notify();
-    }
-
-    public removeWave(index: number) {
-        if (index >= 0 && index < this.waves.length) {
-            this.waves.splice(index, 1);
-            this.notify();
-        }
-    }
-
-    public addEnemyGroup(waveIndex: number) {
-        const wave = this.waves[waveIndex];
-        if (wave) {
-            wave.enemies.push({
-                type: 'GRUNT',
-                count: 1,
-                pattern: 'normal',
-                spawnRate: 'medium'
-            });
-            this.notify();
-        }
-    }
-
-    public removeEnemyGroup(waveIndex: number, groupIndex: number) {
-        const wave = this.waves[waveIndex];
-        if (wave && wave.enemies.length > groupIndex) {
-            wave.enemies.splice(groupIndex, 1);
-            this.notify();
-        }
-    }
-
-    // Explicitly typed for IWaveGroupRaw partial updates
-    public updateEnemyGroup(waveIndex: number, groupIndex: number, updates: Partial<IWaveGroupRaw>) {
-        const wave = this.waves[waveIndex];
-        if (wave && wave.enemies[groupIndex]) {
-            Object.assign(wave.enemies[groupIndex], updates);
-            this.notify();
-        }
-    }
-
-    public moveWave(fromIndex: number, toIndex: number) {
-        if (fromIndex < 0 || fromIndex >= this.waves.length || toIndex < 0 || toIndex >= this.waves.length) return;
-
-        const element = this.waves[fromIndex];
-        this.waves.splice(fromIndex, 1);
-        this.waves.splice(toIndex, 0, element);
-        this.notify();
-    }
-
-    // --- Validation ---
-
-    public validate(): boolean {
-        // Basic validation: must have waves, each wave must have enemies
-        if (this.waves.length === 0) return false;
-
-        for (const wave of this.waves) {
-            if (!wave.enemies || wave.enemies.length === 0) return false;
-            for (const group of wave.enemies) {
-                if (group.count < 1) return false;
-                if (!group.type) return false;
-            }
-        }
-        return true;
-    }
-
-    // --- Observer Pattern ---
-
-    public subscribe(listener: ChangeListener) {
-        this.listeners.push(listener);
-    }
-
-    public unsubscribe(listener: ChangeListener) {
-        this.listeners = this.listeners.filter(l => l !== listener);
-    }
-
-    private notify() {
-        this.listeners.forEach(l => l());
-    }
-
-    public destroy() {
-        this.listeners = [];
     }
 }
 </file>
@@ -7538,6 +7627,707 @@ export class CrashHandler {
 
         return JSON.stringify(report, null, 2);
     }
+}
+</file>
+
+<file path="src/editor/components/WaveList.ts">
+import { BaseComponent } from './BaseComponent';
+import { WaveModel } from '../WaveModel';
+import { EnemyGroupRow } from './EnemyGroupRow';
+import { ThreatMeter } from './ThreatMeter';
+import { WaveSettingsPanel } from './WaveSettingsPanel';
+import { WaveTimeline } from './WaveTimeline';
+
+export class WaveList extends BaseComponent<WaveModel> {
+    private expandedWaveIndex: number = 0; // Default open first wave
+
+    public render(): void {
+        const waveCount = this.data.getWaveCount();
+        if (this.expandedWaveIndex >= waveCount) {
+            this.expandedWaveIndex = waveCount > 0 ? waveCount - 1 : -1;
+        }
+
+        this.element.innerHTML = '';
+        this.element.className = 'we-wave-list';
+        this.element.style.display = 'flex';
+        this.element.style.flexDirection = 'column';
+        this.element.style.gap = '10px';
+
+        // --- Bulk Toolbar ---
+        const bulkToolbar = this.createElement('div', 'we-bulk-toolbar');
+        const delAllBtn = this.createElement('button', 'we-btn we-btn-danger we-btn-icon', '🗑️');
+        delAllBtn.title = 'Удалить все волны';
+        delAllBtn.onclick = () => {
+            if (confirm('Удалить все волны?')) {
+                this.data.replaceAllWaves([]);
+            }
+        };
+        const dupAllBtn = this.createElement('button', 'we-btn we-btn-icon', '📋');
+        dupAllBtn.title = 'Дублировать все';
+        dupAllBtn.onclick = () => {
+            const copy = JSON.parse(JSON.stringify(this.data.getWaves()));
+            const newWaves = [];
+            for (const w of copy) {
+                newWaves.push(w);
+                newWaves.push(JSON.parse(JSON.stringify(w)));
+            }
+            this.data.replaceAllWaves(newWaves);
+        };
+        bulkToolbar.appendChild(delAllBtn);
+        bulkToolbar.appendChild(dupAllBtn);
+        this.element.appendChild(bulkToolbar);
+
+        const waves = this.data.getWaves();
+
+        waves.forEach((_wave, index) => {
+            this.renderWaveItem(index);
+        });
+
+        // Add Wave Button
+        const addBtn = this.createElement('button', 'we-btn we-btn-secondary we-btn-full', '+ Добавить Волну');
+        addBtn.onclick = () => this.data.addWave();
+        this.element.appendChild(addBtn);
+    }
+
+    private renderWaveItem(index: number) {
+        const wave = this.data.getWave(index);
+        const threat = this.data.getThreat(index);
+        const isLast = index === this.data.getWaveCount() - 1;
+        const validation = this.data.validateExtended();
+
+        const container = this.createElement('div', 'we-wave-item');
+
+        const hasError = validation.errors.some(e => e.waveIndex === index);
+        const hasWarning = validation.warnings.some(w => w.waveIndex === index);
+
+        if (hasError) container.classList.add('we-wave-item--error');
+        else if (hasWarning) container.classList.add('we-wave-item--warning');
+
+        // --- Header ---
+        const header = this.createElement('div', 'we-wave-header');
+        header.onclick = (e) => {
+            // Prevent toggling if clicking buttons
+            if ((e.target as HTMLElement).tagName === 'BUTTON') return;
+
+            if (this.expandedWaveIndex === index) {
+                this.expandedWaveIndex = -1; // Collapse
+            } else {
+                this.expandedWaveIndex = index; // Expand
+            }
+            this.render(); // Re-render
+        };
+
+        const titleText = wave.name
+            ? `Волна ${index + 1} — ${wave.name}`
+            : `Волна ${index + 1}`;
+        const title = this.createElement('span', 'we-wave-title', titleText);
+        header.appendChild(title);
+
+        // Cycle badge on last wave
+        if (isLast) {
+            const cycleBadge = this.createElement('span', 'we-cycle-badge', '∞ Повторяется');
+            header.appendChild(cycleBadge);
+        }
+
+        // Preview of threat in header if collapsed
+        if (this.expandedWaveIndex !== index) {
+            const duration = this.data.getEstimatedDuration(index);
+            const threatPreview = this.createElement('span', '', `${Math.round(threat)} 💀 • ~${duration.toFixed(1)}с`);
+            threatPreview.style.fontSize = '12px';
+            threatPreview.style.color = '#888';
+            threatPreview.style.marginLeft = 'auto';
+            threatPreview.style.marginRight = '10px';
+            header.appendChild(threatPreview);
+        }
+
+        // Move Up button
+        if (index > 0) {
+            const moveUpBtn = this.createElement('button', 'we-move-btn', '🔼');
+            moveUpBtn.title = 'Перемещение волны вверх';
+            moveUpBtn.style.marginLeft = this.expandedWaveIndex !== index ? '0' : 'auto';
+            moveUpBtn.onclick = () => this.data.moveWaveUp(index);
+            header.appendChild(moveUpBtn);
+        }
+
+        // Move Down button
+        if (!isLast) {
+            const moveDownBtn = this.createElement('button', 'we-move-btn', '🔽');
+            moveDownBtn.title = 'Перемещение волны вниз';
+            moveDownBtn.style.marginLeft = (this.expandedWaveIndex !== index && index === 0) ? 'auto' : '0';
+            moveDownBtn.onclick = () => this.data.moveWaveDown(index);
+            header.appendChild(moveDownBtn);
+        }
+
+        // Duplicate Wave button
+        const dupBtn = this.createElement('button', 'we-btn we-btn-icon', '📋');
+        dupBtn.title = 'Дублировать волну';
+        dupBtn.style.marginLeft = (this.expandedWaveIndex === index && index === 0 && isLast) ? 'auto' : '0';
+        dupBtn.onclick = () => this.data.duplicateWave(index);
+        header.appendChild(dupBtn);
+
+        // Delete Wave button
+        const delBtn = this.createElement('button', 'we-btn we-btn-icon', '✕');
+        delBtn.onclick = () => this.data.removeWave(index);
+        header.appendChild(delBtn);
+
+        container.appendChild(header);
+
+        // --- Content (if expanded) ---
+        if (this.expandedWaveIndex === index) {
+            const content = this.createElement('div', 'we-wave-content');
+
+            // 1. Wave Settings Panel (name, delay, shuffle, reward)
+            const settingsPanel = new WaveSettingsPanel({
+                waveIndex: index,
+                model: this.data,
+            });
+            settingsPanel.mount(content);
+
+            // 2. Timeline visualization
+            const timeline = new WaveTimeline({ waveIndex: index, model: this.data });
+            timeline.mount(content);
+
+            // 3. Threat Meter
+            const meter = new ThreatMeter({ threat });
+            meter.mount(content);
+
+            // 3. Enemy Groups
+            const groupsContainer = this.createElement('div');
+            groupsContainer.style.marginTop = '10px';
+
+            wave.enemies.forEach((group, gIndex) => {
+                const isGroupError = validation.errors.some(e => e.waveIndex === index && e.groupIndex === gIndex);
+
+                const row = new EnemyGroupRow({
+                    type: group.type,
+                    count: group.count,
+                    baseInterval: group.baseInterval ?? 0.66,
+                    delayBefore: group.delayBefore ?? 0,
+                    spawnPattern: group.spawnPattern || group.pattern || 'normal',
+                    hasError: isGroupError,
+                    onChange: (updates) => {
+                        this.data.updateEnemyGroup(index, gIndex, updates);
+                    },
+                    onDuplicate: () => {
+                        this.data.duplicateGroup(index, gIndex);
+                    },
+                    onRemove: () => {
+                        this.data.removeEnemyGroup(index, gIndex);
+                    }
+                });
+                row.mount(groupsContainer);
+            });
+            content.appendChild(groupsContainer);
+
+            // 4. Add Enemy Button
+            const addEnemyBtn = this.createElement('button', 'we-btn we-btn-secondary', '+ Добавить группу врагов');
+            addEnemyBtn.style.marginTop = '8px';
+            addEnemyBtn.style.fontSize = '12px';
+            addEnemyBtn.style.padding = '4px 8px';
+            addEnemyBtn.style.width = '100%';
+            addEnemyBtn.onclick = () => this.data.addEnemyGroup(index);
+            content.appendChild(addEnemyBtn);
+
+            container.appendChild(content);
+        }
+
+        this.element.appendChild(container);
+    }
+}
+</file>
+
+<file path="src/editor/editor.css">
+/* Wave Editor Core Styles */
+
+.wave-editor-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 2000;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    backdrop-filter: blur(2px);
+}
+
+.wave-editor-container {
+    max-width: 800px;
+    width: 90vw;
+    max-height: 85vh;
+    background: rgba(30, 30, 35, 0.95);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+    border-radius: 12px;
+    display: flex;
+    flex-direction: column;
+    color: #eee;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    overflow: hidden;
+}
+
+/* Header */
+.we-header {
+    padding: 16px;
+    background: rgba(255, 255, 255, 0.05);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.we-header h2 {
+    margin: 0;
+    font-size: 18px;
+    font-weight: 600;
+    color: #fff;
+    letter-spacing: 0.5px;
+}
+
+/* Content Area */
+.we-content {
+    flex: 1;
+    overflow-y: auto;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+/* Scrollbar */
+.we-content::-webkit-scrollbar {
+    width: 8px;
+}
+
+.we-content::-webkit-scrollbar-track {
+    background: rgba(0, 0, 0, 0.2);
+}
+
+.we-content::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 4px;
+}
+
+/* Footer */
+.we-footer {
+    padding: 16px;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+    display: flex;
+    gap: 12px;
+    background: rgba(20, 20, 25, 0.95);
+}
+
+/* Buttons */
+.we-btn {
+    padding: 8px 16px;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-weight: 500;
+    transition: all 0.2s;
+    font-size: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+}
+
+.we-btn-primary {
+    background: #4caf50;
+    color: white;
+}
+
+.we-btn-primary:hover {
+    background: #43a047;
+}
+
+.we-btn-danger {
+    background: #f44336;
+    color: white;
+}
+
+.we-btn-danger:hover {
+    background: #e53935;
+}
+
+.we-btn-secondary {
+    background: rgba(255, 255, 255, 0.1);
+    color: #eee;
+}
+
+.we-btn-secondary:hover {
+    background: rgba(255, 255, 255, 0.2);
+}
+
+.we-btn-icon {
+    padding: 4px;
+    width: 24px;
+    height: 24px;
+    border-radius: 4px;
+    background: transparent;
+    color: #aaa;
+}
+
+.we-btn-icon:hover {
+    background: rgba(255, 255, 255, 0.1);
+    color: #fff;
+}
+
+.we-btn-full {
+    width: 100%;
+}
+
+/* Wave Item */
+.we-wave-item {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    border-radius: 8px;
+    overflow: hidden;
+    transition: background 0.2s;
+}
+
+.we-wave-item:hover {
+    background: rgba(255, 255, 255, 0.06);
+    border-color: rgba(255, 255, 255, 0.1);
+}
+
+.we-wave-header {
+    padding: 10px 12px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: rgba(0, 0, 0, 0.2);
+    cursor: pointer;
+}
+
+.we-wave-title {
+    font-weight: 600;
+    font-size: 14px;
+    color: #bbb;
+}
+
+.we-wave-content {
+    padding: 10px;
+    border-top: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+/* Enemy Row (see Phase 2 section below) */
+
+.we-enemy-row select,
+.we-enemy-row input {
+    background: rgba(0, 0, 0, 0.3);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: #fff;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 13px;
+}
+
+.we-enemy-row select:focus,
+.we-enemy-row input:focus {
+    border-color: #2196f3;
+    outline: none;
+}
+
+/* Threat Meter */
+.we-threat-meter {
+    height: 4px;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 2px;
+    overflow: hidden;
+    margin-top: 4px;
+    width: 100px;
+}
+
+.we-threat-fill {
+    height: 100%;
+    transition: width 0.3s ease, background-color 0.3s ease;
+}
+
+.we-threat-badge {
+    font-size: 10px;
+    padding: 2px 6px;
+    border-radius: 10px;
+    background: rgba(0, 0, 0, 0.4);
+    font-weight: bold;
+}
+
+/* ===== Phase 2 Additions ===== */
+
+/* Toolbar */
+.we-toolbar {
+    display: flex;
+    gap: 4px;
+    align-items: center;
+}
+
+/* Status Bar */
+.we-status-bar {
+    font-size: 12px;
+    color: #888;
+    padding: 6px 16px;
+    background: rgba(0, 0, 0, 0.15);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    font-family: 'Consolas', 'Courier New', monospace;
+}
+
+/* Disabled button */
+.we-btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+    pointer-events: none;
+}
+
+/* Timing Control (SpawnTimingControl) */
+.we-timing-control {
+    display: flex;
+    flex-direction: row;
+    gap: 6px;
+    align-items: center;
+    font-size: 12px;
+}
+
+.we-timing-label {
+    color: #aaa;
+    white-space: nowrap;
+    min-width: 80px;
+}
+
+.we-timing-range {
+    width: 80px;
+    accent-color: #2196f3;
+    cursor: pointer;
+}
+
+.we-timing-number {
+    width: 55px;
+    background: rgba(0, 0, 0, 0.3);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: #fff;
+    padding: 2px 4px;
+    border-radius: 4px;
+    font-size: 12px;
+    text-align: center;
+}
+
+.we-timing-number:focus {
+    border-color: #2196f3;
+    outline: none;
+}
+
+.we-timing-suffix {
+    color: #666;
+    font-size: 11px;
+}
+
+/* Settings Panel (WaveSettingsPanel) */
+.we-settings-panel {
+    background: rgba(255, 255, 255, 0.03);
+    padding: 10px;
+    border-radius: 6px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-bottom: 8px;
+}
+
+.we-settings-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.we-settings-label {
+    color: #aaa;
+    font-size: 12px;
+    min-width: 110px;
+    white-space: nowrap;
+}
+
+.we-settings-input {
+    background: rgba(0, 0, 0, 0.3);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: #fff;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 13px;
+    flex: 1;
+    max-width: 200px;
+}
+
+.we-settings-input:focus {
+    border-color: #2196f3;
+    outline: none;
+}
+
+.we-settings-summary {
+    font-size: 11px;
+    color: #888;
+    padding: 6px 8px;
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 4px;
+    font-family: 'Consolas', 'Courier New', monospace;
+    margin-top: 4px;
+}
+
+/* Enemy Row — two-row layout */
+.we-enemy-row {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin-bottom: 8px;
+    padding: 6px;
+    border-radius: 4px;
+    background: rgba(0, 0, 0, 0.2);
+}
+
+.we-enemy-main {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+.we-enemy-timing {
+    display: flex;
+    gap: 16px;
+    align-items: center;
+    padding: 4px 0 0 24px;
+    border-top: 1px solid rgba(255, 255, 255, 0.03);
+}
+
+/* Type Color Dot */
+.we-type-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+/* Threat Dot */
+.we-threat-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    margin-left: 4px;
+}
+
+/* Duration Label */
+.we-duration-label {
+    font-size: 11px;
+    color: #aaa;
+    font-family: 'Consolas', 'Courier New', monospace;
+    white-space: nowrap;
+}
+
+/* Cycle Badge */
+.we-cycle-badge {
+    font-size: 10px;
+    color: #666;
+    font-style: italic;
+    margin-left: 8px;
+}
+
+/* Timeline Canvas (Phase 3) */
+.we-timeline-canvas {
+    width: 100%;
+    height: 40px;
+    border-radius: 4px;
+    background: rgba(0, 0, 0, 0.3);
+    margin: 8px 0;
+}
+
+/* ===== Phase 4 Additions ===== */
+
+.we-preset-panel {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    padding: 8px 16px;
+    background: rgba(0, 0, 0, 0.2);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.we-bulk-toolbar {
+    display: flex;
+    gap: 8px;
+    padding: 8px;
+    background: rgba(0, 0, 0, 0.15);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.we-move-btn {
+    padding: 4px;
+    width: 20px;
+    height: 20px;
+    background: transparent;
+    border: none;
+    color: #aaa;
+    cursor: pointer;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 10px;
+}
+
+.we-move-btn:hover {
+    background: rgba(255, 255, 255, 0.1);
+    color: #fff;
+}
+
+/* ===== Phase 5 Additions ===== */
+
+.we-wave-item {
+    animation: we-fade-in 0.2s ease;
+}
+
+@keyframes we-fade-in {
+    from {
+        opacity: 0;
+        transform: translateY(-8px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.we-validation-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 8px;
+    margin: 8px;
+    border-radius: 4px;
+    font-size: 12px;
+}
+
+.we-validation-error {
+    color: #ff8a80;
+}
+
+.we-validation-warning {
+    color: #ffd180;
+}
+
+.we-wave-item--error {
+    border-color: #f44336 !important;
+    box-shadow: 0 0 4px rgba(244, 67, 54, 0.4);
+}
+
+.we-wave-item--warning {
+    border-color: #ff9800 !important;
+    box-shadow: 0 0 4px rgba(255, 152, 0, 0.4);
+}
+
+.we-enemy-row--error {
+    border: 1px solid rgba(244, 67, 54, 0.6) !important;
+    background: rgba(244, 67, 54, 0.1) !important;
 }
 </file>
 
@@ -11427,6 +12217,478 @@ function applyEffectsWithBonus(
             }
             // Spinup effects - keep from main card (already handled in processMinigunGroup)
         }
+    }
+}
+</file>
+
+<file path="src/editor/components/EnemyGroupRow.ts">
+import { BaseComponent } from './BaseComponent';
+import { SpawnPattern, IWaveGroupRaw } from '../../MapData';
+import { EnemyRegistry } from '../EnemyRegistry';
+import { ThreatService } from '../ThreatService';
+import { SpawnTimingControl } from './SpawnTimingControl';
+import { IEnemyTypeConfig } from '../../types';
+
+interface EnemyGroupProps {
+    type: string;
+    count: number;
+    baseInterval: number;
+    delayBefore: number;
+    spawnPattern: SpawnPattern;
+    hasError?: boolean;
+    onChange: (updates: Partial<IWaveGroupRaw>) => void;
+    onDuplicate: () => void;
+    onRemove: () => void;
+}
+
+export class EnemyGroupRow extends BaseComponent<EnemyGroupProps> {
+
+    protected createRootElement(): HTMLElement {
+        const el = this.createElement('div', 'we-enemy-row');
+        if (this.data.hasError) {
+            el.classList.add('we-enemy-row--error');
+        }
+        return el;
+    }
+
+    public render(): void {
+        this.element.innerHTML = '';
+
+        // Row 1: Type + Count + Pattern + Actions
+        const mainRow = this.createElement('div', 'we-enemy-main');
+
+        // Color dot for enemy type
+        const typeConfig = EnemyRegistry.getType(this.data.type);
+        if (typeConfig) {
+            const colorDot = document.createElement('div');
+            colorDot.className = 'we-type-dot';
+            colorDot.style.background = typeConfig.color;
+            colorDot.title = typeConfig.name;
+            mainRow.appendChild(colorDot);
+        }
+
+        // 1. Enemy Type Selector
+        const typeSelect = document.createElement('select');
+        typeSelect.title = 'Enemy Type';
+        typeSelect.style.maxWidth = '130px';
+
+        const types: IEnemyTypeConfig[] = EnemyRegistry.getVisibleForEditor();
+        types.forEach((config: IEnemyTypeConfig) => {
+            const opt = document.createElement('option');
+            opt.value = config.id;
+            opt.textContent = `${config.symbol} ${config.name}`;
+
+            const currentType = this.data.type;
+            const isMatch = config.id === currentType ||
+                config.id === currentType.toLowerCase() ||
+                config.id.toUpperCase() === currentType;
+
+            if (isMatch) {
+                opt.selected = true;
+                if (currentType !== config.id) {
+                    this.data.onChange({ type: config.id });
+                }
+            }
+            typeSelect.appendChild(opt);
+        });
+
+        typeSelect.onchange = (e) => {
+            this.data.onChange({ type: (e.target as HTMLSelectElement).value });
+        };
+        mainRow.appendChild(typeSelect);
+
+        // 2. × label + Count input
+        const xLabel = this.createElement('span', '', '×');
+        xLabel.style.color = '#888';
+        mainRow.appendChild(xLabel);
+
+        const countInput = document.createElement('input');
+        countInput.type = 'number';
+        countInput.min = '1';
+        countInput.max = '100';
+        countInput.value = this.data.count.toString();
+        countInput.style.width = '40px';
+        countInput.onchange = (e) => {
+            const val = parseInt((e.target as HTMLInputElement).value) || 1;
+            this.data.onChange({ count: val });
+        };
+        mainRow.appendChild(countInput);
+
+        // 3. Pattern Selector
+        const patternSelect = document.createElement('select');
+        patternSelect.title = 'Spawn Pattern';
+        patternSelect.style.minWidth = '50px';
+        patternSelect.style.cursor = 'pointer';
+
+        const patterns: Array<{ value: SpawnPattern; label: string }> = [
+            { value: 'normal', label: '⏱️ Norm' },
+            { value: 'random', label: '🎲 Rand' },
+            { value: 'swarm', label: '🐝 Swrm' }
+        ];
+
+        patterns.forEach(p => {
+            const opt = document.createElement('option');
+            opt.value = p.value;
+            opt.textContent = p.label;
+            opt.title = p.value;
+            if (p.value === (this.data.spawnPattern || 'normal')) opt.selected = true;
+            patternSelect.appendChild(opt);
+        });
+        patternSelect.onchange = (e) => {
+            this.data.onChange({ spawnPattern: (e.target as HTMLSelectElement).value as SpawnPattern });
+        };
+        mainRow.appendChild(patternSelect);
+
+        // 4. Duration label
+        const interval = this.data.baseInterval;
+        const dur = (this.data.count * interval).toFixed(1);
+        const durLabel = this.createElement('span', 'we-duration-label', `${this.data.count} × ${interval}с = ${dur}с`);
+        mainRow.appendChild(durLabel);
+
+        // 5. Threat dot
+        const threat = ThreatService.calculateGroupThreat({
+            type: this.data.type,
+            count: this.data.count,
+            spawnPattern: this.data.spawnPattern
+        });
+        const threatDot = document.createElement('div');
+        threatDot.className = 'we-threat-dot';
+        threatDot.style.background = ThreatService.getThreatColor(threat);
+        threatDot.title = `Угроза: ${Math.round(threat)}`;
+        mainRow.appendChild(threatDot);
+
+        // 6. Duplicate button
+        const dupBtn = this.createElement('button', 'we-btn we-btn-icon', '🔄');
+        dupBtn.title = 'Дублировать группу';
+        dupBtn.onclick = () => this.data.onDuplicate();
+        mainRow.appendChild(dupBtn);
+
+        // 7. Delete button
+        const delBtn = this.createElement('button', 'we-btn we-btn-icon', '✕');
+        delBtn.style.marginLeft = 'auto';
+        delBtn.onclick = () => this.data.onRemove();
+        mainRow.appendChild(delBtn);
+
+        this.element.appendChild(mainRow);
+
+        // Row 2: Timing controls (interval + delay)
+        const timingRow = this.createElement('div', 'we-enemy-timing');
+
+        const intervalCtrl = new SpawnTimingControl({
+            value: this.data.baseInterval,
+            min: 0.05,
+            max: 5.0,
+            step: 0.05,
+            label: '⏱️ Интервал',
+            suffix: 'с',
+            onChange: (val) => this.data.onChange({ baseInterval: val }),
+        });
+        intervalCtrl.mount(timingRow);
+
+        const delayCtrl = new SpawnTimingControl({
+            value: this.data.delayBefore,
+            min: 0,
+            max: 30,
+            step: 0.5,
+            label: '⏸️ Задержка',
+            suffix: 'с',
+            onChange: (val) => this.data.onChange({ delayBefore: val }),
+        });
+        delayCtrl.mount(timingRow);
+
+        this.element.appendChild(timingRow);
+    }
+}
+</file>
+
+<file path="src/editor/WaveModel.ts">
+import { IWaveConfig, IWaveGroupRaw } from '../MapData';
+import { EnemyRegistry } from './EnemyRegistry';
+import { ThreatService } from './ThreatService';
+import { WaveEditorHistory } from './WaveEditorHistory';
+
+export interface IValidationMessage {
+    waveIndex: number;
+    groupIndex?: number;
+    message: string;
+    field?: string;
+}
+
+export interface IValidationResult {
+    isValid: boolean;
+    errors: IValidationMessage[];
+    warnings: IValidationMessage[];
+}
+
+type ChangeListener = () => void;
+
+/**
+ * Model class for the Wave Editor.
+ * Manages the data state and ensures we work on a draft copy.
+ */
+export class WaveModel {
+    private waves: IWaveConfig[];
+    private listeners: ChangeListener[] = [];
+    private history = new WaveEditorHistory();
+
+    constructor(initialWaves: IWaveConfig[]) {
+        // Deep copy to ensure we hold a draft state
+        this.waves = JSON.parse(JSON.stringify(initialWaves || []));
+
+        // Ensure at least one wave if empty
+        if (this.waves.length === 0) {
+            this.addWave();
+        }
+    }
+
+    // --- Data Access ---
+
+    public getWaves(): IWaveConfig[] {
+        return this.waves;
+    }
+
+    public getWave(index: number): IWaveConfig {
+        return this.waves[index];
+    }
+
+    public getWaveCount(): number {
+        return this.waves.length;
+    }
+
+    public getThreat(waveIndex: number): number {
+        return ThreatService.calculateWaveThreat(this.waves[waveIndex]);
+    }
+
+    // --- Mutation Methods ---
+
+    public addWave() {
+        this.history.push('Add Wave', this.waves);
+        this.waves.push({
+            enemies: [{
+                type: 'GRUNT',
+                count: 5,
+                pattern: 'normal',
+                baseInterval: 0.66,
+            }],
+            shuffleMode: 'none', // New maps: designer controls order
+        });
+        this.notify();
+    }
+
+    public removeWave(index: number) {
+        if (index >= 0 && index < this.waves.length) {
+            this.history.push('Remove Wave', this.waves);
+            this.waves.splice(index, 1);
+            this.notify();
+        }
+    }
+
+    public addEnemyGroup(waveIndex: number) {
+        const wave = this.waves[waveIndex];
+        if (wave) {
+            this.history.push('Add Enemy Group', this.waves);
+            wave.enemies.push({
+                type: 'GRUNT',
+                count: 1,
+                pattern: 'normal',
+                baseInterval: 0.66,
+            });
+            this.notify();
+        }
+    }
+
+    public removeEnemyGroup(waveIndex: number, groupIndex: number) {
+        const wave = this.waves[waveIndex];
+        if (wave && wave.enemies.length > groupIndex) {
+            this.history.push('Remove Enemy Group', this.waves);
+            wave.enemies.splice(groupIndex, 1);
+            this.notify();
+        }
+    }
+
+    // Explicitly typed for IWaveGroupRaw partial updates
+    public updateEnemyGroup(waveIndex: number, groupIndex: number, updates: Partial<IWaveGroupRaw>) {
+        const wave = this.waves[waveIndex];
+        if (wave && wave.enemies[groupIndex]) {
+            this.history.push('Update Enemy Group', this.waves);
+            Object.assign(wave.enemies[groupIndex], updates);
+            this.notify();
+        }
+    }
+
+    public moveWave(fromIndex: number, toIndex: number) {
+        if (fromIndex < 0 || fromIndex >= this.waves.length || toIndex < 0 || toIndex >= this.waves.length) return;
+
+        this.history.push('Move Wave', this.waves);
+        const element = this.waves[fromIndex];
+        this.waves.splice(fromIndex, 1);
+        this.waves.splice(toIndex, 0, element);
+        this.notify();
+    }
+
+    public replaceAllWaves(newWaves: IWaveConfig[]) {
+        this.history.push('Заменить все волны', this.waves);
+        this.waves = JSON.parse(JSON.stringify(newWaves));
+        if (this.waves.length === 0) {
+            this.waves.push({
+                enemies: [{
+                    type: 'GRUNT',
+                    count: 5,
+                    pattern: 'normal',
+                    baseInterval: 0.66,
+                }],
+                shuffleMode: 'none',
+            });
+        }
+        this.notify();
+    }
+
+    public moveWaveUp(index: number) {
+        if (index > 0) this.moveWave(index, index - 1);
+    }
+
+    public moveWaveDown(index: number) {
+        if (index < this.waves.length - 1) this.moveWave(index, index + 1);
+    }
+
+    // --- New Methods ---
+
+    public updateWaveSettings(index: number, updates: Partial<Pick<IWaveConfig, 'name' | 'startDelay' | 'waitForClear' | 'bonusReward' | 'shuffleMode'>>) {
+        const wave = this.waves[index];
+        if (!wave) return;
+        this.history.push('Update Wave Settings', this.waves);
+        Object.assign(wave, updates);
+        this.notify();
+    }
+
+    public updateGroupTiming(waveIndex: number, groupIndex: number, updates: { baseInterval?: number; delayBefore?: number }) {
+        const wave = this.waves[waveIndex];
+        if (!wave || !wave.enemies[groupIndex]) return;
+        this.history.push('Update Group Timing', this.waves);
+        Object.assign(wave.enemies[groupIndex], updates);
+        this.notify();
+    }
+
+    public duplicateWave(index: number) {
+        if (index < 0 || index >= this.waves.length) return;
+        this.history.push('Duplicate Wave', this.waves);
+        const copy: IWaveConfig = JSON.parse(JSON.stringify(this.waves[index]));
+        this.waves.splice(index + 1, 0, copy);
+        this.notify();
+    }
+
+    public duplicateGroup(waveIndex: number, groupIndex: number) {
+        const wave = this.waves[waveIndex];
+        if (!wave || !wave.enemies[groupIndex]) return;
+        this.history.push('Duplicate Group', this.waves);
+        const copy: IWaveGroupRaw = JSON.parse(JSON.stringify(wave.enemies[groupIndex]));
+        wave.enemies.splice(groupIndex + 1, 0, copy);
+        this.notify();
+    }
+
+    public moveGroup(waveIndex: number, fromIdx: number, toIdx: number) {
+        const wave = this.waves[waveIndex];
+        if (!wave || fromIdx < 0 || fromIdx >= wave.enemies.length || toIdx < 0 || toIdx >= wave.enemies.length) return;
+        this.history.push('Move Group', this.waves);
+        const [element] = wave.enemies.splice(fromIdx, 1);
+        wave.enemies.splice(toIdx, 0, element);
+        this.notify();
+    }
+
+    public getEstimatedDuration(waveIndex: number): number {
+        const wave = this.waves[waveIndex];
+        if (!wave || !wave.enemies) return 0;
+        let total = wave.startDelay ?? 0;
+        wave.enemies.forEach(g => {
+            total += g.delayBefore ?? 0;
+            const interval = g.baseInterval ?? 0.66;
+            total += g.count * interval;
+        });
+        return total;
+    }
+
+    public undo(): boolean {
+        const state = this.history.undo(this.waves);
+        if (!state) return false;
+        this.waves = state;
+        this.notify();
+        return true;
+    }
+
+    public redo(): boolean {
+        const state = this.history.redo(this.waves);
+        if (!state) return false;
+        this.waves = state;
+        this.notify();
+        return true;
+    }
+
+    public canUndo(): boolean { return this.history.canUndo(); }
+    public canRedo(): boolean { return this.history.canRedo(); }
+
+    // --- Validation ---
+
+    public validateExtended(): IValidationResult {
+        const errors: IValidationMessage[] = [];
+        const warnings: IValidationMessage[] = [];
+
+        if (this.waves.length === 0) {
+            errors.push({ waveIndex: -1, message: 'Нет ни одной волны' });
+        }
+
+        this.waves.forEach((wave, wi) => {
+            if (!wave.enemies || wave.enemies.length === 0) {
+                errors.push({ waveIndex: wi, message: 'Волна без групп врагов' });
+            }
+            wave.enemies?.forEach((g, gi) => {
+                if (g.count < 1) {
+                    errors.push({ waveIndex: wi, groupIndex: gi, message: 'Количество < 1', field: 'count' });
+                }
+                if ((g.baseInterval ?? 0.66) <= 0) {
+                    errors.push({ waveIndex: wi, groupIndex: gi, message: 'Интервал <= 0', field: 'baseInterval' });
+                }
+                if (!g.type) {
+                    errors.push({ waveIndex: wi, groupIndex: gi, message: 'Не выбран тип врага', field: 'type' });
+                }
+                if (g.type && !EnemyRegistry.getType(g.type)) {
+                    warnings.push({ waveIndex: wi, groupIndex: gi, message: `Неизвестный тип: ${g.type}`, field: 'type' });
+                }
+            });
+
+            const threat = this.getThreat(wi);
+            if (threat > 3000) {
+                warnings.push({ waveIndex: wi, message: `Угроза ${Math.round(threat)} — NIGHTMARE!` });
+            }
+            const dur = this.getEstimatedDuration(wi);
+            if (dur > 120) {
+                warnings.push({ waveIndex: wi, message: `Длительность ${dur.toFixed(0)}с — очень долго` });
+            }
+        });
+
+        return { isValid: errors.length === 0, errors, warnings };
+    }
+
+    public validate(): boolean {
+        return this.validateExtended().isValid;
+    }
+
+    // --- Observer Pattern ---
+
+    public subscribe(listener: ChangeListener) {
+        this.listeners.push(listener);
+    }
+
+    public unsubscribe(listener: ChangeListener) {
+        this.listeners = this.listeners.filter(l => l !== listener);
+    }
+
+    private notify() {
+        this.listeners.forEach(l => l());
+    }
+
+    public destroy() {
+        this.listeners = [];
+        this.history.clear();
     }
 }
 </file>
@@ -17462,138 +18724,6 @@ export const ICE_UPGRADES: Record<number, IUpgradeCard> = {
 };
 </file>
 
-<file path="src/EventBus.ts">
-/**
- * Event Bus Module
- * Decouples game systems using the Observer pattern.
- */
-
-export interface EventPayloadMap {
-    // Economy
-    MONEY_CHANGED: number;
-    LIVES_CHANGED: number;
-
-    // Wave
-    WAVE_STARTED: number;
-    WAVE_COMPLETED: number;
-
-    // Game State
-    GAME_OVER: number;
-    GAME_RESTART: void;
-    TOGGLE_PAUSE: boolean;
-
-    // Entities
-    ENEMY_IMMUNE: { x: number; y: number };
-    ENEMY_DIED: { enemy: any }; // Using any to avoid circular dependency with Enemy for now, or use interface
-    ENEMY_SPAWNED: string;
-    SPAWN_PUDDLE: { x: number; y: number };
-    PROJECTILE_SPAWNED: { x: number; y: number; target: any; stats: any };
-
-    // Boss Mechanics
-    ENEMY_SPLIT: { enemy: any; threshold: number };
-    ENEMY_DEATH_SPAWN: { enemy: any; spawns: string[] };
-
-    // Cards (Phase 6.C)
-    CARD_DROPPED: { card: any; x: number; y: number; actionId?: string }; // card is ICard
-}
-
-export type EventCallback<T> = (data: T) => void;
-
-interface IEventSubscription {
-    id: number;
-    event: string;
-    callback: EventCallback<any>;
-}
-
-export class EventBus {
-    private static instance: EventBus;
-    private subscribers: Map<string, IEventSubscription[]> = new Map();
-    private nextId: number = 0;
-
-    private constructor() { }
-
-    public static getInstance(): EventBus {
-        if (!EventBus.instance) {
-            EventBus.instance = new EventBus();
-        }
-        return EventBus.instance;
-    }
-
-    /**
-     * Subscribe to an event
-     * @returns Unsubscribe function
-     */
-    public on<K extends keyof EventPayloadMap>(event: K, callback: EventCallback<EventPayloadMap[K]>): () => void {
-        const id = this.nextId++;
-        if (!this.subscribers.has(event)) {
-            this.subscribers.set(event, []);
-        }
-        this.subscribers.get(event)!.push({ id, event, callback });
-
-        // Return unsubscribe function
-        return () => this.off(id);
-    }
-
-    /**
-     * Unsubscribe using the ID (Deprecated, use returned function from on())
-     */
-    public off(id: number): void {
-        // Optimized: iterate with for loop instead of forEach
-        const events = this.subscribers.keys();
-        for (const event of events) {
-            const subs = this.subscribers.get(event)!;
-            for (let i = 0; i < subs.length; i++) {
-                if (subs[i].id === id) {
-                    subs.splice(i, 1);
-                    return; // Found and removed, exit early
-                }
-            }
-        }
-    }
-
-    /**
-     * Emit an event with data
-     */
-    public emit<K extends keyof EventPayloadMap>(event: K, data: EventPayloadMap[K]): void {
-        const subs = this.subscribers.get(event);
-        if (!subs) return;
-        // Use for loop instead of forEach for hot path
-        // Clone array to avoid issues if subscribers remove themselves during emit
-        const safeSubs = [...subs];
-        for (let i = 0; i < safeSubs.length; i++) {
-            safeSubs[i].callback(data);
-        }
-    }
-
-    /**
-     * Clear all subscribers (useful for scene transitions)
-     */
-    public clear(): void {
-        this.subscribers.clear();
-    }
-}
-
-// Define Event Constants for type safety type feeling
-// Legacy Events object kept for reference if needed, but prefer string literals with types
-export const Events = {
-    MONEY_CHANGED: 'MONEY_CHANGED',
-    LIVES_CHANGED: 'LIVES_CHANGED',
-    WAVE_STARTED: 'WAVE_STARTED',
-    WAVE_COMPLETED: 'WAVE_COMPLETED',
-    GAME_OVER: 'GAME_OVER',
-    GAME_RESTART: 'GAME_RESTART',
-    TOGGLE_PAUSE: 'TOGGLE_PAUSE',
-    ENEMY_IMMUNE: 'ENEMY_IMMUNE',
-    ENEMY_DIED: 'ENEMY_DIED',
-    ENEMY_SPAWNED: 'ENEMY_SPAWNED',
-    SPAWN_PUDDLE: 'SPAWN_PUDDLE',
-    PROJECTILE_SPAWNED: 'PROJECTILE_SPAWNED',
-    ENEMY_SPLIT: 'ENEMY_SPLIT',
-    ENEMY_DEATH_SPAWN: 'ENEMY_DEATH_SPAWN',
-    CARD_DROPPED: 'CARD_DROPPED'
-} as const;
-</file>
-
 <file path="src/FogSystem.ts">
 import { IMapData } from './MapData';
 import { FogRenderer } from './FogRenderer';
@@ -19498,366 +20628,6 @@ export class StressTestScene extends BaseScene implements IGameScene {
 }
 </file>
 
-<file path="src/systems/NotificationSystem.ts">
-import { Game } from '../Game';
-import { EffectSystem } from '../EffectSystem';
-import { EventBus, Events } from '../EventBus';
-import { SoundManager, SoundPriority } from '../SoundManager';
-
-/**
- * NotificationSystem - Visual notifications for game events
- * Wave start, wave clear, boss spawn, etc.
- */
-export class NotificationSystem {
-    private effects: EffectSystem;
-    private game: Game;
-
-    // Active notifications queue
-    private notifications: INotification[] = [];
-
-    private unsubs: (() => void)[] = [];
-
-    constructor(effects: EffectSystem, game: Game) {
-        this.effects = effects;
-        this.game = game;
-
-        this.initSubscriptions();
-    }
-
-    private initSubscriptions() {
-        const bus = EventBus.getInstance();
-
-        this.unsubs.push(bus.on(Events.WAVE_STARTED, (wave: number) => {
-            this.showWaveStart(wave);
-        }));
-
-        this.unsubs.push(bus.on(Events.WAVE_COMPLETED, (wave: number) => {
-            this.showWaveClear(wave);
-        }));
-
-        this.unsubs.push(bus.on(Events.ENEMY_IMMUNE, (data: { x: number; y: number }) => {
-            this.showImmune(data.x, data.y);
-        }));
-    }
-
-    public destroy() {
-        this.unsubs.forEach(u => u());
-        this.unsubs = [];
-    }
-
-    /**
-     * Wave Start notification - big zoom-in text
-     */
-    public showWaveStart(waveNum: number) {
-        const cx = this.game.width / 2;
-        const cy = this.game.height / 2;
-
-        // Main wave text with zoom effect
-        this.effects.add({
-            type: 'text',
-            text: `WAVE ${waveNum}`,
-            x: cx,
-            y: cy,
-            life: 1.5, // 90 frames
-            color: '#fff',
-            fontSize: 48,
-            vy: 0
-        });
-
-        // Subtitle
-        this.effects.add({
-            type: 'text',
-            text: 'INCOMING',
-            x: cx,
-            y: cy + 50,
-            life: 1.1, // 70 frames
-            color: '#ff5722',
-            fontSize: 24,
-            vy: 0
-        });
-
-        // Screen flash (red tint)
-        this.effects.add({
-            type: 'screen_flash',
-            x: 0,
-            y: 0,
-            life: 25,
-            flashColor: 'rgba(255, 50, 50, '
-        });
-
-        // Sound
-        SoundManager.play('boss_spawn', SoundPriority.HIGH);
-    }
-
-    /**
-     * Wave Clear notification - gold flash + confetti
-     */
-    public showWaveClear(waveNum: number) {
-        const cx = this.game.width / 2;
-        const cy = this.game.height / 2;
-
-        // Victory text
-        this.effects.add({
-            type: 'text',
-            text: 'WAVE CLEARED!',
-            x: cx,
-            y: cy - 30,
-            life: 1.3, // 80 frames
-            color: '#ffd700',
-            fontSize: 36,
-            vy: -30 // -0.5 * 60
-        });
-
-        // Gold screen flash
-        this.effects.add({
-            type: 'screen_flash',
-            x: 0,
-            y: 0,
-            life: 20,
-            flashColor: 'rgba(255, 215, 0, '
-        });
-
-        // Confetti particles
-        this.spawnConfetti(cx, cy);
-
-        // Sound
-        SoundManager.play('click', SoundPriority.HIGH);
-    }
-
-    /**
-     * Boss Spawn notification - dramatic darkening + spotlight
-     */
-    public showBossSpawn(bossName: string, x: number, y: number) {
-        const cx = this.game.width / 2;
-        const cy = this.game.height / 2;
-
-        // Warning text
-        this.effects.add({
-            type: 'text',
-            text: '⚠️ BOSS ⚠️',
-            x: cx,
-            y: cy - 100,
-            life: 2.0, // 120
-            color: '#ff0000',
-            fontSize: 42,
-            vy: 0
-        });
-
-        // Boss name
-        this.effects.add({
-            type: 'text',
-            text: bossName.toUpperCase(),
-            x: cx,
-            y: cy - 50,
-            life: 1.6, // 100
-            color: '#fff',
-            fontSize: 28,
-            vy: 0
-        });
-
-        // Dark flash
-        this.effects.add({
-            type: 'screen_flash',
-            x: 0,
-            y: 0,
-            life: 40,
-            flashColor: 'rgba(0, 0, 0, '
-        });
-
-        // Sound
-        SoundManager.play('boss_spawn', SoundPriority.HIGH);
-    }
-
-    /**
-     * Spawn confetti particles
-     */
-    private spawnConfetti(cx: number, cy: number) {
-        const colors = ['#ffd700', '#ff5722', '#4caf50', '#2196f3', '#e91e63'];
-
-        for (let i = 0; i < 30; i++) {
-            const angle = Math.random() * Math.PI * 2;
-            const speed = (2 + Math.random() * 4) * 60; // Convert to px/sec
-            const color = colors[Math.floor(Math.random() * colors.length)];
-
-            this.effects.add({
-                type: 'particle',
-                x: cx + (Math.random() - 0.5) * 100,
-                y: cy,
-                vx: Math.cos(angle) * speed,
-                vy: Math.sin(angle) * speed - 120, // Bias upward (2 * 60)
-                life: 0.6 + Math.random() * 0.5, // 40-70 frames
-                color: color,
-                radius: 3 + Math.random() * 3
-            });
-        }
-    }
-
-    /**
-     * Custom notification (for special events)
-     */
-    public showCustom(text: string, color: string = '#fff', duration: number = 60) {
-        const cx = this.game.width / 2;
-        const cy = this.game.height / 2;
-
-        this.effects.add({
-            type: 'text',
-            text: text,
-            x: cx,
-            y: cy,
-            life: duration,
-            color: color,
-            fontSize: 32,
-            vy: -0.5
-        });
-    }
-
-    public showImmune(x: number, y: number) {
-        this.effects.add({
-            type: 'text',
-            text: 'IMMUNE',
-            x: x,
-            y: y - 20, // Slight offset up
-            life: 0.6,
-            color: '#ffd700', // Gold
-            fontSize: 16, // Smaller than boss text
-            vy: -50 // Float up fast
-        });
-    }
-}
-
-interface INotification {
-    type: 'wave_start' | 'wave_clear' | 'boss_spawn' | 'custom';
-    text: string;
-    life: number;
-    maxLife: number;
-}
-</file>
-
-<file path="src/WaveEditor.ts">
-import { IWaveConfig } from './MapData';
-import { WaveModel } from './editor/WaveModel';
-import { WaveList } from './editor/components/WaveList';
-import './editor/editor.css';
-
-export class WaveEditor {
-    private container!: HTMLElement;
-    private model: WaveModel;
-    private waveList!: WaveList;
-    private onSave: (waves: IWaveConfig[]) => void;
-    private onClose: () => void;
-
-    /**
-     * @param initialWaves - The initial configuration of waves (will be copied)
-     * @param onSave - Callback when user clicks Save
-     * @param onClose - Callback when user clicks Cancel
-     */
-    constructor(initialWaves: IWaveConfig[], onSave: (waves: IWaveConfig[]) => void, onClose: () => void) {
-        this.onSave = onSave;
-        this.onClose = onClose;
-
-        // Initialize Model with draft data
-        // WaveModel handles deep copying
-        this.model = new WaveModel(initialWaves);
-
-        this.createUI();
-
-        // Subscribe to model changes to re-render the list
-        // In the future, we could have granular updates, but full re-render is safe for now
-        this.model.subscribe(() => {
-            if (this.waveList) {
-                this.waveList.render();
-            }
-        });
-    }
-
-    private createUI() {
-        // 1. Overlay
-        const overlay = document.createElement('div');
-        overlay.className = 'wave-editor-overlay';
-
-        // 2. Main Container
-        this.container = document.createElement('div');
-        this.container.className = 'wave-editor-container';
-
-        // 3. Header
-        const header = document.createElement('div');
-        header.className = 'we-header';
-        header.innerHTML = `
-            <h2>Wave Configuration</h2>
-            <div style="font-size: 12px; color: #888;">Draft Mode</div>
-        `;
-        this.container.appendChild(header);
-
-        // 4. Content (The Wave List)
-        const content = document.createElement('div');
-        content.className = 'we-content';
-
-        this.waveList = new WaveList(this.model);
-        this.waveList.mount(content);
-
-        this.container.appendChild(content);
-
-        // 5. Footer (Buttons)
-        const footer = document.createElement('div');
-        footer.className = 'we-footer';
-
-        const saveBtn = document.createElement('button');
-        saveBtn.className = 'we-btn we-btn-primary';
-        saveBtn.style.flex = '1';
-        saveBtn.textContent = 'Save & Close';
-        saveBtn.onclick = () => this.save();
-
-        const cancelBtn = document.createElement('button');
-        cancelBtn.className = 'we-btn we-btn-danger';
-        cancelBtn.style.flex = '1';
-        cancelBtn.textContent = 'Cancel';
-        cancelBtn.onclick = () => this.close();
-
-        footer.appendChild(saveBtn);
-        footer.appendChild(cancelBtn);
-        this.container.appendChild(footer);
-
-        // Mount Overlay to Body
-        overlay.appendChild(this.container);
-        document.body.appendChild(overlay);
-
-        // Update reference to point to overlay for destruction
-        this.container = overlay;
-    }
-
-    private save() {
-        if (!this.model.validate()) {
-            alert('Invalid configuration! Check for empty waves or groups.');
-            return;
-        }
-        this.onSave(this.model.getWaves());
-        this.destroy();
-    }
-
-    private close() {
-        this.onClose();
-        this.destroy();
-    }
-
-    public destroy() {
-        // Component Cleanup
-        if (this.waveList) {
-            this.waveList.destroy();
-        }
-
-        // Model Cleanup
-        if (this.model) {
-            this.model.destroy();
-        }
-
-        // DOM Cleanup
-        if (this.container && this.container.parentNode) {
-            this.container.parentNode.removeChild(this.container);
-        }
-    }
-}
-</file>
-
 <file path="src/cards/CardType.ts">
 /**
  * Base interfaces and types for the upgrade card system
@@ -20040,6 +20810,138 @@ export const MINIGUN_UPGRADES: Record<number, IUpgradeCard> = {
         ]
     }
 };
+</file>
+
+<file path="src/EventBus.ts">
+/**
+ * Event Bus Module
+ * Decouples game systems using the Observer pattern.
+ */
+
+export interface EventPayloadMap {
+    // Economy
+    MONEY_CHANGED: number;
+    LIVES_CHANGED: number;
+
+    // Wave
+    WAVE_STARTED: { wave: number; name?: string };
+    WAVE_COMPLETED: number;
+
+    // Game State
+    GAME_OVER: number;
+    GAME_RESTART: void;
+    TOGGLE_PAUSE: boolean;
+
+    // Entities
+    ENEMY_IMMUNE: { x: number; y: number };
+    ENEMY_DIED: { enemy: any }; // Using any to avoid circular dependency with Enemy for now, or use interface
+    ENEMY_SPAWNED: string;
+    SPAWN_PUDDLE: { x: number; y: number };
+    PROJECTILE_SPAWNED: { x: number; y: number; target: any; stats: any };
+
+    // Boss Mechanics
+    ENEMY_SPLIT: { enemy: any; threshold: number };
+    ENEMY_DEATH_SPAWN: { enemy: any; spawns: string[] };
+
+    // Cards (Phase 6.C)
+    CARD_DROPPED: { card: any; x: number; y: number; actionId?: string }; // card is ICard
+}
+
+export type EventCallback<T> = (data: T) => void;
+
+interface IEventSubscription {
+    id: number;
+    event: string;
+    callback: EventCallback<any>;
+}
+
+export class EventBus {
+    private static instance: EventBus;
+    private subscribers: Map<string, IEventSubscription[]> = new Map();
+    private nextId: number = 0;
+
+    private constructor() { }
+
+    public static getInstance(): EventBus {
+        if (!EventBus.instance) {
+            EventBus.instance = new EventBus();
+        }
+        return EventBus.instance;
+    }
+
+    /**
+     * Subscribe to an event
+     * @returns Unsubscribe function
+     */
+    public on<K extends keyof EventPayloadMap>(event: K, callback: EventCallback<EventPayloadMap[K]>): () => void {
+        const id = this.nextId++;
+        if (!this.subscribers.has(event)) {
+            this.subscribers.set(event, []);
+        }
+        this.subscribers.get(event)!.push({ id, event, callback });
+
+        // Return unsubscribe function
+        return () => this.off(id);
+    }
+
+    /**
+     * Unsubscribe using the ID (Deprecated, use returned function from on())
+     */
+    public off(id: number): void {
+        // Optimized: iterate with for loop instead of forEach
+        const events = this.subscribers.keys();
+        for (const event of events) {
+            const subs = this.subscribers.get(event)!;
+            for (let i = 0; i < subs.length; i++) {
+                if (subs[i].id === id) {
+                    subs.splice(i, 1);
+                    return; // Found and removed, exit early
+                }
+            }
+        }
+    }
+
+    /**
+     * Emit an event with data
+     */
+    public emit<K extends keyof EventPayloadMap>(event: K, data: EventPayloadMap[K]): void {
+        const subs = this.subscribers.get(event);
+        if (!subs) return;
+        // Use for loop instead of forEach for hot path
+        // Clone array to avoid issues if subscribers remove themselves during emit
+        const safeSubs = [...subs];
+        for (let i = 0; i < safeSubs.length; i++) {
+            safeSubs[i].callback(data);
+        }
+    }
+
+    /**
+     * Clear all subscribers (useful for scene transitions)
+     */
+    public clear(): void {
+        this.subscribers.clear();
+    }
+}
+
+// Define Event Constants for type safety type feeling
+// Legacy Events object kept for reference if needed, but prefer string literals with types
+export const Events = {
+    MONEY_CHANGED: 'MONEY_CHANGED',
+    LIVES_CHANGED: 'LIVES_CHANGED',
+    WAVE_STARTED: 'WAVE_STARTED',
+    WAVE_COMPLETED: 'WAVE_COMPLETED',
+    GAME_OVER: 'GAME_OVER',
+    GAME_RESTART: 'GAME_RESTART',
+    TOGGLE_PAUSE: 'TOGGLE_PAUSE',
+    ENEMY_IMMUNE: 'ENEMY_IMMUNE',
+    ENEMY_DIED: 'ENEMY_DIED',
+    ENEMY_SPAWNED: 'ENEMY_SPAWNED',
+    SPAWN_PUDDLE: 'SPAWN_PUDDLE',
+    PROJECTILE_SPAWNED: 'PROJECTILE_SPAWNED',
+    ENEMY_SPLIT: 'ENEMY_SPLIT',
+    ENEMY_DEATH_SPAWN: 'ENEMY_DEATH_SPAWN',
+    CARD_DROPPED: 'CARD_DROPPED'
+} as const;
 </file>
 
 <file path="src/ForgeSystem.ts">
@@ -20616,6 +21518,241 @@ export class SpatialGrid<T extends IGridEntity> {
             totalEntities,
         };
     }
+}
+</file>
+
+<file path="src/systems/NotificationSystem.ts">
+import { Game } from '../Game';
+import { EffectSystem } from '../EffectSystem';
+import { EventBus, Events } from '../EventBus';
+import { SoundManager, SoundPriority } from '../SoundManager';
+
+/**
+ * NotificationSystem - Visual notifications for game events
+ * Wave start, wave clear, boss spawn, etc.
+ */
+export class NotificationSystem {
+    private effects: EffectSystem;
+    private game: Game;
+
+    // Active notifications queue
+    private notifications: INotification[] = [];
+
+    private unsubs: (() => void)[] = [];
+
+    constructor(effects: EffectSystem, game: Game) {
+        this.effects = effects;
+        this.game = game;
+
+        this.initSubscriptions();
+    }
+
+    private initSubscriptions() {
+        const bus = EventBus.getInstance();
+
+        this.unsubs.push(bus.on(Events.WAVE_STARTED, (data: { wave: number; name?: string }) => {
+            this.showWaveStart(data.wave, data.name);
+        }));
+
+        this.unsubs.push(bus.on(Events.WAVE_COMPLETED, (wave: number) => {
+            this.showWaveClear(wave);
+        }));
+
+        this.unsubs.push(bus.on(Events.ENEMY_IMMUNE, (data: { x: number; y: number }) => {
+            this.showImmune(data.x, data.y);
+        }));
+    }
+
+    public destroy() {
+        this.unsubs.forEach(u => u());
+        this.unsubs = [];
+    }
+
+    /**
+     * Wave Start notification - big zoom-in text
+     */
+    public showWaveStart(waveNum: number, waveName?: string) {
+        const cx = this.game.width / 2;
+        const cy = this.game.height / 2;
+
+        // Main wave text with zoom effect
+        this.effects.add({
+            type: 'text',
+            text: `WAVE ${waveNum}`,
+            x: cx,
+            y: cy,
+            life: 1.5, // 90 frames
+            color: '#fff',
+            fontSize: 48,
+            vy: 0
+        });
+
+        // Subtitle
+        this.effects.add({
+            type: 'text',
+            text: waveName || 'INCOMING',
+            x: cx,
+            y: cy + 50,
+            life: 1.1, // 70 frames
+            color: '#ff5722',
+            fontSize: 24,
+            vy: 0
+        });
+
+        // Screen flash (red tint)
+        this.effects.add({
+            type: 'screen_flash',
+            x: 0,
+            y: 0,
+            life: 25,
+            flashColor: 'rgba(255, 50, 50, '
+        });
+
+        // Sound
+        SoundManager.play('boss_spawn', SoundPriority.HIGH);
+    }
+
+    /**
+     * Wave Clear notification - gold flash + confetti
+     */
+    public showWaveClear(waveNum: number) {
+        const cx = this.game.width / 2;
+        const cy = this.game.height / 2;
+
+        // Victory text
+        this.effects.add({
+            type: 'text',
+            text: 'WAVE CLEARED!',
+            x: cx,
+            y: cy - 30,
+            life: 1.3, // 80 frames
+            color: '#ffd700',
+            fontSize: 36,
+            vy: -30 // -0.5 * 60
+        });
+
+        // Gold screen flash
+        this.effects.add({
+            type: 'screen_flash',
+            x: 0,
+            y: 0,
+            life: 20,
+            flashColor: 'rgba(255, 215, 0, '
+        });
+
+        // Confetti particles
+        this.spawnConfetti(cx, cy);
+
+        // Sound
+        SoundManager.play('click', SoundPriority.HIGH);
+    }
+
+    /**
+     * Boss Spawn notification - dramatic darkening + spotlight
+     */
+    public showBossSpawn(bossName: string, x: number, y: number) {
+        const cx = this.game.width / 2;
+        const cy = this.game.height / 2;
+
+        // Warning text
+        this.effects.add({
+            type: 'text',
+            text: '⚠️ BOSS ⚠️',
+            x: cx,
+            y: cy - 100,
+            life: 2.0, // 120
+            color: '#ff0000',
+            fontSize: 42,
+            vy: 0
+        });
+
+        // Boss name
+        this.effects.add({
+            type: 'text',
+            text: bossName.toUpperCase(),
+            x: cx,
+            y: cy - 50,
+            life: 1.6, // 100
+            color: '#fff',
+            fontSize: 28,
+            vy: 0
+        });
+
+        // Dark flash
+        this.effects.add({
+            type: 'screen_flash',
+            x: 0,
+            y: 0,
+            life: 40,
+            flashColor: 'rgba(0, 0, 0, '
+        });
+
+        // Sound
+        SoundManager.play('boss_spawn', SoundPriority.HIGH);
+    }
+
+    /**
+     * Spawn confetti particles
+     */
+    private spawnConfetti(cx: number, cy: number) {
+        const colors = ['#ffd700', '#ff5722', '#4caf50', '#2196f3', '#e91e63'];
+
+        for (let i = 0; i < 30; i++) {
+            const angle = Math.random() * Math.PI * 2;
+            const speed = (2 + Math.random() * 4) * 60; // Convert to px/sec
+            const color = colors[Math.floor(Math.random() * colors.length)];
+
+            this.effects.add({
+                type: 'particle',
+                x: cx + (Math.random() - 0.5) * 100,
+                y: cy,
+                vx: Math.cos(angle) * speed,
+                vy: Math.sin(angle) * speed - 120, // Bias upward (2 * 60)
+                life: 0.6 + Math.random() * 0.5, // 40-70 frames
+                color: color,
+                radius: 3 + Math.random() * 3
+            });
+        }
+    }
+
+    /**
+     * Custom notification (for special events)
+     */
+    public showCustom(text: string, color: string = '#fff', duration: number = 60) {
+        const cx = this.game.width / 2;
+        const cy = this.game.height / 2;
+
+        this.effects.add({
+            type: 'text',
+            text: text,
+            x: cx,
+            y: cy,
+            life: duration,
+            color: color,
+            fontSize: 32,
+            vy: -0.5
+        });
+    }
+
+    public showImmune(x: number, y: number) {
+        this.effects.add({
+            type: 'text',
+            text: 'IMMUNE',
+            x: x,
+            y: y - 20, // Slight offset up
+            life: 0.6,
+            color: '#ffd700', // Gold
+            fontSize: 16, // Smaller than boss text
+            vy: -50 // Float up fast
+        });
+    }
+}
+
+interface INotification {
+    type: 'wave_start' | 'wave_clear' | 'boss_spawn' | 'custom';
+    text: string;
+    life: number;
+    maxLife: number;
 }
 </file>
 
@@ -22337,6 +23474,224 @@ ${timelineStr}
 }
 </file>
 
+<file path="src/WaveEditor.ts">
+import { IWaveConfig } from './MapData';
+import { WaveModel } from './editor/WaveModel';
+import { WaveList } from './editor/components/WaveList';
+import { WavePresetPanel } from './editor/components/WavePresetPanel';
+import { ValidationPanel } from './editor/components/ValidationPanel';
+import './editor/editor.css';
+
+export class WaveEditor {
+    private container!: HTMLElement;
+    private model: WaveModel;
+    private waveList!: WaveList;
+    private presetPanel!: WavePresetPanel;
+    private validationPanel!: ValidationPanel;
+    private onSave: (waves: IWaveConfig[]) => void;
+    private onClose: () => void;
+
+    // Toolbar elements (for updating disabled state)
+    private undoBtn!: HTMLButtonElement;
+    private redoBtn!: HTMLButtonElement;
+    private statusBar!: HTMLElement;
+
+    // Keyboard handler reference for cleanup
+    private boundKeyHandler: (e: KeyboardEvent) => void;
+
+    /**
+     * @param initialWaves - The initial configuration of waves (will be copied)
+     * @param onSave - Callback when user clicks Save
+     * @param onClose - Callback when user clicks Cancel
+     */
+    constructor(initialWaves: IWaveConfig[], onSave: (waves: IWaveConfig[]) => void, onClose: () => void) {
+        this.onSave = onSave;
+        this.onClose = onClose;
+
+        // Initialize Model with draft data
+        this.model = new WaveModel(initialWaves);
+
+        // Keyboard shortcuts
+        this.boundKeyHandler = (e: KeyboardEvent) => {
+            if (e.ctrlKey && e.key === 'z') {
+                e.preventDefault();
+                this.model.undo();
+            } else if (e.ctrlKey && e.key === 'y') {
+                e.preventDefault();
+                this.model.redo();
+            } else if (e.ctrlKey && e.key === 's') {
+                e.preventDefault();
+                this.save();
+            }
+        };
+        document.addEventListener('keydown', this.boundKeyHandler);
+
+        this.createUI();
+
+        // Subscribe to model changes to re-render the list and update toolbar
+        this.model.subscribe(() => {
+            if (this.waveList) {
+                this.waveList.render();
+            }
+            if (this.validationPanel) {
+                this.validationPanel.updateResult(this.model.validateExtended());
+            }
+            this.updateToolbar();
+        });
+    }
+
+    private createUI() {
+        // 1. Overlay
+        const overlay = document.createElement('div');
+        overlay.className = 'wave-editor-overlay';
+
+        // 2. Main Container (wider)
+        this.container = document.createElement('div');
+        this.container.className = 'wave-editor-container';
+
+        // 3. Header
+        const header = document.createElement('div');
+        header.className = 'we-header';
+
+        const headerLeft = document.createElement('div');
+        headerLeft.innerHTML = `<h2>Конфигурация Волн</h2>`;
+        header.appendChild(headerLeft);
+
+        // Toolbar: Undo / Redo
+        const toolbar = document.createElement('div');
+        toolbar.className = 'we-toolbar';
+
+        this.undoBtn = document.createElement('button');
+        this.undoBtn.className = 'we-btn we-btn-icon';
+        this.undoBtn.textContent = '↩️';
+        this.undoBtn.title = 'Отменить (Ctrl+Z)';
+        this.undoBtn.disabled = true;
+        this.undoBtn.onclick = () => this.model.undo();
+        toolbar.appendChild(this.undoBtn);
+
+        this.redoBtn = document.createElement('button');
+        this.redoBtn.className = 'we-btn we-btn-icon';
+        this.redoBtn.textContent = '↪️';
+        this.redoBtn.title = 'Повторить (Ctrl+Y)';
+        this.redoBtn.disabled = true;
+        this.redoBtn.onclick = () => this.model.redo();
+        toolbar.appendChild(this.redoBtn);
+
+        header.appendChild(toolbar);
+        this.container.appendChild(header);
+
+        // Add WavePresetPanel here
+        this.presetPanel = new WavePresetPanel(this.model);
+        this.presetPanel.mount(this.container);
+
+        // Status Bar
+        this.statusBar = document.createElement('div');
+        this.statusBar.className = 'we-status-bar';
+        this.container.appendChild(this.statusBar);
+        this.updateToolbar(); // Initial status
+
+        // 4. Content (The Wave List)
+        const content = document.createElement('div');
+        content.className = 'we-content';
+
+        this.waveList = new WaveList(this.model);
+        this.waveList.mount(content);
+
+        this.container.appendChild(content);
+
+        // Add Validation Panel here
+        this.validationPanel = new ValidationPanel(this.model.validateExtended());
+        this.validationPanel.mount(this.container);
+
+        // 5. Footer (Buttons)
+        const footer = document.createElement('div');
+        footer.className = 'we-footer';
+
+        const saveBtn = document.createElement('button');
+        saveBtn.className = 'we-btn we-btn-primary';
+        saveBtn.style.flex = '1';
+        saveBtn.textContent = '💾 Сохранить';
+        saveBtn.onclick = () => this.save();
+
+        const cancelBtn = document.createElement('button');
+        cancelBtn.className = 'we-btn we-btn-danger';
+        cancelBtn.style.flex = '1';
+        cancelBtn.textContent = 'Отмена';
+        cancelBtn.onclick = () => this.close();
+
+        footer.appendChild(saveBtn);
+        footer.appendChild(cancelBtn);
+        this.container.appendChild(footer);
+
+        // Mount Overlay to Body
+        overlay.appendChild(this.container);
+        document.body.appendChild(overlay);
+
+        // Update reference to point to overlay for destruction
+        this.container = overlay;
+    }
+
+    private updateToolbar() {
+        // Undo/Redo button state
+        if (this.undoBtn) this.undoBtn.disabled = !this.model.canUndo();
+        if (this.redoBtn) this.redoBtn.disabled = !this.model.canRedo();
+
+        // Status bar
+        if (this.statusBar) {
+            const waves = this.model.getWaves();
+            const waveCount = waves.length;
+            const totalEnemies = waves.reduce((sum, w) => sum + w.enemies.reduce((s, g) => s + g.count, 0), 0);
+            let totalDuration = 0;
+            for (let i = 0; i < waveCount; i++) {
+                totalDuration += this.model.getEstimatedDuration(i);
+            }
+            this.statusBar.textContent = `Черновик • ${waveCount} волн • ${totalEnemies} врагов • ~${totalDuration.toFixed(1)}с`;
+        }
+    }
+
+    private save() {
+        const result = this.model.validateExtended();
+        if (!result.isValid) {
+            this.validationPanel.updateResult(result);
+            return;
+        }
+        this.onSave(this.model.getWaves());
+        this.destroy();
+    }
+
+    private close() {
+        this.onClose();
+        this.destroy();
+    }
+
+    public destroy() {
+        // Keyboard listener cleanup
+        document.removeEventListener('keydown', this.boundKeyHandler);
+
+        // Component Cleanup
+        if (this.waveList) {
+            this.waveList.destroy();
+        }
+        if (this.presetPanel) {
+            this.presetPanel.destroy();
+        }
+        if (this.validationPanel) {
+            this.validationPanel.destroy();
+        }
+
+        // Model Cleanup
+        if (this.model) {
+            this.model.destroy();
+        }
+
+        // DOM Cleanup
+        if (this.container && this.container.parentNode) {
+            this.container.parentNode.removeChild(this.container);
+        }
+    }
+}
+</file>
+
 <file path="src/MapData.ts">
 // Режимы появления врагов из портала
 export type SpawnPattern = 'normal' | 'random' | 'swarm';
@@ -22353,6 +23708,7 @@ export interface IWaveGroupRaw {
     spawnRate?: 'fast' | 'medium' | 'slow';
     spawnPattern?: SpawnPattern; // Alias for pattern, seen in some legacy data
     speed?: number; // Legacy multiplier, rarely used but present in old saves
+    delayBefore?: number;   // Pause before this group spawns (seconds), default: 0
 }
 
 // Runtime format (Strictly normalized)
@@ -22368,6 +23724,11 @@ export interface IWaveGroup {
 export interface IWaveConfig {
     // Configs can be raw, we normalize them at runtime
     enemies: IWaveGroupRaw[];
+    name?: string;                              // Display name ("Boss Wave!")
+    startDelay?: number;                        // Delay before wave starts (seconds)
+    waitForClear?: boolean;                     // Block next wave until all enemies dead
+    bonusReward?: number;                       // Extra gold for clearing this wave
+    shuffleMode?: 'none' | 'within_group' | 'all'; // Spawn order control
 }
 
 // Полная структура файла сохранения
@@ -22448,7 +23809,7 @@ export function migrateMapData(raw: unknown): IMapData {
         throw new Error('Map data has empty tile rows');
     }
 
-    return {
+    const result: IMapData = {
         width: typeof data.width === 'number' ? data.width : width,
         height: typeof data.height === 'number' ? data.height : height,
         tiles,
@@ -22463,6 +23824,22 @@ export function migrateMapData(raw: unknown): IMapData {
         fogData: Array.isArray(data.fogData) ? (data.fogData as number[]) : [],
         schemaVersion: MAP_SCHEMA_VERSION,
     };
+
+    // Sanitize new wave fields
+    if (result.waves) {
+        result.waves.forEach(w => {
+            if (w.startDelay != null) w.startDelay = Math.max(0, w.startDelay);
+            if (w.bonusReward != null) w.bonusReward = Math.max(0, w.bonusReward);
+            if (w.enemies) {
+                w.enemies.forEach(g => {
+                    if (g.delayBefore != null) g.delayBefore = Math.max(0, g.delayBefore);
+                    if (g.baseInterval != null) g.baseInterval = Math.max(0.05, g.baseInterval);
+                });
+            }
+        });
+    }
+
+    return result;
 }
 </file>
 
@@ -22542,8 +23919,8 @@ export class GameHUD {
         const bus = EventBus.getInstance();
         this.unsubMoney = bus.on(Events.MONEY_CHANGED, (money: number) => this.updateMoney(money));
         this.unsubLives = bus.on(Events.LIVES_CHANGED, (lives: number) => this.updateLives(lives));
-        this.unsubWaveStart = bus.on(Events.WAVE_STARTED, (wave: number) => {
-            this.updateWaveText(wave);
+        this.unsubWaveStart = bus.on(Events.WAVE_STARTED, (data: { wave: number; name?: string }) => {
+            this.updateWaveText(data.wave);
             this.updateStartBtn(true);
         });
         this.unsubWaveEnd = bus.on(Events.WAVE_COMPLETED, () => this.updateStartBtn(false));
@@ -24488,223 +25865,6 @@ export class MenuScene extends BaseScene {
     }
 
     // createBtn removed - replaced by UIUtils.createButton
-}
-</file>
-
-<file path="src/Utils.ts">
-import { MapManager } from './Map';
-import { IMapData, IWaveConfig, MAP_SCHEMA_VERSION } from './MapData';
-import { CONFIG } from './Config';
-
-// Fast ID generator using counter instead of regex-based UUID
-let _idCounter = 0;
-export function generateUUID(): string {
-    return `id_${++_idCounter}_${Date.now().toString(36)}`;
-}
-
-/**
- * Linearly interpolates between two angles, handling the cyclic nature of rotation.
- * @param start Current angle (radians)
- * @param end Target angle (radians)
- * @param t Interpolation factor (0.0 to 1.0, usually dt * speed)
- */
-export function lerpAngle(start: number, end: number, t: number): number {
-    let diff = end - start;
-
-    // Normalization: Force difference to be between -PI and +PI
-    while (diff < -Math.PI) diff += Math.PI * 2;
-    while (diff > Math.PI) diff -= Math.PI * 2;
-
-    // Apply interpolation
-    return start + diff * t;
-}
-
-export class ObjectPool<T> {
-    private createFn: () => T;
-    private pool: T[] = [];
-    private hasReset: boolean = false;
-    private resetChecked: boolean = false;
-
-    constructor(createFn: () => T) {
-        this.createFn = createFn;
-    }
-    public obtain(): T {
-        return this.pool.length > 0 ? this.pool.pop()! : this.createFn();
-    }
-    public free(obj: T): void {
-        // Check reset method only once per pool type
-        if (!this.resetChecked) {
-            this.hasReset = obj && typeof obj === 'object' && 'reset' in obj && typeof (obj as any).reset === 'function';
-            this.resetChecked = true;
-        }
-        if (this.hasReset) {
-            (obj as any).reset();
-        }
-        this.pool.push(obj);
-    }
-}
-
-export function generateDefaultWaves(count: number = 10): IWaveConfig[] {
-    const waves: IWaveConfig[] = [];
-    for (let i = 1; i <= count; i++) {
-        const waveEnemies: { type: string; count: number }[] = [];
-        if (i <= 3) {
-            waveEnemies.push({ type: 'grunt', count: 3 + i * 2 });
-        } else {
-            waveEnemies.push({ type: 'grunt', count: 5 + i });
-            waveEnemies.push({ type: 'scout', count: Math.floor(i / 2) });
-        }
-        waves.push({ enemies: waveEnemies });
-    }
-    return waves;
-}
-
-/**
- * Проверяет и нормализует конфигурацию волны для безопасности
- * Обеспечивает обратную совместимость со старыми сохранениями
- */
-export function normalizeWaveConfig(wave: any): IWaveConfig {
-    if (!wave || !wave.enemies || !Array.isArray(wave.enemies)) {
-        return { enemies: [] };
-    }
-
-    return {
-        enemies: wave.enemies.map((group: any) => ({
-            type: group.type || 'GRUNT',
-            count: Math.max(1, parseInt(group.count) || 1),
-            spawnPattern: (['normal', 'random', 'swarm'].includes(group.spawnPattern))
-                ? group.spawnPattern
-                : 'normal',
-            // Сохраняем старые поля для совместимости
-            speed: group.speed,
-            spawnRate: group.spawnRate
-        }))
-    };
-}
-
-
-export function serializeMap(map: MapManager): IMapData {
-    const simpleTiles: number[][] = [];
-    for (let y = 0; y < map.rows; y++) {
-        const row: number[] = [];
-        for (let x = 0; x < map.cols; x++) {
-            row.push(map.grid[y][x].type);
-        }
-        simpleTiles.push(row);
-    }
-    return {
-        width: map.cols,
-        height: map.rows,
-        tiles: simpleTiles,
-        waypoints: map.waypoints.map((wp) => ({ x: wp.x, y: wp.y })),
-        objects: map.objects || [], // Include objects from map
-        waves: map.waves && map.waves.length > 0 ? map.waves : generateDefaultWaves(15),
-        startingMoney: CONFIG.PLAYER.START_MONEY,
-        startingLives: CONFIG.PLAYER.START_LIVES,
-        waypointsMode: map.waypointsMode,
-        schemaVersion: MAP_SCHEMA_VERSION,
-    };
-}
-
-export function validateMap(data: any): boolean {
-    if (!data) return false;
-    if (!data.tiles || !Array.isArray(data.tiles) || data.tiles.length === 0) {
-        console.error('Map Validation Failed: No tiles data');
-        return false;
-    }
-    if (!data.waypoints || !Array.isArray(data.waypoints)) {
-        console.error('Map Validation Failed: No waypoints array');
-        return false;
-    }
-    if (data.waypoints.length < 2) {
-        console.error('Map Validation Failed: Path too short (<2 waypoints)');
-        return false;
-    }
-    return true;
-}
-
-// --- STORAGE UTILS ---
-
-export function getSavedMaps(): Record<string, IMapData> {
-    try {
-        const raw = localStorage.getItem('NEWTOWER_MAPS');
-        if (!raw) return {};
-
-        const maps = JSON.parse(raw);
-
-        // Нормализация всех волн во всех картах для обратной совместимости
-        Object.keys(maps).forEach(mapName => {
-            const mapData = maps[mapName];
-            if (mapData.waves && Array.isArray(mapData.waves)) {
-                mapData.waves = mapData.waves.map(normalizeWaveConfig);
-            }
-        });
-
-        return maps;
-    } catch (e) {
-        console.error('Failed to load maps', e);
-        return {};
-    }
-}
-
-export function saveMapToStorage(name: string, data: IMapData): boolean {
-    try {
-        const maps = getSavedMaps();
-        maps[name] = data;
-        localStorage.setItem('NEWTOWER_MAPS', JSON.stringify(maps));
-        return true;
-    } catch (e) {
-        console.error('Failed to save map', e);
-        return false;
-    }
-}
-
-
-export function deleteMapFromStorage(name: string): void {
-    const maps = getSavedMaps();
-    delete maps[name];
-    localStorage.setItem('NEWTOWER_MAPS', JSON.stringify(maps));
-}
-
-// === GLOBAL SESSION STORAGE ===
-// To preserve Enemy.nextId and other session globals across reloads
-interface IGlobalState {
-    lastEnemyId: number;
-}
-
-export function saveGlobalState(): void {
-    const state: IGlobalState = {
-        lastEnemyId: (window as any).Enemy?.nextId || 0
-    };
-    // Need to access the Enemy class static, but importing it might cause cycles if not careful.
-    // Better to pass the value in if possible, or use the class if imported.
-    // Since we are in Utils, check imports. Enemy is NOT imported here.
-    // Let's rely on the caller to pass it or import it dynamically?
-    // Actually, Utils uses IMapData etc. It does not import Enemy class.
-    // Importing Enemy class here might be fine.
-}
-
-// Better approach: Generic Save/Load for key-values that Game.ts can call
-export function saveSessionData(key: string, value: any): void {
-    try {
-        const raw = localStorage.getItem('NEWTOWER_SESSION') || '{}';
-        const data = JSON.parse(raw);
-        data[key] = value;
-        localStorage.setItem('NEWTOWER_SESSION', JSON.stringify(data));
-    } catch (e) {
-        console.error('Failed to save session data', e);
-    }
-}
-
-export function loadSessionData(key: string): any {
-    try {
-        const raw = localStorage.getItem('NEWTOWER_SESSION');
-        if (!raw) return null;
-        const data = JSON.parse(raw);
-        return data[key];
-    } catch (e) {
-        return null;
-    }
 }
 </file>
 
@@ -26730,6 +27890,252 @@ export class Assets {
 }
 </file>
 
+<file path="src/Utils.ts">
+import { MapManager } from './Map';
+import { IMapData, IWaveConfig, IWaveGroupRaw, MAP_SCHEMA_VERSION } from './MapData';
+import { CONFIG } from './Config';
+
+// Fast ID generator using counter instead of regex-based UUID
+let _idCounter = 0;
+export function generateUUID(): string {
+    return `id_${++_idCounter}_${Date.now().toString(36)}`;
+}
+
+/**
+ * Linearly interpolates between two angles, handling the cyclic nature of rotation.
+ * @param start Current angle (radians)
+ * @param end Target angle (radians)
+ * @param t Interpolation factor (0.0 to 1.0, usually dt * speed)
+ */
+export function lerpAngle(start: number, end: number, t: number): number {
+    let diff = end - start;
+
+    // Normalization: Force difference to be between -PI and +PI
+    while (diff < -Math.PI) diff += Math.PI * 2;
+    while (diff > Math.PI) diff -= Math.PI * 2;
+
+    // Apply interpolation
+    return start + diff * t;
+}
+
+export class ObjectPool<T> {
+    private createFn: () => T;
+    private pool: T[] = [];
+    private hasReset: boolean = false;
+    private resetChecked: boolean = false;
+
+    constructor(createFn: () => T) {
+        this.createFn = createFn;
+    }
+    public obtain(): T {
+        return this.pool.length > 0 ? this.pool.pop()! : this.createFn();
+    }
+    public free(obj: T): void {
+        // Check reset method only once per pool type
+        if (!this.resetChecked) {
+            this.hasReset = obj && typeof obj === 'object' && 'reset' in obj && typeof (obj as any).reset === 'function';
+            this.resetChecked = true;
+        }
+        if (this.hasReset) {
+            (obj as any).reset();
+        }
+        this.pool.push(obj);
+    }
+}
+
+export function generateDefaultWaves(count: number = 10): IWaveConfig[] {
+    const waves: IWaveConfig[] = [];
+    for (let i = 1; i <= count; i++) {
+        const waveEnemies: { type: string; count: number }[] = [];
+        if (i <= 3) {
+            waveEnemies.push({ type: 'grunt', count: 3 + i * 2 });
+        } else {
+            waveEnemies.push({ type: 'grunt', count: 5 + i });
+            waveEnemies.push({ type: 'scout', count: Math.floor(i / 2) });
+        }
+        waves.push({ enemies: waveEnemies });
+    }
+    return waves;
+}
+
+/**
+ * Проверяет и нормализует конфигурацию волны для безопасности
+ * Обеспечивает обратную совместимость со старыми сохранениями
+ */
+export function normalizeWaveConfig(wave: any): IWaveConfig {
+    if (!wave || !wave.enemies || !Array.isArray(wave.enemies)) {
+        return { enemies: [] };
+    }
+
+    const result: IWaveConfig = {
+        enemies: wave.enemies.map((group: any) => {
+            const normalized: IWaveGroupRaw = {
+                type: group.type || 'GRUNT',
+                count: Math.max(1, parseInt(group.count) || 1),
+                spawnPattern: (['normal', 'random', 'swarm'].includes(group.spawnPattern))
+                    ? group.spawnPattern : 'normal',
+                // Legacy compat
+                speed: group.speed,
+                spawnRate: group.spawnRate,
+            };
+            // New fields — preserve with sane clamp
+            if (group.pattern && ['normal', 'random', 'swarm'].includes(group.pattern)) {
+                normalized.pattern = group.pattern;
+            }
+            if (group.baseInterval != null) {
+                normalized.baseInterval = Math.max(0.05, Number(group.baseInterval) || 0.66);
+            }
+            if (group.delayBefore != null) {
+                normalized.delayBefore = Math.max(0, Number(group.delayBefore) || 0);
+            }
+            return normalized;
+        })
+    };
+
+    // Wave-level new fields — preserve with sane clamp
+    if (wave.name != null && String(wave.name).trim()) result.name = String(wave.name).trim();
+    if (wave.startDelay != null) result.startDelay = Math.max(0, Number(wave.startDelay) || 0);
+    if (wave.waitForClear != null) result.waitForClear = Boolean(wave.waitForClear);
+    if (wave.bonusReward != null) result.bonusReward = Math.max(0, Number(wave.bonusReward) || 0);
+    if (wave.shuffleMode && ['none', 'within_group', 'all'].includes(wave.shuffleMode)) {
+        result.shuffleMode = wave.shuffleMode;
+    }
+
+    return result;
+}
+
+
+export function serializeMap(map: MapManager): IMapData {
+    const simpleTiles: number[][] = [];
+    for (let y = 0; y < map.rows; y++) {
+        const row: number[] = [];
+        for (let x = 0; x < map.cols; x++) {
+            row.push(map.grid[y][x].type);
+        }
+        simpleTiles.push(row);
+    }
+    return {
+        width: map.cols,
+        height: map.rows,
+        tiles: simpleTiles,
+        waypoints: map.waypoints.map((wp) => ({ x: wp.x, y: wp.y })),
+        objects: map.objects || [], // Include objects from map
+        waves: map.waves && map.waves.length > 0 ? map.waves : generateDefaultWaves(15),
+        startingMoney: CONFIG.PLAYER.START_MONEY,
+        startingLives: CONFIG.PLAYER.START_LIVES,
+        waypointsMode: map.waypointsMode,
+        schemaVersion: MAP_SCHEMA_VERSION,
+    };
+}
+
+export function validateMap(data: any): boolean {
+    if (!data) return false;
+    if (!data.tiles || !Array.isArray(data.tiles) || data.tiles.length === 0) {
+        console.error('Map Validation Failed: No tiles data');
+        return false;
+    }
+    if (!data.waypoints || !Array.isArray(data.waypoints)) {
+        console.error('Map Validation Failed: No waypoints array');
+        return false;
+    }
+    if (data.waypoints.length < 2) {
+        console.error('Map Validation Failed: Path too short (<2 waypoints)');
+        return false;
+    }
+    return true;
+}
+
+// --- STORAGE UTILS ---
+
+export function getSavedMaps(): Record<string, IMapData> {
+    try {
+        const raw = localStorage.getItem('NEWTOWER_MAPS');
+        if (!raw) return {};
+
+        const maps = JSON.parse(raw);
+
+        // Нормализация всех волн во всех картах для обратной совместимости
+        Object.keys(maps).forEach(mapName => {
+            const mapData = maps[mapName];
+            if (mapData.waves && Array.isArray(mapData.waves)) {
+                mapData.waves = mapData.waves.map(normalizeWaveConfig);
+            }
+        });
+
+        return maps;
+    } catch (e) {
+        console.error('Failed to load maps', e);
+        return {};
+    }
+}
+
+export function saveMapToStorage(name: string, data: IMapData): boolean {
+    try {
+        const maps = getSavedMaps();
+        maps[name] = data;
+        const json = JSON.stringify(maps);
+        // Storage size safety check
+        const byteSize = new TextEncoder().encode(json).length;
+        if (byteSize > 4 * 1024 * 1024) {
+            console.warn(`[Storage] Approaching limit: ${(byteSize / 1024 / 1024).toFixed(1)}MB / 5MB`);
+        }
+        localStorage.setItem('NEWTOWER_MAPS', json);
+        return true;
+    } catch (e) {
+        console.error('Failed to save map', e);
+        return false;
+    }
+}
+
+
+export function deleteMapFromStorage(name: string): void {
+    const maps = getSavedMaps();
+    delete maps[name];
+    localStorage.setItem('NEWTOWER_MAPS', JSON.stringify(maps));
+}
+
+// === GLOBAL SESSION STORAGE ===
+// To preserve Enemy.nextId and other session globals across reloads
+interface IGlobalState {
+    lastEnemyId: number;
+}
+
+export function saveGlobalState(): void {
+    const state: IGlobalState = {
+        lastEnemyId: (window as any).Enemy?.nextId || 0
+    };
+    // Need to access the Enemy class static, but importing it might cause cycles if not careful.
+    // Better to pass the value in if possible, or use the class if imported.
+    // Since we are in Utils, check imports. Enemy is NOT imported here.
+    // Let's rely on the caller to pass it or import it dynamically?
+    // Actually, Utils uses IMapData etc. It does not import Enemy class.
+    // Importing Enemy class here might be fine.
+}
+
+// Better approach: Generic Save/Load for key-values that Game.ts can call
+export function saveSessionData(key: string, value: any): void {
+    try {
+        const raw = localStorage.getItem('NEWTOWER_SESSION') || '{}';
+        const data = JSON.parse(raw);
+        data[key] = value;
+        localStorage.setItem('NEWTOWER_SESSION', JSON.stringify(data));
+    } catch (e) {
+        console.error('Failed to save session data', e);
+    }
+}
+
+export function loadSessionData(key: string): any {
+    try {
+        const raw = localStorage.getItem('NEWTOWER_SESSION');
+        if (!raw) return null;
+        const data = JSON.parse(raw);
+        return data[key];
+    } catch (e) {
+        return null;
+    }
+}
+</file>
+
 <file path="src/Projectile.ts">
 import { ICardEffect } from './cards';
 import { Assets } from './Assets';
@@ -28592,285 +29998,6 @@ export class MapManager {
 }
 </file>
 
-<file path="src/WaveManager.ts">
-import { IGameScene } from './scenes/IGameScene';
-import { CONFIG } from './Config';
-import { IWaveConfig, SpawnPattern, IWaveGroup, IWaveGroupRaw } from './MapData';
-import { Rng } from './utils/Rng';
-import { SoundManager, SoundPriority } from './SoundManager';
-import { EventBus, Events } from './EventBus';
-
-/**
- * Metadata for a queued enemy spawn.
- * Internal Use Only: Derives from normalized IWaveGroup.
- */
-interface SpawnQueueEntry {
-    type: string;
-    pattern: SpawnPattern;
-    interval: number; // Delay BEFORE this unit spawns (seconds)
-}
-
-/**
- * Manages wave logic, spawning enemies, and tracking wave progress.
- */
-export class WaveManager {
-    private scene: IGameScene;
-    public isWaveActive: boolean = false;
-
-    // Queue with pre-calculated determinism
-    private spawnQueue: SpawnQueueEntry[] = [];
-    private spawnTimer: number = 0;
-
-    // Determinism & State
-    private readonly runSeed: number;
-    private pendingWaveStarts: number = 0; // Tracks queued early starts
-    private lastEarlyBonusTime: number = -1; // Cooldown for early wave bonus (ms)
-    private waveStartLives: number = 0; // Snapshot for perfect wave check
-
-    // Card reward tracking
-    private lastCardGivenForWave: number = 0;
-
-    constructor(scene: IGameScene, runSeed: number) {
-        this.scene = scene;
-        this.runSeed = runSeed;
-    }
-
-    /**
-     * Starts the next wave. If already active, appends to queue and adds bonus.
-     */
-    public startWave() {
-        const nowMs = Date.now();
-
-        // Logic split:
-        if (!this.isWaveActive) {
-            // Case A: Fresh Start
-            this.scene.wave++;
-            this.isWaveActive = true;
-            this.pendingWaveStarts = 0;
-
-            // Snapshot lives for "Perfect Wave" check (only on fresh start of a sequence)
-            this.waveStartLives = this.scene.lives;
-            this.lastEarlyBonusTime = nowMs; // Initialize to prevent instant early bonus on first stack
-
-            this.generateWave(this.scene.wave);
-            EventBus.getInstance().emit(Events.WAVE_STARTED, this.scene.wave);
-        } else {
-            // Case B: Early Start (Stacking)
-            // Give bonus only if cooldown passed to prevent accidental double-clicks
-            if (nowMs - this.lastEarlyBonusTime > 500) {
-                this.scene.addMoney(CONFIG.ECONOMY.EARLY_WAVE_BONUS);
-                this.scene.metrics.trackMoneyEarned(CONFIG.ECONOMY.EARLY_WAVE_BONUS);
-                this.scene.showFloatingText(`EARLY! +${CONFIG.ECONOMY.EARLY_WAVE_BONUS}💰`, this.scene.game.width / 2, 300, 'gold');
-                this.lastEarlyBonusTime = nowMs;
-            }
-
-            this.pendingWaveStarts++;
-            this.scene.wave++;
-            this.generateWave(this.scene.wave); // Appends to queue WITHOUT clearing
-
-            // Notify UI of new wave number
-            EventBus.getInstance().emit(Events.WAVE_STARTED, this.scene.wave);
-        }
-
-        this.scene.metrics.trackWaveReached(this.scene.wave);
-    }
-
-    public update(dt: number) {
-        if (!this.isWaveActive) return;
-
-        // Process Spawn Queue
-        if (this.spawnQueue.length > 0) {
-            this.spawnTimer += dt;
-
-            // Peek at next enemy
-            const nextEntry = this.spawnQueue[0];
-
-            if (this.spawnTimer >= nextEntry.interval) {
-                // Time to spawn!
-                // FIFO: Remove from head
-                const entry = this.spawnQueue.shift()!;
-                this.scene.spawnEnemy(entry.type);
-
-                // Sound: Boss Spawn
-                if (entry.type.toUpperCase() === 'SPIDER' || entry.type.toUpperCase() === 'TANK') {
-                    SoundManager.play('boss_spawn', SoundPriority.HIGH);
-                }
-
-                this.spawnTimer = 0;
-            }
-        } else {
-            // If queue is empty AND no enemies alive -> Wave Complete
-            if (this.scene.enemies.length === 0) {
-                this.endWave();
-            }
-        }
-    }
-
-    private endWave() {
-        this.isWaveActive = false;
-        EventBus.getInstance().emit(Events.WAVE_COMPLETED, this.scene.wave);
-
-        // Progressive economy
-        const reward = CONFIG.ECONOMY.WAVE_BASE_REWARD + (this.scene.wave * CONFIG.ECONOMY.WAVE_SCALING_FACTOR);
-        this.scene.addMoney(reward);
-
-        // Perfect wave bonus
-        if (this.scene.lives >= this.waveStartLives) {
-            this.scene.addMoney(CONFIG.ECONOMY.PERFECT_WAVE_BONUS);
-            this.scene.metrics.trackMoneyEarned(CONFIG.ECONOMY.PERFECT_WAVE_BONUS);
-            this.scene.showFloatingText(
-                `PERFECT! +${CONFIG.ECONOMY.PERFECT_WAVE_BONUS}💰`,
-                this.scene.game.width / 2,
-                350,
-                '#00ffff'
-            );
-        }
-
-        // Give card reward (for all completed waves since last grant)
-        const wavesToReward = this.scene.wave - this.lastCardGivenForWave;
-        if (wavesToReward > 0) {
-            for (let i = 0; i < wavesToReward; i++) {
-                this.scene.giveRandomCard();
-            }
-            this.lastCardGivenForWave = this.scene.wave;
-        }
-    }
-
-    public getWaveConfig(waveNum: number): IWaveConfig | null {
-        let waveConfig: IWaveConfig | null = null;
-
-        // 1. Try Map Data
-        if (this.scene.mapData && this.scene.mapData.waves && this.scene.mapData.waves.length > 0) {
-            const idx = Math.min(waveNum - 1, this.scene.mapData.waves.length - 1);
-            waveConfig = this.scene.mapData.waves[idx];
-        }
-
-        // 2. Fallback to Global Config
-        if (!waveConfig) {
-            const idx = Math.min(waveNum - 1, CONFIG.WAVES.length - 1);
-            const rawData = CONFIG.WAVES[idx];
-
-            if (Array.isArray(rawData)) {
-                // @ts-ignore
-                waveConfig = { enemies: rawData };
-            } else {
-                waveConfig = rawData as unknown as IWaveConfig;
-            }
-        }
-
-        return waveConfig;
-    }
-
-    /**
-     * Generates a wave DETERMINISTICALLY.
-     * Normalizes config before processing.
-     */
-    private generateWave(waveNum: number) {
-        const waveConfig = this.getWaveConfig(waveNum);
-        if (!waveConfig || !waveConfig.enemies) return;
-
-        // 1. Create ISOLATED RNG
-        const waveSeed = (this.runSeed ^ (waveNum * 1664525)) >>> 0;
-        const waveRng = new Rng(waveSeed);
-
-        // 2. Normalize and Process Config
-        const waveEnemies: SpawnQueueEntry[] = [];
-
-        waveConfig.enemies.forEach((rawGroup: IWaveGroupRaw) => {
-            // STRICT MIGRATION: Convert Raw Config to Normalized Group
-            const group: IWaveGroup = WaveManager.normalizeWaveGroup(rawGroup);
-
-            for (let i = 0; i < group.count; i++) {
-                // Use NORMALIZED baseInterval
-                const delay = this.calculateDelay(group.pattern, group.baseInterval, waveRng);
-
-                waveEnemies.push({
-                    type: group.type,
-                    pattern: group.pattern,
-                    interval: delay
-                });
-            }
-        });
-
-        // 3. Shuffle
-        waveRng.shuffle(waveEnemies);
-
-        // 4. Append
-        this.spawnQueue.push(...waveEnemies);
-    }
-
-    /**
-     * Pure function to normalize legacy or partial config into strict IWaveGroup
-     * Made PUBLIC STATIC to allow ThreatService to use the EXACT same logic
-     */
-    public static normalizeWaveGroup(raw: IWaveGroupRaw): IWaveGroup {
-        // Validation
-        if (!raw.type) throw new Error('[WaveManager] Invalid group: missing type');
-        if (raw.count <= 0) throw new Error('[WaveManager] Invalid group: count must be > 0');
-
-        // Resolve Pattern
-        // Priority: pattern > spawnPattern > default
-        const pattern: SpawnPattern = raw.pattern || raw.spawnPattern || 'normal';
-
-        // Resolve Base Interval
-        // Priority: baseInterval > spawnRate mapping > default
-        let baseInterval = 0.66; // default medium
-
-        if (raw.baseInterval !== undefined) {
-            baseInterval = raw.baseInterval;
-        } else if (raw.spawnRate) {
-            baseInterval = WaveManager.getBaseIntervalFromRate(raw.spawnRate);
-        }
-
-        // Clamping (Safety)
-        // Prevent near-zero intervals crashing the game or 50s intervals breaking flow
-        baseInterval = Math.max(0.05, Math.min(baseInterval, 10.0));
-
-        return {
-            type: raw.type,
-            count: raw.count,
-            baseInterval: baseInterval,
-            pattern: pattern
-        };
-    }
-
-    private calculateDelay(pattern: SpawnPattern, baseInterval: number, rng: Rng): number {
-        // Use normalized interval
-        const safeBase = baseInterval;
-
-        switch (pattern) {
-            case 'normal':
-                return safeBase;
-
-            case 'random':
-                // ±30% variance
-                const variance = safeBase * 0.3;
-                const randomOffset = (rng.next() - 0.5) * 2 * variance;
-                return Math.max(0.05, safeBase + randomOffset);
-
-            case 'swarm':
-                // Fast: 10-25% of base
-                const swarmBase = safeBase * 0.15;
-                const swarmVariance = swarmBase * 0.5;
-                const swarmDelay = swarmBase + rng.next() * swarmVariance;
-                return Math.max(0.02, swarmDelay);
-
-            default:
-                return safeBase;
-        }
-    }
-
-    public static getBaseIntervalFromRate(rate: 'fast' | 'medium' | 'slow'): number {
-        switch (rate) {
-            case 'fast': return 0.4;
-            case 'slow': return 1.0;
-            case 'medium':
-            default: return 0.66;
-        }
-    }
-}
-</file>
-
 <file path="src/CardSystem.ts">
 import { IGameScene } from './scenes/IGameScene';
 import { CONFIG } from './Config';
@@ -29448,6 +30575,328 @@ export class EnemyRenderer {
 
             renderer.drawEmissive(ctx, enemy, scale, moveAngle);
             ctx.restore();
+        }
+    }
+}
+</file>
+
+<file path="src/WaveManager.ts">
+import { IGameScene } from './scenes/IGameScene';
+import { CONFIG } from './Config';
+import { IWaveConfig, SpawnPattern, IWaveGroup, IWaveGroupRaw } from './MapData';
+import { Rng } from './utils/Rng';
+import { SoundManager, SoundPriority } from './SoundManager';
+import { EventBus, Events } from './EventBus';
+
+/** Marker type for delay entries in spawn queue. Not an actual enemy. */
+const DELAY_MARKER = '__DELAY__' as const;
+
+/**
+ * Metadata for a queued enemy spawn.
+ * Internal Use Only: Derives from normalized IWaveGroup.
+ */
+interface SpawnQueueEntry {
+    type: string;
+    pattern: SpawnPattern;
+    interval: number; // Delay BEFORE this unit spawns (seconds)
+}
+
+/**
+ * Manages wave logic, spawning enemies, and tracking wave progress.
+ */
+export class WaveManager {
+    private scene: IGameScene;
+    public isWaveActive: boolean = false;
+
+    // Queue with pre-calculated determinism
+    private spawnQueue: SpawnQueueEntry[] = [];
+    private spawnTimer: number = 0;
+
+    // Determinism & State
+    private readonly runSeed: number;
+    private pendingWaveStarts: number = 0; // Tracks queued early starts
+    private lastEarlyBonusTime: number = -1; // Cooldown for early wave bonus (ms)
+    private waveStartLives: number = 0; // Snapshot for perfect wave check
+
+    // Card reward tracking
+    private lastCardGivenForWave: number = 0;
+
+    constructor(scene: IGameScene, runSeed: number) {
+        this.scene = scene;
+        this.runSeed = runSeed;
+    }
+
+    /**
+     * Starts the next wave. If already active, appends to queue and adds bonus.
+     */
+    public startWave() {
+        const nowMs = Date.now();
+
+        // Logic split:
+        if (!this.isWaveActive) {
+            // Case A: Fresh Start
+            this.scene.wave++;
+            this.isWaveActive = true;
+            this.pendingWaveStarts = 0;
+
+            // Snapshot lives for "Perfect Wave" check (only on fresh start of a sequence)
+            this.waveStartLives = this.scene.lives;
+            this.lastEarlyBonusTime = nowMs; // Initialize to prevent instant early bonus on first stack
+
+            this.generateWave(this.scene.wave);
+            const emitConfig = this.getWaveConfig(this.scene.wave);
+            EventBus.getInstance().emit(Events.WAVE_STARTED, {
+                wave: this.scene.wave,
+                name: emitConfig?.name
+            });
+        } else {
+            // Case B: Early Start (Stacking)
+            // Block stacking if current wave requires clear
+            const currentWaveConfig = this.getWaveConfig(this.scene.wave);
+            if (currentWaveConfig?.waitForClear) {
+                return; // Silently block — UI should disable the button
+            }
+
+            // Give bonus only if cooldown passed to prevent accidental double-clicks
+            if (nowMs - this.lastEarlyBonusTime > 500) {
+                this.scene.addMoney(CONFIG.ECONOMY.EARLY_WAVE_BONUS);
+                this.scene.metrics.trackMoneyEarned(CONFIG.ECONOMY.EARLY_WAVE_BONUS);
+                this.scene.showFloatingText(`EARLY! +${CONFIG.ECONOMY.EARLY_WAVE_BONUS}💰`, this.scene.game.width / 2, 300, 'gold');
+                this.lastEarlyBonusTime = nowMs;
+            }
+
+            this.pendingWaveStarts++;
+            this.scene.wave++;
+            this.generateWave(this.scene.wave); // Appends to queue WITHOUT clearing
+
+            // Notify UI of new wave number
+            const emitConfig = this.getWaveConfig(this.scene.wave);
+            EventBus.getInstance().emit(Events.WAVE_STARTED, {
+                wave: this.scene.wave,
+                name: emitConfig?.name
+            });
+        }
+
+        this.scene.metrics.trackWaveReached(this.scene.wave);
+    }
+
+    public update(dt: number) {
+        if (!this.isWaveActive) return;
+
+        // Process Spawn Queue
+        if (this.spawnQueue.length > 0) {
+            this.spawnTimer += dt;
+
+            // Peek at next enemy
+            const nextEntry = this.spawnQueue[0];
+
+            if (this.spawnTimer >= nextEntry.interval) {
+                // Time to spawn!
+                // FIFO: Remove from head
+                const entry = this.spawnQueue.shift()!;
+
+                if (entry.type !== DELAY_MARKER) {
+                    this.scene.spawnEnemy(entry.type);
+                    // Sound: Boss Spawn
+                    if (entry.type.toUpperCase() === 'SPIDER' || entry.type.toUpperCase() === 'TANK') {
+                        SoundManager.play('boss_spawn', SoundPriority.HIGH);
+                    }
+                }
+                // DELAY entries consume their interval and do nothing
+
+                this.spawnTimer = 0;
+            }
+        } else {
+            // If queue is empty AND no enemies alive -> Wave Complete
+            if (this.scene.enemies.length === 0) {
+                this.endWave();
+            }
+        }
+    }
+
+    private endWave() {
+        this.isWaveActive = false;
+        EventBus.getInstance().emit(Events.WAVE_COMPLETED, this.scene.wave);
+
+        // Progressive economy
+        const reward = CONFIG.ECONOMY.WAVE_BASE_REWARD + (this.scene.wave * CONFIG.ECONOMY.WAVE_SCALING_FACTOR);
+        this.scene.addMoney(reward);
+
+        // Custom bonus reward (Variant A: applies to last wave in stack)
+        const endWaveConfig = this.getWaveConfig(this.scene.wave);
+        if (endWaveConfig?.bonusReward && endWaveConfig.bonusReward > 0) {
+            this.scene.addMoney(endWaveConfig.bonusReward);
+            this.scene.metrics.trackMoneyEarned(endWaveConfig.bonusReward);
+        }
+        // Perfect wave bonus
+        if (this.scene.lives >= this.waveStartLives) {
+            this.scene.addMoney(CONFIG.ECONOMY.PERFECT_WAVE_BONUS);
+            this.scene.metrics.trackMoneyEarned(CONFIG.ECONOMY.PERFECT_WAVE_BONUS);
+            this.scene.showFloatingText(
+                `PERFECT! +${CONFIG.ECONOMY.PERFECT_WAVE_BONUS}💰`,
+                this.scene.game.width / 2,
+                350,
+                '#00ffff'
+            );
+        }
+
+        // Give card reward (for all completed waves since last grant)
+        const wavesToReward = this.scene.wave - this.lastCardGivenForWave;
+        if (wavesToReward > 0) {
+            for (let i = 0; i < wavesToReward; i++) {
+                this.scene.giveRandomCard();
+            }
+            this.lastCardGivenForWave = this.scene.wave;
+        }
+    }
+
+    public getWaveConfig(waveNum: number): IWaveConfig | null {
+        let waveConfig: IWaveConfig | null = null;
+
+        // 1. Try Map Data
+        if (this.scene.mapData && this.scene.mapData.waves && this.scene.mapData.waves.length > 0) {
+            const idx = Math.min(waveNum - 1, this.scene.mapData.waves.length - 1);
+            waveConfig = this.scene.mapData.waves[idx];
+        }
+
+        // 2. Fallback to Global Config
+        if (!waveConfig) {
+            const idx = Math.min(waveNum - 1, CONFIG.WAVES.length - 1);
+            const rawData = CONFIG.WAVES[idx];
+
+            if (Array.isArray(rawData)) {
+                // @ts-ignore
+                waveConfig = { enemies: rawData };
+            } else {
+                waveConfig = rawData as unknown as IWaveConfig;
+            }
+        }
+
+        return waveConfig;
+    }
+
+    /**
+     * Generates a wave DETERMINISTICALLY.
+     * Normalizes config before processing.
+     */
+    private generateWave(waveNum: number) {
+        const waveConfig = this.getWaveConfig(waveNum);
+        if (!waveConfig || !waveConfig.enemies) return;
+
+        // Start delay for this wave
+        const startDelay = waveConfig.startDelay ?? 0;
+        if (startDelay > 0) {
+            this.spawnQueue.push({ type: DELAY_MARKER, pattern: 'normal', interval: startDelay });
+        }
+
+        // 1. Create ISOLATED RNG
+        const waveSeed = (this.runSeed ^ (waveNum * 1664525)) >>> 0;
+        const waveRng = new Rng(waveSeed);
+
+        // 2. Normalize and Process Config
+        const waveEnemies: SpawnQueueEntry[] = [];
+
+        waveConfig.enemies.forEach((rawGroup: IWaveGroupRaw) => {
+            // STRICT MIGRATION: Convert Raw Config to Normalized Group
+            const group: IWaveGroup = WaveManager.normalizeWaveGroup(rawGroup);
+
+            // Group delay (gap before this group)
+            const groupDelay = rawGroup.delayBefore ?? 0;
+            if (groupDelay > 0) {
+                waveEnemies.push({ type: DELAY_MARKER, pattern: 'normal', interval: groupDelay });
+            }
+
+            for (let i = 0; i < group.count; i++) {
+                // Use NORMALIZED baseInterval
+                const delay = this.calculateDelay(group.pattern, group.baseInterval, waveRng);
+
+                waveEnemies.push({
+                    type: group.type,
+                    pattern: group.pattern,
+                    interval: delay
+                });
+            }
+        });
+
+        // 3. Shuffle control — default 'all' preserves legacy behavior for old maps
+        // New maps from WaveEditor use 'none' by default
+        const shuffleMode = waveConfig.shuffleMode ?? 'all';
+        if (shuffleMode === 'all') {
+            waveRng.shuffle(waveEnemies);
+        }
+        // 'none' and 'within_group' preserve group order
+
+        // 4. Append
+        this.spawnQueue.push(...waveEnemies);
+    }
+
+    /**
+     * Pure function to normalize legacy or partial config into strict IWaveGroup
+     * Made PUBLIC STATIC to allow ThreatService to use the EXACT same logic
+     */
+    public static normalizeWaveGroup(raw: IWaveGroupRaw): IWaveGroup {
+        // Validation
+        if (!raw.type) throw new Error('[WaveManager] Invalid group: missing type');
+        if (raw.count <= 0) throw new Error('[WaveManager] Invalid group: count must be > 0');
+
+        // Resolve Pattern
+        // Priority: pattern > spawnPattern > default
+        const pattern: SpawnPattern = raw.pattern || raw.spawnPattern || 'normal';
+
+        // Resolve Base Interval
+        // Priority: baseInterval > spawnRate mapping > default
+        let baseInterval = 0.66; // default medium
+
+        if (raw.baseInterval !== undefined) {
+            baseInterval = raw.baseInterval;
+        } else if (raw.spawnRate) {
+            baseInterval = WaveManager.getBaseIntervalFromRate(raw.spawnRate);
+        }
+
+        // Clamping (Safety)
+        // Prevent near-zero intervals crashing the game or 50s intervals breaking flow
+        baseInterval = Math.max(0.05, Math.min(baseInterval, 10.0));
+
+        return {
+            type: raw.type,
+            count: raw.count,
+            baseInterval: baseInterval,
+            pattern: pattern
+        };
+    }
+
+    private calculateDelay(pattern: SpawnPattern, baseInterval: number, rng: Rng): number {
+        // Use normalized interval
+        const safeBase = baseInterval;
+
+        switch (pattern) {
+            case 'normal':
+                return safeBase;
+
+            case 'random':
+                // ±30% variance
+                const variance = safeBase * 0.3;
+                const randomOffset = (rng.next() - 0.5) * 2 * variance;
+                return Math.max(0.05, safeBase + randomOffset);
+
+            case 'swarm':
+                // Fast: 10-25% of base
+                const swarmBase = safeBase * 0.15;
+                const swarmVariance = swarmBase * 0.5;
+                const swarmDelay = swarmBase + rng.next() * swarmVariance;
+                return Math.max(0.02, swarmDelay);
+
+            default:
+                return safeBase;
+        }
+    }
+
+    public static getBaseIntervalFromRate(rate: 'fast' | 'medium' | 'slow'): number {
+        switch (rate) {
+            case 'fast': return 0.4;
+            case 'slow': return 1.0;
+            case 'medium':
+            default: return 0.66;
         }
     }
 }

@@ -129,7 +129,8 @@ The game uses a **Logical Coordinate System** decoupled from physical pixels to 
 | `src/TargetingSystem.ts` | Centralized O(1) targeting logic with hysteresis |
 | `src/systems/ProjectileSystem.ts` | Projectile pooling and lifecycle management |
 | `src/WeaponSystem.ts` | Firing logic, cooldowns, recoil, gated shooting |
-| `src/SaveManager.ts` | Persistence, schema versioning, safe save cadence |
+| `src/SaveManager.ts` | Campaign persistence, schema versioning, safe save cadence |
+| `src/MapStorage.ts` | Hybrid map storage: bundled JSON (`public/maps/`) + localStorage. [Docs](map_storage.md) |
 | `src/scenes/GameController.ts` | Отвечает за инпуты (Space = toggleTimeScale, Click = Building) |
 
 ---

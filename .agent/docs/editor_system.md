@@ -90,14 +90,48 @@ The `EditorHistory` class supports **Compound Actions** to handle continuous inp
 
 ---
 
-## 💾 Serialization
+## 💾 Serialization & Map Storage
 
 Map saving is handled by `Utils.serializeMap()` and `EditorScene.saveMap()`.
 
 - **Strict Typing:** `waves` are cast to `IWaveConfig[]` to prevent `any` pollution.
 - **Explicit Modes:** `waypointsMode` is explicitly saved to ensure loaded maps behave consistently.
 - **Default Waves:** New maps generate default waves if none exist.
-- **Size Check:** `saveMapToStorage()` проверяет размер через `TextEncoder` — предупреждение при >4MB.
+- **Size Check:** `MapStorage.saveLocal()` проверяет размер через `TextEncoder` — предупреждение при >4MB.
+
+### 📦 Map Storage Architecture (MapStorage.ts)
+
+Карты хранятся **гибридно** — два источника:
+
+| Источник | Тип | Чтение | Запись |
+|---|---|---|---|
+| `public/maps/*.json` | Bundled (из проекта) | `fetch()` (async) | Вручную: положить JSON в папку |
+| `localStorage` (`NEWTOWER_MAPS`) | Local (пользовательские) | Sync | `MapStorage.saveLocal()` |
+
+**Collision Policy: Local Override.** Если имена совпадают — local побеждает, bundled скрывается. Удаление local → bundled «восстанавливается».
+
+**Bundled миграция:** `getBundledMaps()` прогоняет каждую карту через `migrateMapData()` + `validateMap()`. Без этого при изменении `IMapData` в будущем bundled карты сломаются.
+
+### Async UI: Local-First + Async Append
+
+`refreshMapsPanel()` (EditorScene) и `refreshList()` (MenuScene) используют двухфазную отрисовку:
+
+1. **Фаза 1 (sync):** Показать local карты мгновенно
+2. **Фаза 2 (async):** Дописать bundled карты через `.then()`
+
+Race condition guard: `_refreshGeneration` counter отбрасывает устаревшие промисы.
+
+### Import / Export
+
+- **Export:** `MapStorage.createExportBlob(data)` → `<a download>` в EditorScene
+- **Import:** File input → `MapStorage.importFromFile()` → `migrateMapData()` → `validateMap()` → prompt имя → конфликт-check → save
+
+### Vite Plugin (vite.config.ts)
+
+`mapsIndexPlugin()` автогенерирует `public/maps/_index.json`:
+
+- `buildStart`: сканирует `*.json` (исключая `_*.json`)
+- `configureServer`: HMR watcher на add/unlink с debounce 300ms
 
 ---
 
