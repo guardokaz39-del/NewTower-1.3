@@ -16,6 +16,7 @@ export interface ICardEffect {
 
     // Splash effect properties
     splashRadius?: number;
+    splashDamageMultiplier?: number; // Added for configurable splash, e.g. 0.7 for 70%
 
     // Burn effect properties (Napalm evolution)
     burnDps?: number;           // Damage per second

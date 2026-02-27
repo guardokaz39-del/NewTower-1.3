@@ -16,6 +16,8 @@ export interface IProjectileStats {
     explosionRadius?: number;       // Radius of explosion
     projectileType?: string;        // Visual type: standard, ice, fire, sniper, split
     towerLevel?: number;            // Tower's max card level (for trail effects)
+    towerId?: number;               // Source tower ID for kill credit
+    cardTypeId?: number;            // Source card/evolution ID
 }
 
 export class Projectile {
@@ -38,6 +40,8 @@ export class Projectile {
     public explosionRadius: number = 0;       // Radius of explosion
     public projectileType: string = 'standard'; // Visual type
     public towerLevel: number = 1;            // Tower's max card level (for trails)
+    public sourceTowerId: number = -1;
+    public sourceCardId: number = 0;
 
     private static readonly EMPTY_EFFECTS: ICardEffect[] = [];
 
@@ -57,6 +61,8 @@ export class Projectile {
         this.projectileType = stats.projectileType || 'standard';
         this.towerLevel = stats.towerLevel || 1;
         this.radius = 4; // Default radius
+        this.sourceTowerId = stats.towerId || -1;
+        this.sourceCardId = stats.cardTypeId || 0;
 
         // Handle critical hits
         const critChance = stats.critChance || 0;
@@ -123,5 +129,7 @@ export class Projectile {
         this.pierce = 0;
         this.radius = 4;
         this.color = '#fff';
+        this.sourceTowerId = -1;
+        this.sourceCardId = 0;
     }
 }

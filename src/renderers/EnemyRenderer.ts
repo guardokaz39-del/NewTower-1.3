@@ -135,14 +135,9 @@ export class EnemyRenderer {
     private static readonly BURN_COLORS = ['#ff6400', '#ffa000', '#ff8c00'];
 
     private static drawStatusEffects(ctx: CanvasRenderingContext2D, enemy: Enemy) {
-        // PERF: Manual status check — no .some() closure allocation (Rule 5)
-        let hasSlow = false;
-        let hasBurn = false;
-        for (let s = 0; s < enemy.statuses.length; s++) {
-            const t = enemy.statuses[s].type;
-            if (t === 'slow') hasSlow = true;
-            else if (t === 'burn') hasBurn = true;
-        }
+        // PERF: Manual status check — direct property access (Rule 5)
+        let hasSlow = enemy.slowDuration > 0;
+        let hasBurn = enemy.burnDuration > 0 && enemy.burnStacks > 0;
 
         // SLOW (Blue Orbs)
         if (hasSlow) {

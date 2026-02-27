@@ -801,7 +801,7 @@ export class GameScene extends BaseScene implements IGameScene {
 
                 const dist = Math.hypot(enemy.x - x, enemy.y - y);
                 if (dist <= radius) {
-                    enemy.takeDamage(damage);
+                    enemy.takeDamage(damage, -1, 0, 0);
                 }
             }
         }

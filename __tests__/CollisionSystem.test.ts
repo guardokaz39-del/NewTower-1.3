@@ -72,41 +72,44 @@ describe('CollisionSystem Public API', () => {
         expect(enemy.currentHealth).toBe(90);
     });
 
-    it('should safely process explosive chain reactions without crashing via recursive calls', () => {
-        const enemies = [new Enemy(), new Enemy(), new Enemy()];
-
+    it('Explosion CallStack Depth Test: should safely process explosive chain reactions without crashing via recursive calls', () => {
+        const enemies = Array.from({ length: 10 }, () => new Enemy());
         enemies.forEach((e, i) => {
             e.init({ health: 100, speed: 50, path: [] } as any);
-            e.x = 100 + (10 * i);
-            e.y = 100 + (10 * i);
-            e.currentHealth = 50; // Low health to ensure death
+            e.x = 100; // Clustered to trigger chain reaction
+            e.y = 100;
+            e.currentHealth = 50; // Low health
+            e.setOnDeathExplode(50, 100, 1); // Set fixed-slot explosion
         });
+
+        // Ensure clean queue state
+        CollisionSystem.explosionQueue.length = 0;
 
         colSys.getValidGrid(enemies);
 
-        const explosiveProj = new Projectile();
-        explosiveProj.init(100, 100, { x: 100, y: 100 }, {
-            dmg: 100,
-            speed: 50,
-            color: '#f00',
-            pierce: 1,
-            effects: []
-        });
-        explosiveProj.explodeOnDeath = true;
-        explosiveProj.explosionRadius = 50;
-        explosiveProj.explosionDamage = 100;
+        // Kill the first one directly
+        enemies[0].takeDamage(100, 2, 202, 0);
 
+        // We need to continuously pump the grid and updates to resolve the chain reaction
+        let pumpCount = 0;
         expect(() => {
-            // Testing via public update API instead of private handleHit
-            colSys.update([explosiveProj], enemies);
+            while (CollisionSystem.explosionQueue.length > 0 && pumpCount < 10) {
+                pumpCount++;
+                // 1. Grid MUST be rebuilt for dead/dying enemy positions, but since they are dead they are removed.
+                // However, queryInRadius needs the *current* grid. If an enemy dies, it's removed.
+                // Actually taking damage directly doesn't process queue, so we trigger manual process:
+                const grid = colSys.getValidGrid(enemies);
+
+                // Trigger private processExplosions by utilizing the updated prototype
+                (colSys as any).processExplosions(grid);
+            }
         }).not.toThrow();
 
-        // The first enemy dies due to the 100 dmg hit, triggering an explosion
-        // The explosion (radius 50) hits the other two enemies (at dist 14 and 28)
-        // Since they have 50 health, they also die.
-        // The test explicitly verifies that taking them out of the aoeBuffer during iteration doesn't crash the loop.
-        expect(enemies[0].isAlive()).toBe(false);
-        expect(enemies[1].isAlive()).toBe(false);
-        expect(enemies[2].isAlive()).toBe(false);
+        // The first explosion hits all others, triggering their deaths, looping through buffer
+        let deadCount = 0;
+        enemies.forEach(e => {
+            if (!e.isAlive()) deadCount++;
+        });
+        expect(deadCount).toBe(10);
     });
 });

@@ -92,7 +92,7 @@ export class DefaultUnitRenderer implements UnitRenderer {
             }
 
             // Status Tints
-            if (enemy.statuses.some(s => s.type === 'slow')) {
+            if (enemy.slowDuration > 0) {
                 ctx.save();
                 ctx.globalCompositeOperation = 'source-atop';
                 ctx.fillStyle = CONFIG.AMBIENT.LIGHTING.ICE || '#00e5ff';
@@ -100,7 +100,7 @@ export class DefaultUnitRenderer implements UnitRenderer {
                 ctx.fillRect(-half, -half, size, size);
                 ctx.restore();
             }
-            if (enemy.statuses.some(s => s.type === 'burn')) {
+            if (enemy.burnDuration > 0 && enemy.burnStacks > 0) {
                 ctx.save();
                 ctx.globalCompositeOperation = 'source-atop';
                 ctx.fillStyle = CONFIG.AMBIENT.LIGHTING.FIRE || '#ff3d00';

@@ -5,6 +5,7 @@ import { PerformanceMonitor } from './utils/PerformanceMonitor';
 import { PerformanceProfiler } from './utils/PerformanceProfiler';
 import { SoundManager, SoundPriority } from './SoundManager';
 import { SpatialGrid } from './SpatialGrid';
+import { DamageTags } from './systems/DamageTypes';
 
 export class CollisionSystem {
     private effects: EffectSystem;
@@ -21,6 +22,51 @@ export class CollisionSystem {
 
 
     private static aoeBuffer: Enemy[] = [];
+    public static explosionQueue: number[] = [];
+
+    public static queueExplosion(x: number, y: number, radius: number, damage: number, sourceId: number) {
+        CollisionSystem.explosionQueue.push(x, y, radius, damage, sourceId);
+    }
+
+    private processExplosions(activeGrid: SpatialGrid<Enemy>) {
+        if (CollisionSystem.explosionQueue.length === 0) return;
+
+        const queue = [...CollisionSystem.explosionQueue];
+        CollisionSystem.explosionQueue.length = 0;
+
+        for (let i = 0; i < queue.length; i += 5) {
+            const exX = queue[i];
+            const exY = queue[i + 1];
+            const exRadius = queue[i + 2];
+            const exDamage = queue[i + 3];
+            const exSourceId = queue[i + 4];
+
+            this.effects.spawn({
+                type: 'explosion',
+                x: exX,
+                y: exY,
+                radius: exRadius,
+                life: 0.3,
+                priority: EffectPriority.HIGH,
+                color: 'rgba(255, 100, 0, 0.6)'
+            });
+
+            CollisionSystem.aoeBuffer.length = 0;
+            const count = activeGrid.queryInRadius(exX, exY, exRadius, CollisionSystem.aoeBuffer);
+            const radiusSq = exRadius * exRadius;
+
+            for (let j = 0; j < count; j++) {
+                const neighbor = CollisionSystem.aoeBuffer[j];
+                if (!neighbor.isAlive()) continue;
+
+                const dx = neighbor.x - exX;
+                const dy = neighbor.y - exY;
+                if (dx * dx + dy * dy <= radiusSq) {
+                    neighbor.takeDamage(exDamage, exSourceId, 0, DamageTags.SPLASH);
+                }
+            }
+        }
+    }
 
     public invalidateGrid() {
         this.gridDirty = true;
@@ -73,6 +119,12 @@ export class CollisionSystem {
     public update(projectiles: Projectile[], enemies: Enemy[]) {
         const activeGrid = this.getValidGrid(enemies);
 
+        let processLoops = 0;
+        while (CollisionSystem.explosionQueue.length > 0 && processLoops < 10) {
+            this.processExplosions(activeGrid);
+            processLoops++;
+        }
+
         // Check projectile collisions using spatial grid
         for (let p = 0; p < projectiles.length; p++) {
             const proj = projectiles[p];
@@ -121,15 +173,9 @@ export class CollisionSystem {
 
     private handleHit(p: Projectile, target: Enemy, allEnemies: Enemy[], activeGrid: SpatialGrid<Enemy>) {
         // Apply damage with projectile reference (for tracking kills)
-        let wasSlowed = false;
-        for (let i = 0; i < target.statuses.length; i++) {
-            if (target.statuses[i].type === 'slow') {
-                wasSlowed = true;
-                break;
-            }
-        }
+        let wasSlowed = target.slowDuration > 0;
 
-        target.takeDamage(p.damage, p);
+        target.takeDamage(p.damage, p.sourceTowerId, p.sourceCardId, p.isCrit ? DamageTags.CRIT : DamageTags.NONE);
 
         // Sound Hit
         SoundManager.play('hit', SoundPriority.LOW);
@@ -212,19 +258,22 @@ export class CollisionSystem {
 
             // 2. PHYSICS (Decoupled: Instant Area Damage via Grid)
             // PERF: Use local array for splash to prevent recursive static buffer overwrite if enemies die and explode
+            const splashMultiplier = splash.splashDamageMultiplier || 0.7;
             const radius = splash.splashRadius || splash.radius || 40;
-            const splashTargets: Enemy[] = [];
-            const count = activeGrid.queryInRadius(target.x, target.y, radius, splashTargets);
+
+            CollisionSystem.aoeBuffer.length = 0;
+            const count = activeGrid.queryInRadius(target.x, target.y, radius, CollisionSystem.aoeBuffer);
             const radiusSq = radius * radius;
 
             for (let i = 0; i < count; i++) {
-                const neighbor = splashTargets[i];
+                const neighbor = CollisionSystem.aoeBuffer[i];
                 if (neighbor === target || !neighbor.isAlive()) continue;
 
                 const dx = neighbor.x - target.x;
                 const dy = neighbor.y - target.y;
                 if (dx * dx + dy * dy <= radiusSq) {
-                    neighbor.takeDamage(p.damage * 0.7, p); // Pass projectile context
+                    // Pass primitive source IDs and SPLASH tag instead of raw projectile
+                    neighbor.takeDamage(p.damage * splashMultiplier, p.sourceTowerId, p.sourceCardId, DamageTags.SPLASH | (p.isCrit ? DamageTags.CRIT : DamageTags.NONE));
                 }
             }
         }
@@ -239,7 +288,7 @@ export class CollisionSystem {
         }
         if (slow) {
             const damageBonus = slow.damageToSlowed || 1.0;
-            target.applyStatus('slow', slow.slowDuration || slow.dur || 1.0, slow.slowPower || slow.power || 0.4, damageBonus);
+            target.applySlow(slow.slowDuration || slow.dur || 1.0, slow.slowPower || slow.power || 0.4, damageBonus);
         }
 
         // Burn effect (Napalm evolution)
@@ -252,7 +301,7 @@ export class CollisionSystem {
         }
         if (burn) {
             // Power = DPS for burn
-            target.applyStatus('burn', burn.burnDuration || 3, burn.burnDps || 5);
+            target.applyBurn(burn.burnDuration || 3, burn.burnDps || 5, 3, p.sourceTowerId, p.sourceCardId);
         }
     }
 
@@ -263,37 +312,8 @@ export class CollisionSystem {
         // Sound Death
         SoundManager.play('death', SoundPriority.LOW);
 
-        // Fire Level 3: Explosion on death
-        if (killingProjectile.explodeOnDeath) {
-            // 1. VISUAL
-            this.effects.spawn({
-                type: 'explosion',
-                x: deathX,
-                y: deathY,
-                radius: killingProjectile.explosionRadius,
-                life: 0.35,
-                priority: EffectPriority.HIGH, // Gameplay effect
-                color: 'rgba(255, 69, 0, 0.8)',
-            });
+        // Fire Level 3 Explosion logic removed here (now deferred via Enemy.die -> explosionQueue)
 
-            // 2. PHYSICS (Decoupled: Instant Area Damage via Grid)
-            // PERF: Use local array for death explosion to prevent recursive static buffer overwrite
-            const radius = killingProjectile.explosionRadius || 60;
-            const deathExplosionTargets: Enemy[] = [];
-            const count = activeGrid.queryInRadius(deathX, deathY, radius, deathExplosionTargets);
-            const radiusSq = radius * radius;
-
-            for (let i = 0; i < count; i++) {
-                const neighbor = deathExplosionTargets[i];
-                if (!neighbor.isAlive()) continue;
-
-                const dx = neighbor.x - deathX;
-                const dy = neighbor.y - deathY;
-                if (dx * dx + dy * dy <= radiusSq) {
-                    neighbor.takeDamage(killingProjectile.explosionDamage, killingProjectile);
-                }
-            }
-        }
 
         // Ice Level 3: Chain slow on death (if enemy was slowed when it died)
         if (wasSlowed) {
@@ -331,7 +351,7 @@ export class CollisionSystem {
                         const dx = neighbor.x - deathX;
                         const dy = neighbor.y - deathY;
                         if (dx * dx + dy * dy <= radiusSq) {
-                            neighbor.applyStatus('slow', duration, power, damageBonus);
+                            neighbor.applySlow(duration, power, damageBonus);
                         }
                     }
                 }

@@ -2,8 +2,10 @@ import { CONFIG, getEnemyType } from './Config';
 import { EventBus, Events } from './EventBus';
 import { RendererFactory } from './RendererFactory';
 import { Assets } from './Assets';
-import { Projectile } from './Projectile';
 import { EnemyRenderer } from './renderers/EnemyRenderer';
+import { DamageTags } from './systems/DamageTypes';
+import { CollisionSystem } from './CollisionSystem';
+import { GlobalEnemyDeathEvent, GlobalEnemyDeathSpawnEvent, Events as GlobalEvents } from './EventBus';
 
 export interface IEnemyConfig {
     // id removed - generated internally
@@ -15,11 +17,6 @@ export interface IEnemyConfig {
     path: { x: number; y: number }[];
 }
 
-interface IStatus {
-    type: 'slow' | 'burn';
-    duration: number;
-    power: number;
-}
 
 export class Enemy {
     // Global ID counter for session
@@ -41,10 +38,27 @@ export class Enemy {
     public pathIndex: number = 0;
     public finished: boolean = false;
 
-    public statuses: IStatus[] = [];
+    public slowDuration: number = 0;
+    public slowPower: number = 0;
     public damageModifier: number = 1.0;     // Damage multiplier (e.g., 1.2 = +20% damage)
-    public killedByProjectile: Projectile | null = null;   // Track what projectile killed this enemy
     public hitFlashTimer: number = 0;        // Timer for white flash on hit
+
+    // Damage Pipeline Slots
+    public lastDamageTags: number = 0;
+    public lastHitTowerId: number = -1;
+    public lastHitCardId: number = 0;
+
+    // Burn Status Slots
+    public burnStacks: number = 0;
+    public burnDpsPerStack: number = 0; // Сохраняем DPS одного стака
+    public burnDuration: number = 0;
+    public burnPrimaryApplierId: number = -1; // Чей credit при смерти от ДОТ
+    public burnPrimaryCardId: number = 0;
+
+    // Explode On Death Slots (Max Wins Policy)
+    public onDeathExplodeRadius: number = 0;
+    public onDeathExplodeDamage: number = 0;
+    public onDeathExplodeSourceId: number = -1;
 
     public lastFacingLeft: boolean = false; // Persistent facing state
     private static readonly FACING_VX_EPSILON = 0.1;
@@ -95,10 +109,8 @@ export class Enemy {
         this.finished = false;
 
         this.damageModifier = 1.0;
-        this.killedByProjectile = null;
         this.lastFacingLeft = false; // Reset facing
 
-        // Reset specific fields
         this.threatPriority = 0;
         // Arrays are cleared in reset(), but here we ensure they are empty or set specific initial values if needed
         // For pooling safety, reset() should have been called before init() or init should overwrite everything.
@@ -106,13 +118,24 @@ export class Enemy {
     }
 
     public reset() {
-        // 3. Clear arrays without GC (keep capacity)
-        this.statuses.length = 0;
+        this.slowDuration = 0;
+        this.slowPower = 0;
+        this.burnStacks = 0;
+        this.burnDpsPerStack = 0;
+        this.burnDuration = 0;
+        this.burnPrimaryApplierId = -1;
+        this.burnPrimaryCardId = 0;
+        this.onDeathExplodeRadius = 0;
+        this.onDeathExplodeDamage = 0;
+        this.onDeathExplodeSourceId = -1;
+
         this.hitFlashTimer = 0;
         this.pathIndex = 0;
         this.finished = false;
         this.damageModifier = 1.0;
-        this.killedByProjectile = null;
+        this.lastDamageTags = 0;
+        this.lastHitTowerId = -1;
+        this.lastHitCardId = 0;
         this.x = -1000; // Move offscreen
         this.y = -1000;
         this.lastFacingLeft = false;
@@ -161,7 +184,9 @@ export class Enemy {
         }
     }
 
-    public takeDamage(amount: number, projectile?: Projectile): void {
+    public takeDamage(amount: number, sourceTowerId: number = -1, sourceCardId: number = 0, tags: number = 0): void {
+        if (!this.isAlive()) return;
+
         if (this.isInvulnerable) {
             // Visual Effect "BLOCKED"
             EventBus.getInstance().emit(Events.ENEMY_IMMUNE, { x: this.x, y: this.y });
@@ -170,11 +195,29 @@ export class Enemy {
 
         const prevHpPercent = this.currentHealth / this.maxHealth;
 
-        // Apply damage modifier (from slow effects, etc.)
-        const modifiedAmount = amount * this.damageModifier;
-        const actualDamage = Math.max(1, modifiedAmount - this.armor);
-        this.currentHealth -= actualDamage;
+        // 1. Modifiers & True Damage
+        let finalAmount = amount;
+        if (!(tags & DamageTags.TRUE_DAMAGE)) {
+            finalAmount *= this.damageModifier;
+            // Armor mitigates physical damage, but ensures at least 1 damage
+            if (finalAmount > 0) {
+                finalAmount = Math.max(1, finalAmount - this.armor);
+            } else {
+                finalAmount = 0;
+            }
+        }
+
+        // 2. Commit & Context Update
+        this.currentHealth -= finalAmount;
         if (this.currentHealth < 0) this.currentHealth = 0;
+
+        this.lastDamageTags = tags;
+
+        // Обновляем Hit Track только для не-DOT урона
+        if (!(tags & DamageTags.DOT)) {
+            this.lastHitTowerId = sourceTowerId;
+            this.lastHitCardId = sourceCardId;
+        }
 
         const currentHpPercent = this.currentHealth / this.maxHealth;
 
@@ -200,23 +243,36 @@ export class Enemy {
         // Visual Feedback: Hit Flash
         this.hitFlashTimer = 0.08; // ~5 frames at 60fps
 
-        // Track what killed this enemy
-        if (!this.isAlive()) {
-            if (projectile) {
-                this.killedByProjectile = projectile;
-            }
-
-            // Check for Death Spawns (Flesh Colossus mechanic)
-            const typeConfig = getEnemyType(this.typeId);
-            if (typeConfig?.deathSpawns && typeConfig.deathSpawns.length > 0) {
-                EventBus.getInstance().emit('ENEMY_DEATH_SPAWN', {
-                    enemy: this,
-                    spawns: typeConfig.deathSpawns
-                });
-            }
-
-            EventBus.getInstance().emit(Events.ENEMY_DIED, { enemy: this });
+        // 3. Death Pipeline
+        if (this.currentHealth <= 0) {
+            this.die(); // synchronous handling
         }
+    }
+
+    private die() {
+        // Track what killed this enemy
+        let killingTowerId = this.lastHitTowerId;
+        let killingCardId = this.lastHitCardId;
+
+        if (this.lastDamageTags & DamageTags.DOT) {
+            killingTowerId = this.burnPrimaryApplierId;
+            killingCardId = this.burnPrimaryCardId;
+        }
+
+        // 4. Queue OnDeath Explosions (Защита от рекурсии)
+        if (this.onDeathExplodeRadius > 0) {
+            CollisionSystem.queueExplosion(this.x, this.y, this.onDeathExplodeRadius, this.onDeathExplodeDamage, this.onDeathExplodeSourceId);
+        }
+
+        // Check for Death Spawns (Flesh Colossus mechanic)
+        const typeConfig = getEnemyType(this.typeId);
+        if (typeConfig?.deathSpawns && typeConfig.deathSpawns.length > 0) {
+            GlobalEnemyDeathSpawnEvent.enemy = this;
+            GlobalEnemyDeathSpawnEvent.spawns = typeConfig.deathSpawns;
+            EventBus.getInstance().emit('ENEMY_DEATH_SPAWN', GlobalEnemyDeathSpawnEvent);
+        }
+
+        EventBus.getInstance().emit(Events.ENEMY_DIED, { enemy: this, towerId: killingTowerId, cardId: killingCardId });
     }
 
     private activateShield(duration: number) {
@@ -231,10 +287,8 @@ export class Enemy {
     public move(dt: number, flowField: any): void { // Using 'any' briefly to avoid circular deps if types not ready, but better import FlowField interface
         let speedMod = 1;
         // Apply slow statuses
-        for (const status of this.statuses) { // Assuming statuses is an array of IStatus
-            if (status.type === 'slow') { // Assuming IStatus has a 'type' and 'power' property
-                speedMod *= (1 - status.power); // Assuming 'power' is the slow percentage (e.g., 0.5 for 50% slow)
-            }
+        if (this.slowDuration > 0) {
+            speedMod *= (1 - this.slowPower);
         }
 
         // BERSERKER ENRAGE MECHANIC
@@ -301,88 +355,68 @@ export class Enemy {
         return this.currentHealth / this.maxHealth;
     }
 
-    public applyStatus(type: 'slow' | 'burn', duration: number, power: number, damageBonus?: number) {
-        let existing = null;
-        for (let i = 0; i < this.statuses.length; i++) {
-            if (this.statuses[i].type === type) {
-                existing = this.statuses[i];
-                break;
-            }
-        }
-
-        if (existing) {
-            // Refresh duration
-            existing.duration = Math.max(existing.duration, duration);
-
-            if (type === 'slow') {
-                // For slow, keep the strongest effect (highest power/slow amount)
-                existing.power = Math.max(existing.power, power);
-                // Apply highest damage modifier
-                if (damageBonus) {
-                    this.damageModifier = Math.max(this.damageModifier, damageBonus);
-                }
-            } else if (type === 'burn') {
-                // For burn, keep the strongest DoT
-                existing.power = Math.max(existing.power, power);
+    public applySlow(duration: number, power: number, damageBonus?: number) {
+        if (this.slowDuration > 0) {
+            this.slowDuration = Math.max(this.slowDuration, duration);
+            this.slowPower = Math.max(this.slowPower, power);
+            if (damageBonus) {
+                this.damageModifier = Math.max(this.damageModifier, damageBonus);
             }
         } else {
-            this.statuses.push({ type, duration, power });
-            if (type === 'slow' && damageBonus) {
+            this.slowDuration = duration;
+            this.slowPower = power;
+            if (damageBonus) {
                 this.damageModifier = Math.max(this.damageModifier, damageBonus);
             }
         }
     }
 
+    public applyBurn(duration: number, dpsPerStack: number, stackCap: number, towerId: number, cardId: number) {
+        if (this.burnStacks === 0) {
+            // Первый поджигатель (Primary Applier) получает Credit
+            this.burnPrimaryApplierId = towerId;
+            this.burnPrimaryCardId = cardId;
+            this.burnDpsPerStack = dpsPerStack;
+        }
+
+        // Duration refresh
+        this.burnDuration = Math.max(this.burnDuration, duration);
+        // Stacks increase
+        this.burnStacks = Math.min(stackCap, this.burnStacks + 1);
+    }
+
+    public setOnDeathExplode(radius: number, damage: number, sourceId: number) {
+        if (radius > this.onDeathExplodeRadius) { // Max Radius Wins
+            this.onDeathExplodeRadius = radius;
+            this.onDeathExplodeDamage = damage;
+            this.onDeathExplodeSourceId = sourceId;
+        }
+    }
+
     public update(dt: number): void {
-        // Update status durations - in-place removal (no new array)
-        for (let i = this.statuses.length - 1; i >= 0; i--) {
-            this.statuses[i].duration -= dt;
-            if (this.statuses[i].duration <= 0) {
-                // Swap with last and pop
-                this.statuses[i] = this.statuses[this.statuses.length - 1];
-                this.statuses.pop();
+        // Update statuses
+        if (this.slowDuration > 0) {
+            this.slowDuration -= dt;
+            if (this.slowDuration <= 0) {
+                this.slowDuration = 0;
+                this.damageModifier = 1.0;
             }
         }
 
-        // Reset damage modifier if no slow status
-        let hasSlow = false;
-        for (let i = 0; i < this.statuses.length; i++) {
-            if (this.statuses[i].type === 'slow') {
-                hasSlow = true;
-                break;
-            }
-        }
-        if (!hasSlow) {
-            this.damageModifier = 1.0;
-        }
+        if (this.burnDuration > 0 && this.burnStacks > 0) {
+            this.burnDuration -= dt;
 
-        // Burn damage tick
-        for (let i = 0; i < this.statuses.length; i++) {
-            if (this.statuses[i].type === 'burn') {
-                // power = burnDps (damage per second)
-                // Direct health subtraction (bypasses armor — burn is TRUE damage)
-                this.currentHealth -= this.statuses[i].power * dt;
+            // Burn damage tick: DPS * dt * stacks
+            const tickDamage = this.burnDpsPerStack * this.burnStacks * dt;
 
-                // Check death from DOT
-                if (this.currentHealth <= 0) {
-                    this.currentHealth = 0;
+            // takeDamage with TRUE_DAMAGE | DOT
+            // Burn has its own damage pipeline resolution now via internal calls, 
+            // but we can just use takeDamage:
+            this.takeDamage(tickDamage, this.burnPrimaryApplierId, this.burnPrimaryCardId, DamageTags.TRUE_DAMAGE | DamageTags.DOT);
 
-                    // Emit death events — same as takeDamage() death path
-                    // Without this, deathSpawns (Flesh Colossus), sapper_rat explosion,
-                    // and ENEMY_DIED listeners won't fire for burn kills
-                    const typeConfig = getEnemyType(this.typeId);
-                    if (typeConfig && typeConfig.deathSpawns && typeConfig.deathSpawns.length > 0) {
-                        EventBus.getInstance().emit('ENEMY_DEATH_SPAWN', {
-                            enemy: this,
-                            spawns: typeConfig.deathSpawns
-                        });
-                    }
-                    EventBus.getInstance().emit(Events.ENEMY_DIED, { enemy: this });
-
-                    // Critical hit fix: purge burn status so we don't emit death twice if update is called again
-                    this.statuses.splice(i, 1);
-                }
-                break; // One burn source (last applied overwrites)
+            if (this.burnDuration <= 0) {
+                this.burnDuration = 0;
+                this.burnStacks = 0;
             }
         }
 

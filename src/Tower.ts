@@ -21,6 +21,9 @@ export interface SlotState {
 }
 
 export class Tower {
+    private static nextId: number = 1;
+    public readonly id: number;
+
     public col: number;
     public row: number;
     public x: number;
@@ -85,6 +88,7 @@ export class Tower {
     public visualState: Record<string, any> = {};
 
     constructor(c: number, r: number) {
+        this.id = Tower.nextId++;
         this.col = c;
         this.row = r;
         this.x = c * CONFIG.TILE_SIZE + CONFIG.TILE_SIZE / 2;

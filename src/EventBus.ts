@@ -19,14 +19,16 @@ export interface EventPayloadMap {
 
     // Entities
     ENEMY_IMMUNE: { x: number; y: number };
-    ENEMY_DIED: { enemy: any }; // Using any to avoid circular dependency with Enemy for now, or use interface
+    /** WARNING: Emitted payload is a mutable Singleton to avoid GC allocations! DO NOT hold references to this object. Extract primitive values immediately! */
+    ENEMY_DIED: EnemyDeathEvent;
     ENEMY_SPAWNED: string;
     SPAWN_PUDDLE: { x: number; y: number };
     PROJECTILE_SPAWNED: { x: number; y: number; target: any; stats: any };
 
     // Boss Mechanics
     ENEMY_SPLIT: { enemy: any; threshold: number };
-    ENEMY_DEATH_SPAWN: { enemy: any; spawns: string[] };
+    /** WARNING: Emitted payload is a mutable Singleton to avoid GC allocations! DO NOT hold references to this object. Extract primitive values immediately! */
+    ENEMY_DEATH_SPAWN: EnemyDeathSpawnEvent;
 
     // Cards (Phase 6.C)
     CARD_DROPPED: { card: any; x: number; y: number; actionId?: string }; // card is ICard
@@ -127,3 +129,16 @@ export const Events = {
     ENEMY_DEATH_SPAWN: 'ENEMY_DEATH_SPAWN',
     CARD_DROPPED: 'CARD_DROPPED'
 } as const;
+
+export class EnemyDeathEvent {
+    public enemy: any = null;
+    public towerId: number = -1;
+    public cardId: number = 0;
+}
+export const GlobalEnemyDeathEvent = new EnemyDeathEvent();
+
+export class EnemyDeathSpawnEvent {
+    public enemy: any = null;
+    public spawns: string[] = [];
+}
+export const GlobalEnemyDeathSpawnEvent = new EnemyDeathSpawnEvent();

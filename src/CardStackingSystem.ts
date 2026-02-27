@@ -278,9 +278,10 @@ function applyEffectsWithBonus(
             if (effect.chainRadius !== undefined && existing.chainRadius !== undefined) {
                 existing.chainRadius = Math.max(existing.chainRadius, effect.chainRadius);
             }
-            // Burn effect: keep strongest values
+            // Burn effect: accumulate DPS, keep longest duration
             if (effect.burnDps !== undefined && existing.burnDps !== undefined) {
-                existing.burnDps = Math.max(existing.burnDps, effect.burnDps);
+                // Stack the DPS based on the bonus multiplier instead of discarding it via Math.max
+                existing.burnDps += effect.burnDps * bonus;
             }
             if (effect.burnDuration !== undefined && existing.burnDuration !== undefined) {
                 existing.burnDuration = Math.max(existing.burnDuration, effect.burnDuration);

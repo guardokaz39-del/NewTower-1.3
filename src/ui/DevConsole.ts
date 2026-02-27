@@ -264,7 +264,7 @@ export class DevConsole {
         addBtn('Следующая волна', '⏩', () => { this.scene.wave++; Logger.info(LogChannel.GAME, `Волна ${this.scene.wave}`); }, '#4a3a1a');
         addBtn('Убить всех врагов', '💀', () => {
             for (let i = 0; i < this.scene.enemies.length; i++) {
-                this.scene.enemies[i].takeDamage(999999);
+                this.scene.enemies[i].takeDamage(999999, -1, 0, 0);
             }
             Logger.info(LogChannel.GAME, 'Все враги убиты');
         }, '#4a1a1a');
