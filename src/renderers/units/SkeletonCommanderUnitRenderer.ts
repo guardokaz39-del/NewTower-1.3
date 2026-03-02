@@ -90,9 +90,9 @@ export class SkeletonCommanderUnitRenderer implements UnitRenderer {
 
             // Hit Flash logic
             if (enemy.hitFlashTimer > 0) {
-                ctx.globalCompositeOperation = 'source-atop';
-                ctx.fillStyle = 'rgba(255, 255, 255, 0.6)';
-                ctx.fillRect(-size / 2, -size / 2, size, size);
+                ctx.globalCompositeOperation = 'lighter';
+                ctx.globalAlpha = 0.6;
+                ctx.drawImage(sprite, -size / 2, -size / 2, size, size);
             }
             ctx.restore();
             return;

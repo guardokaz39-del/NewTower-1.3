@@ -74,38 +74,40 @@ export class DefaultUnitRenderer implements UnitRenderer {
 
             if (tint) {
                 ctx.save();
-                ctx.globalCompositeOperation = 'source-atop';
                 ctx.fillStyle = tint;
-                ctx.globalAlpha = 0.5;
-                ctx.fillRect(-half, -half, size, size);
+                ctx.globalAlpha = 0.4;
+                ctx.beginPath();
+                ctx.arc(0, 0, 20 * scale, 0, Math.PI * 2);
+                ctx.fill();
                 ctx.restore();
             }
 
             // Hit Flash
             if (enemy.hitFlashTimer > 0) {
                 ctx.save();
-                ctx.globalCompositeOperation = 'source-atop';
-                ctx.fillStyle = '#ffffff';
+                ctx.globalCompositeOperation = 'lighter';
                 ctx.globalAlpha = 0.8;
-                ctx.fillRect(-half, -half, size, size);
+                ctx.drawImage(bodyImg, -half, -half, size, size);
                 ctx.restore();
             }
 
             // Status Tints
             if (enemy.slowDuration > 0) {
                 ctx.save();
-                ctx.globalCompositeOperation = 'source-atop';
                 ctx.fillStyle = CONFIG.AMBIENT.LIGHTING.ICE || '#00e5ff';
                 ctx.globalAlpha = 0.4;
-                ctx.fillRect(-half, -half, size, size);
+                ctx.beginPath();
+                ctx.arc(0, 0, 20 * scale, 0, Math.PI * 2);
+                ctx.fill();
                 ctx.restore();
             }
             if (enemy.burnDuration > 0 && enemy.burnStacks > 0) {
                 ctx.save();
-                ctx.globalCompositeOperation = 'source-atop';
                 ctx.fillStyle = CONFIG.AMBIENT.LIGHTING.FIRE || '#ff3d00';
                 ctx.globalAlpha = 0.4;
-                ctx.fillRect(-half, -half, size, size);
+                ctx.beginPath();
+                ctx.arc(0, 0, 20 * scale, 0, Math.PI * 2);
+                ctx.fill();
                 ctx.restore();
             }
         } else {
