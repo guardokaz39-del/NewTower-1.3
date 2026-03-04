@@ -235,6 +235,56 @@ export class EffectSystem {
     }
 
     /**
+     * Primitive-based Zero-Allocation Particle Spawn
+     * @performance No anonymous object creation
+     */
+    public spawnParticle(type: IEffect['type'], x: number, y: number, vx?: number, vy?: number, life?: number, radius?: number, color?: string): IEffect | null {
+        const priority = EffectPriority.LOW;
+
+        if (!this.canSpawn(priority, x, y, type)) return null;
+
+        const effect = this.acquire(type);
+        effect.x = x;
+        effect.y = y;
+        effect.vx = vx;
+        effect.vy = vy;
+        effect.life = life || 0.5;
+        effect.maxLife = effect.life;
+        effect.radius = radius;
+        effect.color = color;
+        effect.priority = priority;
+
+        this.effects.push(effect);
+        this.incrementCount(priority);
+
+        return effect;
+    }
+
+    /**
+     * Primitive-based Zero-Allocation Explosion Spawn
+     * @performance No anonymous object creation
+     */
+    public spawnExplosion(x: number, y: number, radius: number, life: number, color?: string): IEffect | null {
+        const priority = EffectPriority.HIGH;
+
+        if (!this.canSpawn(priority, x, y, 'explosion')) return null;
+
+        const effect = this.acquire('explosion');
+        effect.x = x;
+        effect.y = y;
+        effect.radius = radius;
+        effect.life = life;
+        effect.maxLife = life;
+        effect.color = color;
+        effect.priority = priority;
+
+        this.effects.push(effect);
+        this.incrementCount(priority);
+
+        return effect;
+    }
+
+    /**
      * Intelligent Spawn Logic (LOD + Culling + Budget)
      */
     private canSpawn(priority: EffectPriority, x: number, y: number, type: string): boolean {

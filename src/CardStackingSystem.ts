@@ -28,7 +28,7 @@ export function getStackingBonus(level: number): number {
 /**
  * Group cards by type ID
  */
-function groupCardsByType(cards: ICard[]): Map<string, ICard[]> {
+function groupCardsByType(cards: readonly ICard[]): Map<string, ICard[]> {
     const grouped = new Map<string, ICard[]>();
 
     for (const card of cards) {
@@ -50,7 +50,7 @@ export interface MergedCardData {
 /**
  * Merge modifiers and effects from cards with advanced stacking rules
  */
-export function mergeCardsWithStacking(cards: ICard[]): MergedCardData {
+export function mergeCardsWithStacking(cards: readonly ICard[]): MergedCardData {
     const result: ICardModifiers = {
         damage: 0,
         damageMultiplier: undefined,

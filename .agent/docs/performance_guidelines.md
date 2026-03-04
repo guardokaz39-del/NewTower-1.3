@@ -64,19 +64,50 @@ public getVector(x, y, out: {x: number, y: number}): void {
 flowField.getVector(this.x, this.y, this._moveVector);
 ```
 
+### 3b. Zero-Allocation Object Instantiation (Primitives API) [NEW]
+
+Для подсистем, генерирующих тысячи событий (снаряды, эффекты частиц), **ЗАПРЕЩЕНО** использовать анонимные конфигурационные объекты `{}` в `update()` цикле.
+
+```typescript
+// ❌ ЗАПРЕЩЕНО (Выделяет память под конфигурационный объект каждый вызов)
+effects.add({ type: 'particle', x: p.x, y: p.y, vx: 5, vy: 5, color: '#fff' });
+
+// ✅ ПРАВИЛЬНО (Использует только стек-примитивы, 0 allocs)
+effects.spawnParticle('particle', p.x, p.y, 5, 5, 0.5, 2, '#fff');
+```
+
 ### 4. Array filter в update
 
 ```typescript
 // ❌ ЗАПРЕЩЕНО
 this.entities = this.entities.filter(e => e.alive);
 
-// ✅ ПРАВИЛЬНО: In-place обратная итерация
+// ❌ ПЛОХО (Хак с ручным i--, склонно к багам пропуска элементов)
+for (let i = 0; i < this.entities.length; i++) {
+    if (!this.entities[i].alive) {
+        this.entities.splice(i, 1);
+        i--;
+    }
+}
+
+// ✅ ПРАВИЛЬНО: Safe Reverse Loop (Swap & Pop)
 for (let i = this.entities.length - 1; i >= 0; i--) {
     if (!this.entities[i].alive) {
+        // Быстрое удаление за O(1) без сдвига массива
         this.entities[i] = this.entities[this.entities.length - 1];
         this.entities.pop();
     }
 }
+```
+
+### 4a. Math Bounds Limits (Guards) [NEW]
+
+Арифметические операции, управляющие ключевыми циклами (кулдауны) или здоровьем (урон), **ОБЯЗАТЕЛЬНО** должны быть ограничены через `Math.max()` / `Math.min()` на выходе из геттеров, чтобы синергия модификаторов не сломала игровой цикл.
+
+```typescript
+// ✅ ПРАВИЛЬНО: Финальные лимиты после всех вычислений (защита от Infinity/зависаний)
+cached.dmg = Math.max(1.0, cached.dmg);
+cached.cd = Math.max(0.05, Math.min(10.0, cached.cd));
 ```
 
 ### 5. forEach в render loops

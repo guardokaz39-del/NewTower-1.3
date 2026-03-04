@@ -33,11 +33,40 @@ export class Tower {
     public slots: SlotState[] = [];
     public selectedSlotId: number = -1; // -1: None, 0-2: Slot ID selected in UI
 
-    // Backward compatibility getter: Returns all equipped cards
-    public get cards(): ICard[] {
-        return this.slots
-            .filter(s => !s.isLocked && s.card !== null)
-            .map(s => s.card!);
+    // Cache State for Getter
+    private _activeCardsCache: ICard[] = [];
+
+    // Safe, Zero-Allocation, Auto-Healing getter
+    public get cards(): readonly ICard[] {
+        let changed = false;
+        let activeCount = 0;
+
+        // Fast O(1) memory validation (max 3 slots)
+        for (let i = 0; i < this.slots.length; i++) {
+            const s = this.slots[i];
+            if (!s.isLocked && s.card) {
+                if (this._activeCardsCache[activeCount] !== s.card) {
+                    changed = true;
+                }
+                activeCount++;
+            }
+        }
+
+        // In-place rebuild only if mismatch detected
+        if (changed || activeCount !== this._activeCardsCache.length) {
+            this._activeCardsCache.length = 0; // Clear without allocation
+            for (let i = 0; i < this.slots.length; i++) {
+                if (!this.slots[i].isLocked && this.slots[i].card) {
+                    this._activeCardsCache.push(this.slots[i].card);
+                }
+            }
+        }
+
+        // Apply read-only freeze in Development
+        if (process.env.NODE_ENV === 'development') {
+            return Object.freeze([...this._activeCardsCache]);
+        }
+        return this._activeCardsCache;
     }
 
     // Legacy setter (optional, but safer to prevent direct assignment bugs)
@@ -266,6 +295,10 @@ export class Tower {
             cached.cd = (cached as any)._baseCd / (cached as any)._baseSpeedMult;
         }
 
+        // Apply Math Bounds (Safety Limits)
+        cached.dmg = Math.max(1.0, cached.dmg);
+        cached.cd = Math.max(0.05, Math.min(10.0, cached.cd));
+
         return cached;
     }
 
@@ -365,16 +398,16 @@ export class Tower {
             // Spawn dust particles during construction (every ~0.15s)
             // Using a hacky random check for now to avoid storing another timer
             if (Math.random() < dt * 6) { // Approx 6 times per second
-                effects.add({
-                    type: 'particle',
-                    x: this.x + (Math.random() - 0.5) * 30,
-                    y: this.y + 15,
-                    vx: (Math.random() - 0.5) * 120, // ~2 px/frame -> 120 px/sec
-                    vy: -Math.random() * 120,
-                    life: 0.3 + Math.random() * 0.15, // ~20 frames -> 0.3s
-                    color: '#a69060',
-                    radius: 2 + Math.random() * 2
-                });
+                effects.spawnParticle(
+                    'particle',
+                    this.x + (Math.random() - 0.5) * 30,
+                    this.y + 15,
+                    (Math.random() - 0.5) * 120, // vx: ~2 px/frame -> 120 px/sec
+                    -Math.random() * 120,        // vy
+                    0.3 + Math.random() * 0.15,  // life: ~20 frames -> 0.3s
+                    2 + Math.random() * 2,       // radius
+                    '#a69060'                    // color
+                );
             }
 
             if (this.buildProgress >= this.maxBuildProgress) {
@@ -383,20 +416,20 @@ export class Tower {
                 // Completion burst - dust cloud
                 for (let i = 0; i < 12; i++) {
                     const angle = (i / 12) * Math.PI * 2;
-                    effects.add({
-                        type: 'particle',
-                        x: this.x,
-                        y: this.y,
-                        vx: Math.cos(angle) * 180, // 3 px/frame -> 180 px/sec
-                        vy: Math.sin(angle) * 180 - 60, // gravity effect approximately
-                        life: 0.4 + Math.random() * 0.15,
-                        color: '#c0a060',
-                        radius: 3 + Math.random() * 2
-                    });
+                    effects.spawnParticle(
+                        'particle',
+                        this.x,
+                        this.y,
+                        Math.cos(angle) * 180, // vx: 3 px/frame -> 180 px/sec
+                        Math.sin(angle) * 180 - 60, // vy: gravity effect approximately
+                        0.4 + Math.random() * 0.15, // life
+                        3 + Math.random() * 2, // radius
+                        '#c0a060' // color
+                    );
                 }
 
                 // Flash effect
-                effects.add({ type: 'explosion', x: this.x, y: this.y, radius: 25, life: 0.25, color: '#ffd700' });
+                effects.spawnExplosion(this.x, this.y, 25, 0.25, '#ffd700');
             }
         }
     }
@@ -427,21 +460,8 @@ export class Tower {
         }
 
         if (needsSearch) {
-            // Validate existing target range if we have one
             if (this.target) {
-                const dx = this.target.x - this.x;
-                const dy = this.target.y - this.y;
-                const distSq = dx * dx + dy * dy;
-
-                // Recalc range only if needed
-                if (this.rangeSquared === 0) {
-                    const range = this.getRange();
-                    this.rangeSquared = range * range;
-                }
-
-                if (distSq > this.rangeSquared) {
-                    this.target = null; // Out of range, drop it
-                }
+                // Remove redundant check here since we now do it every frame below
             }
 
             // If we need a new target (either dropped, or just periodic check for better one)
@@ -466,15 +486,24 @@ export class Tower {
         }
 
         // --- TRACKING (High Frequency: Every Frame) ---
-        // Always look at the target's CURRENT position
         if (this.target && this.target.isAlive()) {
             const dx = this.target.x - this.x;
             const dy = this.target.y - this.y;
-            const targetAngle = Math.atan2(dy, dx);
+            const distSq = dx * dx + dy * dy;
 
-            // Smooth Interpolation
-            // dt * turnSpeed (e.g. 0.016 * 10 = 0.16 interpolation factor)
-            this.angle = lerpAngle(this.angle, targetAngle, dt * this.turnSpeed);
+            // Continual Range Guard (Fixes Zombie Pool Ref bug safely)
+            if (this.rangeSquared === 0) {
+                const range = this.getRange();
+                this.rangeSquared = range * range;
+            }
+
+            if (distSq > this.rangeSquared) {
+                this.target = null; // Target walked or respawned out of bounds
+            } else {
+                const targetAngle = Math.atan2(dy, dx);
+                // Smooth Interpolation
+                this.angle = lerpAngle(this.angle, targetAngle, dt * this.turnSpeed);
+            }
         }
     }
 

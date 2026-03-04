@@ -50,8 +50,8 @@ export class ProjectileSystem {
     }
 
     public update(dt: number, effects: EffectSystem) {
-        // Iterate active projectiles
-        for (let i = 0; i < this.active.length; i++) {
+        // Iterate active projectiles backwards for safe removal
+        for (let i = this.active.length - 1; i >= 0; i--) {
             const p = this.active[i];
 
             p.update(dt); // Update logic (physics only)
@@ -65,9 +65,6 @@ export class ProjectileSystem {
             } else {
                 // Remove from active (Swap & Pop)
                 this.remove(i);
-
-                // Decrement i because we swapped a new element into this slot
-                i--;
             }
         }
     }
@@ -77,42 +74,42 @@ export class ProjectileSystem {
 
         // Fire Trail (Smoke/Embers)
         if (type === 'fire') {
-            effects.add({
-                type: 'particle',
-                x: p.x + (Math.random() - 0.5) * 4,
-                y: p.y + (Math.random() - 0.5) * 4,
-                vx: -p.vx * 0.2 + (Math.random() - 0.5) * 60,
-                vy: -p.vy * 0.2 + (Math.random() - 0.5) * 60,
-                life: 0.25 + Math.random() * 0.15, // ~15-25 frames
-                radius: 2 + Math.random() * 2,
-                color: Math.random() > 0.5 ? 'rgba(255, 100, 0, 0.5)' : 'rgba(100, 100, 100, 0.3)'
-            });
+            effects.spawnParticle(
+                'particle',
+                p.x + (Math.random() - 0.5) * 4,
+                p.y + (Math.random() - 0.5) * 4,
+                -p.vx * 0.2 + (Math.random() - 0.5) * 60,
+                -p.vy * 0.2 + (Math.random() - 0.5) * 60,
+                0.25 + Math.random() * 0.15, // life: ~15-25 frames
+                2 + Math.random() * 2,       // radius
+                Math.random() > 0.5 ? 'rgba(255, 100, 0, 0.5)' : 'rgba(100, 100, 100, 0.3)'
+            );
         }
         // Ice Trail (Snow/Sparkle)
         else if (type === 'ice') {
-            effects.add({
-                type: 'particle',
-                x: p.x,
-                y: p.y,
-                vx: (Math.random() - 0.5) * 30,
-                vy: (Math.random() - 0.5) * 30,
-                life: 0.35, // 20 frames
-                radius: 1.5,
-                color: '#e1f5fe'
-            });
+            effects.spawnParticle(
+                'particle',
+                p.x,
+                p.y,
+                (Math.random() - 0.5) * 30,
+                (Math.random() - 0.5) * 30,
+                0.35,                        // life: 20 frames
+                1.5,                         // radius
+                '#e1f5fe'                    // color
+            );
         }
         // Level 3 Trail (Glow) - Generic for all high levels
         if (p.towerLevel >= 3) {
-            effects.add({
-                type: 'particle',
-                x: p.x,
-                y: p.y,
-                vx: 0,
-                vy: 0,
-                life: 0.16, // 10 frames
-                radius: 2,
-                color: p.color
-            });
+            effects.spawnParticle(
+                'particle',
+                p.x,
+                p.y,
+                0,                           // vx
+                0,                           // vy
+                0.16,                        // life: 10 frames
+                2,                           // radius
+                p.color                      // color
+            );
         }
     }
 
