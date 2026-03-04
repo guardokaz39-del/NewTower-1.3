@@ -85,7 +85,8 @@ export class Tower {
     // Targeting State (Optimized)
     public target: Enemy | null = null;
     public searchTimer: number = Math.random() * 0.2; // Random offset to spread CPU load
-    public rangeSquared: number = 0;
+    public currentRangeSq: number = 0;
+    public statsVersion: number = 0;
 
     public isBuilding: boolean = false;
     public buildProgress: number = 0;
@@ -96,7 +97,7 @@ export class Tower {
     // Cache State
     private statsDirty: boolean = true;
     private cachedStats: (IProjectileStats & { range: number; cd: number; projCount: number; spread: number; projectileType: string; attackSpeedMultiplier: number }) | null = null;
-    // public rangeSquared: number = 0; // Removed duplicate declaration
+    private _frameStats: any = null;
 
     // Spinup state (for Minigun cards)
     public spinupTime: number = 0;        // Seconds spent firing continuously
@@ -144,7 +145,7 @@ export class Tower {
     // Force cache update
     public invalidateCache() {
         this.statsDirty = true;
-        this.rangeSquared = 0; // Force range recalc
+        this.statsVersion++;
     }
 
     getStats(): IProjectileStats & { range: number; cd: number; projCount: number; spread: number; projectileType: string; attackSpeedMultiplier: number } {
@@ -248,12 +249,16 @@ export class Tower {
                 _baseSpeedMult: baseSpeedMult,
                 _spinupEffect: spinupEffect,
             } as any;
+
+            this.currentRangeSq = range * range;
+            this._frameStats = { ...this.cachedStats };
+
             this.statsDirty = false;
         }
 
         // === TIER 2: Lightweight spinup overlay (runs every frame for Minigun) ===
-        const cached = this.cachedStats!;
-        const se = (cached as any)._spinupEffect;
+        const frameStats = this._frameStats;
+        const se = (this.cachedStats as any)._spinupEffect;
 
         if (se && this.spinupTime > 0) {
             const spinupSeconds = this.spinupTime;
@@ -284,22 +289,22 @@ export class Tower {
                 spinupSpeedBonus = se.spinupSpeedBonus * ratio;
             }
 
-            // Apply overlays (mutate cached — it's our own object)
-            cached.dmg = (cached as any)._baseDamage + bonusDamage;
-            cached.critChance = (cached as any)._baseCrit + bonusCrit;
-            cached.cd = (cached as any)._baseCd / ((cached as any)._baseSpeedMult + spinupSpeedBonus);
+            // Apply overlays (mutate frameStats — it's our own object)
+            frameStats.dmg = (this.cachedStats as any)._baseDamage + bonusDamage;
+            frameStats.critChance = (this.cachedStats as any)._baseCrit + bonusCrit;
+            frameStats.cd = (this.cachedStats as any)._baseCd / ((this.cachedStats as any)._baseSpeedMult + spinupSpeedBonus);
         } else if (se) {
             // No spinup active — restore base values
-            cached.dmg = (cached as any)._baseDamage;
-            cached.critChance = (cached as any)._baseCrit;
-            cached.cd = (cached as any)._baseCd / (cached as any)._baseSpeedMult;
+            frameStats.dmg = (this.cachedStats as any)._baseDamage;
+            frameStats.critChance = (this.cachedStats as any)._baseCrit;
+            frameStats.cd = (this.cachedStats as any)._baseCd / (this.cachedStats as any)._baseSpeedMult;
         }
 
         // Apply Math Bounds (Safety Limits)
-        cached.dmg = Math.max(1.0, cached.dmg);
-        cached.cd = Math.max(0.05, Math.min(10.0, cached.cd));
+        frameStats.dmg = Math.max(1.0, frameStats.dmg);
+        frameStats.cd = Math.max(0.05, Math.min(10.0, frameStats.cd));
 
-        return cached;
+        return frameStats as Readonly<IProjectileStats & { range: number; cd: number; projCount: number; spread: number; projectileType: string; attackSpeedMultiplier: number }>;
     }
 
     addCard(c: ICard): boolean {
@@ -393,18 +398,18 @@ export class Tower {
 
     updateBuilding(effects: EffectSystem, dt: number) {
         if (this.isBuilding) {
+            const prevProgress = this.buildProgress;
             this.buildProgress += dt;
 
-            // Spawn dust particles during construction (every ~0.15s)
-            // Using a hacky random check for now to avoid storing another timer
-            if (Math.random() < dt * 6) { // Approx 6 times per second
+            // Spawn dust particles during construction deterministically (~ every 0.16s)
+            if (Math.floor(this.buildProgress / 0.16) > Math.floor(prevProgress / 0.16)) {
                 effects.spawnParticle(
                     'particle',
-                    this.x + (Math.random() - 0.5) * 30,
+                    this.x + (Math.random() - 0.5) * 30, // Still random pos, but deterministic timing
                     this.y + 15,
-                    (Math.random() - 0.5) * 120, // vx: ~2 px/frame -> 120 px/sec
+                    (Math.random() - 0.5) * 120, // vx
                     -Math.random() * 120,        // vy
-                    0.3 + Math.random() * 0.15,  // life: ~20 frames -> 0.3s
+                    0.3 + Math.random() * 0.15,  // life
                     2 + Math.random() * 2,       // radius
                     '#a69060'                    // color
                 );
@@ -492,12 +497,11 @@ export class Tower {
             const distSq = dx * dx + dy * dy;
 
             // Continual Range Guard (Fixes Zombie Pool Ref bug safely)
-            if (this.rangeSquared === 0) {
-                const range = this.getRange();
-                this.rangeSquared = range * range;
+            if (this.currentRangeSq === 0) {
+                this.getStats(); // Hydrate caches
             }
 
-            if (distSq > this.rangeSquared) {
+            if (distSq > this.currentRangeSq) {
                 this.target = null; // Target walked or respawned out of bounds
             } else {
                 const targetAngle = Math.atan2(dy, dx);

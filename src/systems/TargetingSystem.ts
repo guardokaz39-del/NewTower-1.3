@@ -27,8 +27,12 @@ export class TargetingSystem {
     public static findTarget(tower: Tower, grid: SpatialGrid<Enemy>, flowField: FlowField): Enemy | null {
         const tx = tower.x;
         const ty = tower.y;
-        const range = tower.getRange();
-        const rangeSq = range * range;
+
+        if (tower.currentRangeSq === 0) {
+            tower.getStats(); // Force hydrate if 0
+        }
+        const rangeSq = tower.currentRangeSq;
+        const range = Math.sqrt(rangeSq); // We still need visual range for query radius
 
         // 1. Zero-Alloc Query
         grid.queryInRadius(tx, ty, range, this.buffer);
@@ -54,7 +58,9 @@ export class TargetingSystem {
             const dy = e.y - ty;
             const distSq = dx * dx + dy * dy;
 
-            if (distSq > rangeSq) continue;
+            // Hysteresis: current target gets 15% extra range leniency to prevent jitter
+            const effectiveRangeSq = (e === currentTarget) ? rangeSq * this.HYSTERESIS_FACTOR : rangeSq;
+            if (distSq > effectiveRangeSq) continue;
 
             // --- PRIORITY LOGIC (Taunt) ---
             // If this enemy has lower priority than the current best, skip it

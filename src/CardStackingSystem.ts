@@ -66,8 +66,18 @@ export function mergeCardsWithStacking(cards: readonly ICard[]): MergedCardData 
 
     // Process each card type group
     for (const [typeId, typeCards] of grouped) {
-        // Sort by level (highest first)
-        typeCards.sort((a, b) => b.level - a.level);
+        // O(N) find max level card and swap to index 0 (Zero Alloc)
+        let maxIdx = 0;
+        for (let i = 1; i < typeCards.length; i++) {
+            if (typeCards[i].level > typeCards[maxIdx].level) {
+                maxIdx = i;
+            }
+        }
+        if (maxIdx !== 0) {
+            const temp = typeCards[0];
+            typeCards[0] = typeCards[maxIdx];
+            typeCards[maxIdx] = temp;
+        }
 
         if (typeId === 'minigun') {
             // Special handling for Minigun

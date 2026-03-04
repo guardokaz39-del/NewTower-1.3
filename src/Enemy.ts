@@ -50,10 +50,11 @@ export class Enemy {
 
     // Burn Status Slots
     public burnStacks: number = 0;
-    public burnDpsPerStack: number = 0; // Сохраняем DPS одного стака
+    public totalBurnDps: number = 0; // Cumulative DPS 
     public burnDuration: number = 0;
     public burnPrimaryApplierId: number = -1; // Чей credit при смерти от ДОТ
     public burnPrimaryCardId: number = 0;
+    private burnTickAcc: number = 0; // Fixed-step time accumulator for DOTs
 
     // Explode On Death Slots (Max Wins Policy)
     public onDeathExplodeRadius: number = 0;
@@ -121,10 +122,11 @@ export class Enemy {
         this.slowDuration = 0;
         this.slowPower = 0;
         this.burnStacks = 0;
-        this.burnDpsPerStack = 0;
+        this.totalBurnDps = 0;
         this.burnDuration = 0;
         this.burnPrimaryApplierId = -1;
         this.burnPrimaryCardId = 0;
+        this.burnTickAcc = 0;
         this.onDeathExplodeRadius = 0;
         this.onDeathExplodeDamage = 0;
         this.onDeathExplodeSourceId = -1;
@@ -245,14 +247,24 @@ export class Enemy {
 
         // 3. Death Pipeline
         if (this.currentHealth <= 0) {
-            this.die(); // synchronous handling
+            this.kill(sourceTowerId, sourceCardId); // Use centralized kill gateway
         }
     }
 
-    private die() {
+    public kill(sourceTowerId: number, sourceCardId: number) {
+        if (this.currentHealth > 0) {
+            this.currentHealth = 0;
+        }
+
+        // Ensure kill logic only runs once by checking if we just died or were already dead.
+        // Actually takeDamage guards against double calling because of !this.isAlive() check at the top.
+        this.die(sourceTowerId, sourceCardId);
+    }
+
+    private die(sourceTowerId: number, sourceCardId: number) {
         // Track what killed this enemy
-        let killingTowerId = this.lastHitTowerId;
-        let killingCardId = this.lastHitCardId;
+        let killingTowerId = sourceTowerId;
+        let killingCardId = sourceCardId;
 
         if (this.lastDamageTags & DamageTags.DOT) {
             killingTowerId = this.burnPrimaryApplierId;
@@ -376,8 +388,11 @@ export class Enemy {
             // Первый поджигатель (Primary Applier) получает Credit
             this.burnPrimaryApplierId = towerId;
             this.burnPrimaryCardId = cardId;
-            this.burnDpsPerStack = dpsPerStack;
         }
+
+        // Add to total DPS securely without overwriting strong previous DPS with weak
+        this.totalBurnDps += dpsPerStack;
+        this.totalBurnDps = Math.min(this.totalBurnDps, stackCap * dpsPerStack);
 
         // Duration refresh
         this.burnDuration = Math.max(this.burnDuration, duration);
@@ -405,17 +420,22 @@ export class Enemy {
 
         if (this.burnDuration > 0 && this.burnStacks > 0) {
             this.burnDuration -= dt;
+            this.burnTickAcc += dt;
 
-            // Burn damage tick: DPS * dt * stacks
-            const tickDamage = this.burnDpsPerStack * this.burnStacks * dt;
+            const BURN_TICK_RATE = CONFIG.COMBAT.BURN_TICK_RATE;
 
-            // takeDamage with TRUE_DAMAGE | DOT
-            // Burn has its own damage pipeline resolution now via internal calls, 
-            // but we can just use takeDamage:
-            this.takeDamage(tickDamage, this.burnPrimaryApplierId, this.burnPrimaryCardId, DamageTags.TRUE_DAMAGE | DamageTags.DOT);
+            while (this.burnTickAcc >= BURN_TICK_RATE) {
+                this.burnTickAcc -= BURN_TICK_RATE;
+                // Flat damage per tick
+                const tickDamage = this.totalBurnDps * BURN_TICK_RATE;
+                this.takeDamage(tickDamage, this.burnPrimaryApplierId, this.burnPrimaryCardId, DamageTags.TRUE_DAMAGE | DamageTags.DOT);
+            }
 
             if (this.burnDuration <= 0) {
+                // Symmetrical complete state cleanup
                 this.burnDuration = 0;
+                this.burnTickAcc = 0;
+                this.totalBurnDps = 0;
                 this.burnStacks = 0;
             }
         }

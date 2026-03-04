@@ -23,6 +23,7 @@ export class CollisionSystem {
 
     private static aoeBuffer: Enemy[] = [];
     public static explosionQueue: number[] = [];
+    public static standbyQueue: number[] = [];
 
     public static queueExplosion(x: number, y: number, radius: number, damage: number, sourceId: number) {
         CollisionSystem.explosionQueue.push(x, y, radius, damage, sourceId);
@@ -31,7 +32,10 @@ export class CollisionSystem {
     private processExplosions(activeGrid: SpatialGrid<Enemy>) {
         if (CollisionSystem.explosionQueue.length === 0) return;
 
-        const queue = [...CollisionSystem.explosionQueue];
+        // Double Buffering (Zero Alloc)
+        const queue = CollisionSystem.explosionQueue;
+        CollisionSystem.explosionQueue = CollisionSystem.standbyQueue;
+        CollisionSystem.standbyQueue = queue;
         CollisionSystem.explosionQueue.length = 0;
 
         for (let i = 0; i < queue.length; i += 5) {

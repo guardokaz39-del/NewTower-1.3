@@ -32,6 +32,10 @@ export const CONFIG = {
         SLOT_UNLOCK_COST: [0, 150, 350], // Cost to unlock Slot 1 (0), Slot 2, Slot 3
     },
 
+    COMBAT: {
+        BURN_TICK_RATE: 0.25, // Seconds between DOT ticks (4 ticks/sec)
+    },
+
     TOWER: TOWER_CONFIG,
 
     TARGETING_MODES: TARGETING_MODES,
