@@ -32,6 +32,10 @@ export interface EventPayloadMap {
 
     // Cards (Phase 6.C)
     CARD_DROPPED: { card: any; x: number; y: number; actionId?: string }; // card is ICard
+
+    // UI Map Selection
+    UI_MAP_SELECTED: import('./MapData').IMapData;
+    UI_MAP_PLAY_REQUESTED: import('./MapData').IMapData;
 }
 
 export type EventCallback<T> = (data: T) => void;
@@ -127,7 +131,9 @@ export const Events = {
     PROJECTILE_SPAWNED: 'PROJECTILE_SPAWNED',
     ENEMY_SPLIT: 'ENEMY_SPLIT',
     ENEMY_DEATH_SPAWN: 'ENEMY_DEATH_SPAWN',
-    CARD_DROPPED: 'CARD_DROPPED'
+    CARD_DROPPED: 'CARD_DROPPED',
+    UI_MAP_SELECTED: 'UI_MAP_SELECTED',
+    UI_MAP_PLAY_REQUESTED: 'UI_MAP_PLAY_REQUESTED'
 } as const;
 
 export class EnemyDeathEvent {

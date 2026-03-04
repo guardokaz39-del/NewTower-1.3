@@ -361,3 +361,27 @@ The `IGameScene` interface is the contract that allows UI components to talk to 
 | `src/ForgeSystem.ts` | Forge: Slot management, drag drop, evolution modal |
 | `src/CardSystem.ts` | Hand rendering, card creation, drag ghost |
 | `src/design/*.ts` | Design tokens (colors, spacing, borders, shadows, transitions, fonts) |
+| `src/ui/MapSelectionUI.ts` | Map Selector: Overlay lifecycle, map previews, integration with `MapStorage` |
+| `src/utils/MapPreviewRenderer.ts` | Stateless fast-renderer for map canvas previews. |
+
+---
+
+## 🗺️ Map Selection & Canvas Previews
+
+Map previews are generated dynamically via `MapPreviewRenderer.ts` rather than loading images. This approach requires specific optimizations.
+
+### Stateless Rendering & Performance
+
+`MapPreviewRenderer` is a purely static class that draws `IMapData` to a provided Canvas context. It must run in under **16ms** to maintain consistent frame limits.
+
+**Optimization Rules for Map Previews:**
+
+1. **Background Batching**: Never draw individual base tiles (e.g., Grass) in a loop `(x, y)`. Instead, fill the entire Canvas context with the base color (`ctx.fillRect(0, 0, width, height)`) and only iterate to draw tiles that differ from the base (Water, Paths, Lava).
+2. **Deterministic Scale**: Compute `scale = Math.min(canvasWidth / realWidth, canvasHeight / realHeight)` to perfectly fit any map size inside the UI overlay.
+
+### Map Selection Component Lifecycle
+
+`MapSelectionUI` bridges `MapStorage` and `MapPreviewRenderer`.
+
+- It must ensure the DOM container (`#map-selection-ui`) is explicitly hidden via `display: none` within its `destroy()` method. Failure to do so blocks pointer events on the `GameScene` canvas beneath it.
+- Event listeners (e.g., Play, Back) must be guarded via an `isInitialized` flag or unbound properly to prevent multiple triggers (Zombie events) if the user quickly toggles menus.

@@ -9,12 +9,14 @@ import { UIUtils } from '../UIUtils';
 import { Assets } from '../Assets';
 import { VISUALS } from '../VisualConfig';
 import { StressTestScene } from './StressTestScene';
+import { MapSelectionUI } from '../ui/MapSelectionUI';
+import { EventBus, Events } from '../EventBus';
 
 export class MenuScene extends BaseScene {
     private game: Game;
     private container!: HTMLElement;
-    private mapSelectionContainer!: HTMLElement;
-    private _refreshGeneration: number = 0;
+    private mapSelectionUI?: MapSelectionUI;
+    private playRequestSub!: () => void;
 
     constructor(game: Game) {
         super();
@@ -26,12 +28,27 @@ export class MenuScene extends BaseScene {
         if (!this.container) {
             this.createUI();
         }
-        if (!this.mapSelectionContainer) {
-            this.createMapSelectionUI();
+        if (!this.mapSelectionUI) {
+            this.mapSelectionUI = new MapSelectionUI(() => {
+                this.mapSelectionUI?.hide();
+                this.container.style.display = 'flex';
+            });
+            this.mapSelectionUI.init();
         }
 
         this.container.style.display = 'flex';
-        this.mapSelectionContainer.style.display = 'none';
+        this.mapSelectionUI.hide();
+
+        // Подписываемся на запуск карты
+        this.playRequestSub = EventBus.getInstance().on(Events.UI_MAP_PLAY_REQUESTED, (data: IMapData) => {
+            const isValid = validateMap(data);
+            if (isValid) {
+                this.game.toGame(data);
+            } else {
+                console.error('Map is invalid!');
+                alert('Map is invalid!');
+            }
+        });
 
         // Hide game UI layers via UIRoot
         this.game.uiRoot.hideGameUI();
@@ -39,10 +56,15 @@ export class MenuScene extends BaseScene {
 
     protected onExitImpl() {
         if (this.container) this.container.style.display = 'none';
-        if (this.mapSelectionContainer) this.mapSelectionContainer.style.display = 'none';
 
-        // Cleanup canvas elements to prevent memory leaks
-        this.clearMapPreviews();
+        if (this.playRequestSub) {
+            this.playRequestSub();
+        }
+
+        if (this.mapSelectionUI) {
+            this.mapSelectionUI.destroy();
+            this.mapSelectionUI = undefined; // Для повторной ре-инициализации при возврате
+        }
     }
 
     public update(dt: number) { }
@@ -145,227 +167,9 @@ export class MenuScene extends BaseScene {
         document.body.appendChild(this.container);
     }
 
-    private createMapSelectionUI() {
-        this.mapSelectionContainer = UIUtils.createContainer({
-            position: 'absolute',
-            top: '0',
-            left: '0',
-            width: '100%',
-            height: '100%',
-            display: 'none',
-            flexDirection: 'column',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: '2000',
-            color: '#fff'
-        });
-        // Фоновое изображение вручную (из корня)
-        this.mapSelectionContainer.style.backgroundImage = 'url("../map.jpg")';
-        this.mapSelectionContainer.style.backgroundSize = 'cover';
-        this.mapSelectionContainer.style.backgroundPosition = 'center';
-        this.mapSelectionContainer.style.backgroundRepeat = 'no-repeat';
-
-        // Затемняющий overlay с градиентом для лучшего фокуса
-        const overlay = document.createElement('div');
-        Object.assign(overlay.style, {
-            position: 'absolute',
-            top: '0',
-            left: '0',
-            width: '100%',
-            height: '100%',
-            background: 'radial-gradient(circle at center, rgba(0, 0, 0, 0.4) 0%, rgba(0, 0, 0, 0.7) 100%)',
-            zIndex: '-1',
-            pointerEvents: 'none'
-        });
-        this.mapSelectionContainer.appendChild(overlay);
-
-        const title = document.createElement('h2');
-        title.innerText = 'SELECT MAP';
-        Object.assign(title.style, {
-            marginBottom: `${VISUALS.UI.SPACING.xl}px`,
-            fontSize: VISUALS.UI.FONTS.size.huge,
-            fontWeight: VISUALS.UI.FONTS.weight.bold,
-            textShadow: VISUALS.UI.SHADOWS.lg,
-            letterSpacing: '2px'
-        });
-        this.mapSelectionContainer.appendChild(title);
-
-        const listContainer = document.createElement('div');
-        Object.assign(listContainer.style, {
-            display: 'flex',
-            gap: `${VISUALS.UI.SPACING.lg}px`,
-            overflowX: 'auto',
-            overflowY: 'hidden',
-            maxWidth: '90%',
-            maxHeight: '70vh',
-            padding: `${VISUALS.UI.SPACING.xl}px`,
-            border: `${VISUALS.UI.BORDERS.width.normal} solid ${VISUALS.UI.COLORS.glass.border}`,
-            borderRadius: VISUALS.UI.BORDERS.radius.xl,
-            background: VISUALS.UI.COLORS.glass.bgLight,
-            backdropFilter: 'blur(10px)',
-            boxShadow: VISUALS.UI.SHADOWS.xl,
-            scrollbarWidth: 'thin',
-            scrollbarColor: `${VISUALS.UI.COLORS.glass.borderHover} ${VISUALS.UI.COLORS.glass.bgDark}`
-        });
-        this.mapSelectionContainer.appendChild(listContainer);
-
-        // Function to refresh list
-        (this.mapSelectionContainer as any).refreshList = () => {
-            const gen = ++this._refreshGeneration;
-            listContainer.innerHTML = '';
-
-            // DEMO MAP
-            this.createMapCard(listContainer, 'Demo Map', DEMO_MAP);
-
-            // Фаза 1 (sync): local maps мгновенно
-            const local = MapStorage.getLocalMaps();
-            const localNames = new Set(Object.keys(local));
-            for (const key of localNames) {
-                this.createMapCard(listContainer, `💾 ${key}`, local[key]);
-            }
-
-            // Фаза 2 (async): bundled maps дописываются
-            MapStorage.getBundledMaps().then(bundled => {
-                if (gen !== this._refreshGeneration) return; // race condition guard
-
-                for (const name of Object.keys(bundled).sort()) {
-                    if (localNames.has(name)) continue; // local override
-                    this.createMapCard(listContainer, `📦 ${name}`, bundled[name]);
-                }
-            }).catch(e => {
-                console.warn('[MenuScene] Failed to load bundled maps', e);
-            });
-        };
-
-        UIUtils.createButton(this.mapSelectionContainer, 'BACK', () => {
-            this.mapSelectionContainer.style.display = 'none';
-            this.container.style.display = 'flex';
-        }, {
-            background: `linear-gradient(135deg, ${VISUALS.UI.COLORS.danger}, #b71c1c)`,
-            fontSize: VISUALS.UI.FONTS.size.xl,
-            padding: `${VISUALS.UI.SPACING.md}px ${VISUALS.UI.SPACING.xxl}px`,
-            border: `${VISUALS.UI.BORDERS.width.normal} solid ${VISUALS.UI.COLORS.glass.border}`,
-            borderRadius: VISUALS.UI.BORDERS.radius.lg,
-            boxShadow: VISUALS.UI.SHADOWS.glow.danger,
-            width: 'auto'
-        });
-
-        document.body.appendChild(this.mapSelectionContainer);
-    }
-
-    private createMapCard(parent: HTMLElement, name: string, data: IMapData) {
-        try {
-            const card = document.createElement('div');
-            Object.assign(card.style, {
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                gap: `${VISUALS.UI.SPACING.sm}px`,
-                background: VISUALS.UI.COLORS.glass.bg,
-                padding: `${VISUALS.UI.SPACING.md}px`,
-                borderRadius: VISUALS.UI.BORDERS.radius.lg,
-                minWidth: '220px',
-                cursor: 'pointer',
-                border: `${VISUALS.UI.BORDERS.width.thick} solid ${VISUALS.UI.COLORS.glass.border}`,
-                backdropFilter: 'blur(5px)',
-                transition: VISUALS.UI.TRANSITIONS.presets.normal,
-                boxShadow: VISUALS.UI.SHADOWS.md,
-                transform: 'translateZ(0)' // GPU acceleration
-            });
-
-            // Preview Canvas
-            const canvas = document.createElement('canvas');
-            canvas.width = 200;
-            canvas.height = 150;
-            const ctx = canvas.getContext('2d')!;
-
-            // Render preview
-            // We need a temporary MapManager to draw
-            const tempMap = new MapManager(data);
-            // Scale context to fit
-            ctx.save();
-            const scale = Math.min(200 / (tempMap.cols * CONFIG.TILE_SIZE), 150 / (tempMap.rows * CONFIG.TILE_SIZE));
-            ctx.scale(scale, scale);
-            tempMap.draw(ctx);
-            ctx.restore();
-
-            card.appendChild(canvas);
-
-            const label = document.createElement('div');
-            label.innerText = name;
-            label.style.fontWeight = VISUALS.UI.FONTS.weight.bold;
-            label.style.fontSize = VISUALS.UI.FONTS.size.lg;
-            label.style.textShadow = VISUALS.UI.SHADOWS.md;
-            card.appendChild(label);
-
-            card.onmouseover = () => {
-                card.style.borderColor = VISUALS.UI.COLORS.primary;
-                card.style.transform = 'scale(1.05) translateY(-5px)';
-                card.style.boxShadow = VISUALS.UI.SHADOWS.glow.primary;
-            };
-            card.onmouseout = () => {
-                card.style.borderColor = VISUALS.UI.COLORS.glass.border;
-                card.style.transform = 'scale(1)';
-                card.style.boxShadow = VISUALS.UI.SHADOWS.md;
-            };
-            card.onclick = () => {
-                console.log('Map card clicked:', name);
-                console.log('Map data:', data);
-                const isValid = validateMap(data);
-                console.log('Map validation result:', isValid);
-                if (isValid) {
-                    console.log('Calling toGame...');
-                    this.game.toGame(data);
-                } else {
-                    console.error('Map is invalid!');
-                    alert('Map is invalid!');
-                }
-            };
-
-            parent.appendChild(card);
-        } catch (e) {
-            console.error(`Failed to render map card for ${name}`, e);
-            const errCard = document.createElement('div');
-            errCard.innerText = `❌ ${name} (Corrupted)`;
-            Object.assign(errCard.style, {
-                background: '#300',
-                color: '#f88',
-                padding: '10px',
-                borderRadius: '8px',
-                minWidth: '200px',
-                textAlign: 'center',
-            });
-            parent.appendChild(errCard);
-        }
-    }
-
-    /**
-     * Clears canvas previews to prevent memory leaks
-     */
-    private clearMapPreviews(): void {
-        // Find the list container with map cards
-        const listContainer = this.mapSelectionContainer.querySelector('div[style*="overflowX"]') as HTMLElement;
-        if (!listContainer) return;
-
-        // Clear all canvas contexts before removing from DOM
-        const canvases = listContainer.querySelectorAll('canvas');
-        canvases.forEach(canvas => {
-            const ctx = canvas.getContext('2d');
-            if (ctx) {
-                ctx.clearRect(0, 0, canvas.width, canvas.height);
-            }
-        });
-
-        // Remove all map cards to free memory
-        listContainer.innerHTML = '';
-    }
-
     private showMapSelection() {
         this.container.style.display = 'none';
-        this.mapSelectionContainer.style.display = 'flex';
-        if ((this.mapSelectionContainer as any).refreshList) {
-            (this.mapSelectionContainer as any).refreshList();
-        }
+        this.mapSelectionUI?.show();
     }
 
     // createBtn removed - replaced by UIUtils.createButton

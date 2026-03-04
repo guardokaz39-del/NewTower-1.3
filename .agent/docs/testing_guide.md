@@ -39,7 +39,7 @@
 | --- | --- |
 | `Enemy.test.ts` | Стаки эффектов (Slow), защита от двойных триггеров смерти при DoT (Burn) |
 | `Tower.test.ts` | Математика калькуляции карточек (`mergeCardsWithStacking`), логика выборки цели (`TargetingSystem`) |
-| `ProjectileSystem.test.ts`| Безопасность пулинга и удаления пуль (swap & pop без потери индексов) |
+| `ProjectileSystem.test.ts` | Безопасность пулинга и удаления пуль (swap & pop без потери индексов) |
 | `CollisionSystem.test.ts` | Защита от рекурсивных CallStack/RangeError-ошибок при массовых сплеш-взрывах |
 | `FlowField.test.ts` | Валидация алгоритма Дейкстры (обход стен) и правильность нормализованных векторов направлений |
 | `SaveManager.test.ts` | Аккумулирование накопительной дельты (kills, money) при сохранениях |
@@ -60,6 +60,20 @@
 > Object.defineProperty(window, 'innerWidth', { writable: true, configurable: true, value: 1024 });
 > Object.defineProperty(window, 'innerHeight', { writable: true, configurable: true, value: 768 });
 > ```
+
+### Ограничения Canvas API в Vitest (jsdom)
+
+Не полагайтесь на полное соответствие Canvas API реальному браузеру в среде `jsdom`.
+
+**Частые проблемы:**
+
+1. **`TypeError: ctx.setLineDash is not a function`**: JSDOM не реализует метод `setLineDash`. Если вы используете его в рендере (например, для отрисовки путей на миникарте), оборачивайте вызов в проверку:
+
+   ```typescript
+   if (ctx.setLineDash) ctx.setLineDash([5, 5]);
+   ```
+
+2. **Performance Spikes**: В тестах производительности, массированные вызовы `ctx.fillRect` (даже замоканного контекста) могут занимать дольше 16мс, ломая Smoke-тесты. Оптимизируйте циклы отрисовки — например, заливайте фон карты одним большим `fillRect`, а не рисуйте сетку 100x100 тайлов поштучно.
 
 ## ⚔️ Интеграционное тестирование (Combat)
 
