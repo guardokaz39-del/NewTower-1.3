@@ -34,12 +34,12 @@ export const MULTISHOT_UPGRADES: Record<number, IUpgradeCard> = {
 
 // Lookup tables for Multishot Evolutions
 const EVOLUTION_PROJECTILE_COUNTS: Record<string, number> = {
-    'barrage': 4, 'spread': 2, 'storm': 6,
+    'barrage': 4, 'spread': 2, 'storm': 3,
     'volley': 4, 'homing': 3, 'twin': 2,
 };
 
 const EVOLUTION_SPREADS: Record<string, number> = {
-    'barrage': 0.35, 'spread': 0.12, 'storm': 0.52,
+    'barrage': 0.35, 'spread': 0.12, 'storm': 0.45,
     'volley': 0.30, 'homing': 0.20, 'twin': 0.10,
 };
 

@@ -185,7 +185,10 @@ export class EnemyRenderer {
     }
 
     private static drawHealthBar(ctx: CanvasRenderingContext2D, enemy: Enemy, scale: number) {
-        if (enemy.currentHealth < enemy.maxHealth) {
+        let hasSlow = enemy.slowDuration > 0;
+        let hasBurn = enemy.burnDuration > 0 && enemy.burnStacks > 0;
+
+        if (enemy.currentHealth < enemy.maxHealth || hasSlow || hasBurn || enemy.isInvulnerable) {
             const barWidth = CONFIG.UI.HP_BAR_WIDTH;
             const barHeight = CONFIG.UI.HP_BAR_HEIGHT;
             const barY = -30 * scale;
@@ -207,7 +210,19 @@ export class EnemyRenderer {
             }
 
             ctx.fillStyle = hpColor;
-            ctx.fillRect(-barWidth / 2, barY, barWidth * hpPercent, barHeight);
+            ctx.fillRect(-barWidth / 2, barY, barWidth * Math.max(0, hpPercent), barHeight);
+
+            // Phase 2: Primitive Status Markers LOD
+            let markerX = barWidth / 2 + 2;
+            if (hasSlow) {
+                ctx.fillStyle = '#4fc3f7';
+                ctx.fillRect(markerX, barY + barHeight / 2 - 2, 4, 4);
+                markerX += 5;
+            }
+            if (hasBurn) {
+                ctx.fillStyle = '#ff6400';
+                ctx.fillRect(markerX, barY + barHeight / 2 - 2, 4, 4);
+            }
         }
     }
     static drawEmissive(ctx: CanvasRenderingContext2D, enemy: Enemy) {

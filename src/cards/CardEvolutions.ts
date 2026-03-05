@@ -134,7 +134,7 @@ export const EVOLUTION_UPGRADES: Record<string, Record<number, IUpgradeCard>> = 
         2: {
             level: 2,
             modifiers: {
-                damage: 0,                     // NO damage bonus
+                damage: 1,                     // symbolic damage for UI feedback
                 rangeMultiplier: 0.70,         // Short range
             },
             effects: [{ type: 'slow', slowPower: 0.70, slowDuration: 6 }],  // 70%!
@@ -160,7 +160,7 @@ export const EVOLUTION_UPGRADES: Record<string, Record<number, IUpgradeCard>> = 
         3: {
             level: 3,
             modifiers: {
-                damage: 0,
+                damage: 1,                     // symbolic damage for UI feedback
                 rangeMultiplier: 0.60,
             },
             effects: [{ type: 'slow', slowPower: 0.85, slowDuration: 8 }],  // 85% FROZEN
@@ -265,6 +265,7 @@ export const EVOLUTION_UPGRADES: Record<string, Record<number, IUpgradeCard>> = 
                 range: 200,
                 attackSpeedMultiplier: 0.30,
                 critChance: 0.25,
+                targetingMode: 'healthiest',
             },
             effects: [],  // +100% vs >70% HP targets (handled in damage system)
             visualOverrides: { projectileType: 'sniper', projectileColor: '#aeea00' }
@@ -330,9 +331,11 @@ export const EVOLUTION_UPGRADES: Record<string, Record<number, IUpgradeCard>> = 
         3: {
             level: 3,
             modifiers: {
-                damageMultiplier: 0.30,
+                damageMultiplier: 0.45,        // Buffed damage slightly to compensate
             },
-            effects: [],  // 6 projectiles, 90° spread
+            effects: [
+                { type: 'splash', splashRadius: 25 } // Added small splash to compensate for fewer projectiles
+            ],  // 3 projectiles, 90° spread
         },
     },
     'volley': {
@@ -383,7 +386,7 @@ export const EVOLUTION_UPGRADES: Record<string, Record<number, IUpgradeCard>> = 
                 type: 'spinup',
                 spinupDamagePerSecond: 8,      // FAST ramp
                 maxSpinupSeconds: 3,           // Short window
-                overheatDuration: 0.5,         // Quick recovery
+                overheatDuration: 0.3,         // Quick recovery (from 0.5)
             }],
             visualOverrides: { projectileType: 'minigun', projectileColor: '#e0e0e0' }
         },
@@ -401,7 +404,7 @@ export const EVOLUTION_UPGRADES: Record<string, Record<number, IUpgradeCard>> = 
                 type: 'spinup',
                 spinupDamagePerSecond: 4,      // Slow ramp
                 maxSpinupSeconds: 10,          // LONG sustain!
-                overheatDuration: 2.5,         // Painful recovery
+                overheatDuration: 1.5,         // Painful recovery (down from 2.5)
             }],
             visualOverrides: { projectileType: 'minigun', projectileColor: '#bdbdbd' }
         },
@@ -461,7 +464,7 @@ export const EVOLUTION_UPGRADES: Record<string, Record<number, IUpgradeCard>> = 
                 ],
                 spinupCritPerSecond: 0.02,
                 maxSpinupSeconds: 12,
-                overheatDuration: 4,
+                overheatDuration: 2,           // Halved from 4.0
             }],
             visualOverrides: { projectileType: 'minigun', projectileColor: '#ffab40' }
         },
@@ -477,7 +480,7 @@ export const EVOLUTION_UPGRADES: Record<string, Record<number, IUpgradeCard>> = 
                 type: 'spinup',
                 spinupDamagePerSecond: 5,
                 maxSpinupSeconds: 8,
-                overheatDuration: 2,
+                overheatDuration: 1.0,         // Halved from 2.0
                 // At max spinup: 20% slow to targets (handled in damage system)
             }],
             visualOverrides: { projectileType: 'minigun', projectileColor: '#ce93d8' }
@@ -607,44 +610,44 @@ export const EVOLUTION_CHOICES: IEvolutionChoice[] = [
 
 export const EVOLUTION_STATS_DISPLAY: Record<string, { primary: string; secondary: string; color: string }> = {
     // Fire
-    'inferno': { primary: '💥 x120 AoE', secondary: '-35% скорость', color: '#ff3d00' },
-    'napalm': { primary: '🔥 32 DoT', secondary: '+10% скорость', color: '#ff9100' },
-    'meteor': { primary: '☄️ x160 MEGA', secondary: '-50% скорость', color: '#d50000' },
-    'hellfire': { primary: '👹 Взрыв', secondary: '75% урона', color: '#c51162' },
-    'magma': { primary: '🌊 60 DoT', secondary: '12 dps x 5s', color: '#ff6d00' },
-    'scorch': { primary: '🔥 СТАКИ', secondary: '+25% скорость', color: '#ffab00' },
+    'inferno': { primary: 'Радиус AoE 120', secondary: '-35% скор. атаки', color: '#ff3d00' },
+    'napalm': { primary: 'Ожог 32 урона', secondary: '+10% скор. атаки', color: '#ff9100' },
+    'meteor': { primary: 'Радиус AoE 160', secondary: '-50% скор. атаки', color: '#d50000' },
+    'hellfire': { primary: 'Взрыв врага', secondary: 'Урон взрыва 75%', color: '#c51162' },
+    'magma': { primary: 'Ожог 60 урона', secondary: '12 DPS на 5 сек', color: '#ff6d00' },
+    'scorch': { primary: 'Стакающийся ожог', secondary: '+25% скор. атаки', color: '#ffab00' },
 
     // Ice
-    'frost': { primary: '❄️ 70% СТОП', secondary: '0 урона', color: '#40c4ff' },
-    'shatter': { primary: '💎 +60%', secondary: 'vs замедл.', color: '#18ffff' },
-    'absolutezero': { primary: '🧊 85% FREEZE', secondary: '0 урона', color: '#00b0ff' },
-    'blizzard': { primary: '🌨️ Цепь', secondary: '100px радиус', color: '#00e5ff' },
-    'permafrost': { primary: '💠 +80%!', secondary: 'Казнь врагов', color: '#64ffda' },
-    'glacier': { primary: '🏔️ Дальность', secondary: '+10% range', color: '#84ffff' },
+    'frost': { primary: 'Замедление 70%', secondary: 'Символический урон', color: '#40c4ff' },
+    'shatter': { primary: 'Урон +60%', secondary: 'По замедленным', color: '#18ffff' },
+    'absolutezero': { primary: 'Заморозка 85%', secondary: 'Символический урон', color: '#00b0ff' },
+    'blizzard': { primary: 'Цепное замедл.', secondary: 'Радиус 100', color: '#00e5ff' },
+    'permafrost': { primary: 'Урон +80%', secondary: 'По замедленным', color: '#64ffda' },
+    'glacier': { primary: 'Дальность +10%', secondary: 'Радиус цепи 70', color: '#84ffff' },
 
     // Sniper
-    'precision': { primary: '🎯 30% крит', secondary: 'x2.5 множитель', color: '#76ff03' },
-    'penetrator': { primary: '🔫 Pierce 3', secondary: '-10% за цель', color: '#b2ff59' },
-    'executor': { primary: '⚔️ 40% крит', secondary: 'x3.0 DELETE', color: '#64dd17' },
-    'headhunter': { primary: '🎭 +100%', secondary: 'vs >70% HP', color: '#aeea00' },
-    'railgun': { primary: '⚡ Pierce 6', secondary: '300 range', color: '#eeff41' },
-    'marksman': { primary: '🏹 Pierce 4', secondary: '20% крит', color: '#c6ff00' },
+    'precision': { primary: 'Шанс крита 30%', secondary: 'Крит. урон x2.5', color: '#76ff03' },
+    'penetrator': { primary: 'Пробивает 3 цели', secondary: '-10% урона за цель', color: '#b2ff59' },
+    'executor': { primary: 'Шанс крита 40%', secondary: 'Крит. урон x3.0', color: '#64dd17' },
+    'headhunter': { primary: 'Урон +100%', secondary: 'По врагам >70% HP', color: '#aeea00' },
+    'railgun': { primary: 'Пробивает 6 целей', secondary: 'Дальность 300', color: '#eeff41' },
+    'marksman': { primary: 'Пробивает 4 цели', secondary: 'Шанс крита 20%', color: '#c6ff00' },
 
     // Multishot
-    'barrage': { primary: '💥 4 снаряда', secondary: '60° веер', color: '#ea80fc' },
-    'spread': { primary: '🎯 2 мощных', secondary: '85% урон', color: '#b388ff' },
-    'storm': { primary: '🌪️ 6 снарядов', secondary: '90° хаос', color: '#e040fb' },
-    'volley': { primary: '🎆 +30% APS', secondary: '4 снаряда', color: '#d500f9' },
-    'homing': { primary: '🎯 Наведение', secondary: '3 снаряда', color: '#7c4dff' },
-    'twin': { primary: '👯 x2 удар', secondary: '100% урон', color: '#651fff' },
+    'barrage': { primary: 'Снарядов: 4', secondary: 'Урон 40%', color: '#ea80fc' },
+    'spread': { primary: 'Снарядов: 2', secondary: 'Урон 85%', color: '#b388ff' },
+    'storm': { primary: 'Снарядов: 3', secondary: 'AoE сплеш 25', color: '#e040fb' },
+    'volley': { primary: 'Снарядов: 4', secondary: 'Скор. атаки +30%', color: '#d500f9' },
+    'homing': { primary: 'Саморег. 3 снаряда', secondary: 'Урон 70%', color: '#7c4dff' },
+    'twin': { primary: 'Парный удар x2', secondary: 'Урон 100%', color: '#651fff' },
 
     // Minigun
-    'chaingun': { primary: '⚡ 3с огонь', secondary: '+8 dps/с', color: '#e0e0e0' },
-    'gatling': { primary: '💪 10с огонь', secondary: '+4 dps/с', color: '#bdbdbd' },
-    'autocannon': { primary: '🔧 ∞ ОГОНЬ', secondary: 'Без перегрева', color: '#90a4ae' },
-    'rotary': { primary: '🌀 x3.5 speed', secondary: '+5% крит/с', color: '#ff8a80' },
-    'devastator': { primary: '💀 +100 урон', secondary: 'На макс', color: '#ffab40' },
-    'suppressor': { primary: '🛡️ 20% slow', secondary: 'На макс', color: '#ce93d8' },
+    'chaingun': { primary: 'Разгон 3 сек', secondary: 'Урон +8 DPS/с', color: '#e0e0e0' },
+    'gatling': { primary: 'Разгон 10 сек', secondary: 'Урон +4 DPS/с', color: '#bdbdbd' },
+    'autocannon': { primary: 'Бесконечный огонь', secondary: 'Без перегрева', color: '#90a4ae' },
+    'rotary': { primary: 'Скор. атаки x3.5', secondary: 'Крит +5%/с', color: '#ff8a80' },
+    'devastator': { primary: 'Макс. урон +100', secondary: 'Перегрев 2 сек', color: '#ffab40' },
+    'suppressor': { primary: 'Замедление 20%', secondary: 'На макс. разгоне', color: '#ce93d8' },
 };
 
 // ============================================================================

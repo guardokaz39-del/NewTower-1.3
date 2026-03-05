@@ -99,6 +99,11 @@ export class TargetingSystem {
                     // Higher distance to base is better
                     score = this.getPreciseFlowDistance(e, flowField);
                     break;
+
+                case 'healthiest':
+                    // Higher absolute health is better (e.g. for hunting bosses over full-hp weaklings)
+                    score = e.currentHealth;
+                    break;
             }
 
             // --- HYSTERESIS BIAS ---

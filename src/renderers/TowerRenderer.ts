@@ -193,6 +193,17 @@ export class TowerRenderer {
             // Current design: Modules are ON the turret.
             TowerRenderer.drawModules(ctx, tower);
 
+            // Phase 2: Overheat Status Indicator (Fast Primitive with Pulse)
+            if (tower.isOverheated) {
+                ctx.save();
+                ctx.globalAlpha = 0.5 + Math.sin(performance.now() * 0.01) * 0.3; // Breathing pulse
+                ctx.fillStyle = '#ff4400';
+                ctx.beginPath();
+                ctx.arc(0, 0, 12, 0, Math.PI * 2); // Central glowing core
+                ctx.fill();
+                ctx.restore();
+            }
+
             // 5. Draw turret-specific effects (laser, heat haze)
             // Called INSIDE rotated+recoiled context so effects move with barrel
             if (renderer.drawEffects) {

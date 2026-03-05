@@ -229,6 +229,10 @@ export class Tower {
 
             const baseSpeedMult = mergedMods.attackSpeedMultiplier || 1.0;
 
+            if (mergedMods.targetingMode) {
+                this.targetingMode = mergedMods.targetingMode;
+            }
+
             this.cachedStats = {
                 range: Math.round(range),
                 dmg: damage,

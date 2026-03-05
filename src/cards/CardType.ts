@@ -9,6 +9,7 @@ export interface ICardModifiers {
     range?: number;               // Flat range bonus
     rangeMultiplier?: number;     // Multiplier for range
     critChance?: number;          // Critical hit chance (0-1)
+    targetingMode?: 'first' | 'last' | 'closest' | 'strongest' | 'healthiest'; // Dynamic targeting strategy mode
 }
 
 export interface ICardEffect {
@@ -84,6 +85,7 @@ export function mergeModifiers(modifiers: ICardModifiers[]): ICardModifiers {
         result.range! += mod.range || 0;
         result.rangeMultiplier! *= mod.rangeMultiplier || 1.0;
         result.critChance! = Math.max(result.critChance!, mod.critChance || 0);
+        if (mod.targetingMode) result.targetingMode = mod.targetingMode;
     });
 
     return result;

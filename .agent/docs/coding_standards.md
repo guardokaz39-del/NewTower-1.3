@@ -63,3 +63,25 @@ const nearby = allEnemies.filter(e => Math.hypot(e.x - my.x, e.y - my.y) < 100);
 // ✅ Хорошо
 const nearbyCount = spatialGrid.queryInRadius(my.x, my.y, 100, bufferArray);
 ```
+
+## 6. TypeScript Strictness (Union Types > Strings)
+
+Никогда не используйте обычный `string` для полей, которые имеют фиксированный набор допустимых состояний (особенно в конфигурациях, модификаторах карт или стейтах). Это приводит к тихим ошибкам и опечаткам.
+
+**❌ Плохо:**
+
+```typescript
+interface ICardModifiers {
+    targetingMode?: string; // Можно случайно написать 'fiirst' или 'random'
+}
+```
+
+**✅ Хорошо:**
+
+```typescript
+interface ICardModifiers {
+    targetingMode?: 'first' | 'last' | 'closest' | 'strongest' | 'healthiest';
+}
+```
+
+Это гарантирует покрытие всех возможных случаев в `switch` блоках (Exhaustiveness Check) и позволяет редакторам кода подсвечивать ошибки до компиляции.
