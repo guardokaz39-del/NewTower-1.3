@@ -66,7 +66,8 @@ export class CollisionSystem {
                 const dx = neighbor.x - exX;
                 const dy = neighbor.y - exY;
                 if (dx * dx + dy * dy <= radiusSq) {
-                    neighbor.takeDamage(exDamage, exSourceId, 0, DamageTags.SPLASH);
+                    const safeExDmg = Math.max(0, exDamage);
+                    neighbor.takeDamage(safeExDmg, exSourceId, 0, DamageTags.SPLASH);
                 }
             }
         }
@@ -277,7 +278,8 @@ export class CollisionSystem {
                 const dy = neighbor.y - target.y;
                 if (dx * dx + dy * dy <= radiusSq) {
                     // Pass primitive source IDs and SPLASH tag instead of raw projectile
-                    neighbor.takeDamage(p.damage * splashMultiplier, p.sourceTowerId, p.sourceCardId, DamageTags.SPLASH | (p.isCrit ? DamageTags.CRIT : DamageTags.NONE));
+                    const safeSplashDamage = Math.max(0, p.damage * splashMultiplier);
+                    neighbor.takeDamage(safeSplashDamage, p.sourceTowerId, p.sourceCardId, DamageTags.SPLASH | (p.isCrit ? DamageTags.CRIT : DamageTags.NONE));
                 }
             }
         }

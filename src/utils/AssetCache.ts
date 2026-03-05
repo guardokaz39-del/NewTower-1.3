@@ -7,6 +7,7 @@ export class AssetCache {
      * @param factory Функция, которая нарисует ассет, если его нет
      */
     public static get(key: string, factory: (ctx: CanvasRenderingContext2D, w: number, h: number) => void, width: number, height: number): HTMLCanvasElement {
+        key = key.toLowerCase();
         if (!this.cache.has(key)) {
             // Simple Cache Cap (Phase 5.C Lite)
             // If cache grows too large, clear it completely to prevent memory leaks
@@ -35,14 +36,14 @@ export class AssetCache {
      * Проверить наличие ассета в кэше без создания.
      */
     public static has(key: string): boolean {
-        return this.cache.has(key);
+        return this.cache.has(key.toLowerCase());
     }
 
     /**
      * Получить ассет из кэша без создания (вернет undefined если нет).
      */
     public static peek(key: string): HTMLCanvasElement | undefined {
-        return this.cache.get(key);
+        return this.cache.get(key.toLowerCase());
     }
 
     /**

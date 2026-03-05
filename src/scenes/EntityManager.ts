@@ -169,8 +169,8 @@ export class EntityManager {
         // Soft death sound (throttled by SoundManager)
         SoundManager.play('death');
 
-        // Floating text with emoji
-        this.effects.add({
+        // Floating text with emoji (Phase 2.2: pool-based spawn)
+        this.effects.spawn({
             type: 'text',
             text: `+${reward}💰`,
             x: enemy.x,
@@ -180,19 +180,19 @@ export class EntityManager {
             vy: -90,
         });
 
-        // Coin particle burst
+        // Coin particle burst (Phase 2.2: zero-alloc spawnParticle)
         const particleCount = Math.min(3 + Math.floor(reward / 5), 8);
         for (let p = 0; p < particleCount; p++) {
-            this.effects.add({
-                type: 'particle',
-                x: enemy.x + (Math.random() - 0.5) * 20,
-                y: enemy.y + (Math.random() - 0.5) * 20,
-                vx: (Math.random() - 0.5) * 360,
-                vy: -(Math.random() * 240 + 120),
-                life: 0.4 + Math.random() * 0.25,
-                radius: 3 + Math.random() * 2,
-                color: Math.random() > 0.3 ? '#ffd700' : '#ffeb3b',
-            });
+            this.effects.spawnParticle(
+                'particle',
+                enemy.x + (Math.random() - 0.5) * 20,
+                enemy.y + (Math.random() - 0.5) * 20,
+                (Math.random() - 0.5) * 360,
+                -(Math.random() * 240 + 120),
+                0.4 + Math.random() * 0.25,
+                3 + Math.random() * 2,
+                Math.random() > 0.3 ? '#ffd700' : '#ffeb3b'
+            );
         }
     }
 
@@ -217,20 +217,42 @@ export class EntityManager {
      * Update all enemies and handle death/finish
      */
     public updateEnemies(dt: number, flowField: any): void { // Using 'any' to avoid circular ref, but should be FlowField
-        for (let i = this.state.enemies.length - 1; i >= 0; i--) {
-            const e = this.state.enemies[i];
-            e.move(dt, flowField);
+        const enemies = this.state.enemies;
+        // Phase 2.1: Sub-step movement to prevent tunneling at low FPS
+        const MAX_MOVE_STEP = 1 / 60; // 16.66ms movement chunks
+
+        // Phase 2.2: Forward iteration with swap-and-pop (O(1) removal)
+        let i = 0;
+        while (i < enemies.length) {
+            const e = enemies[i];
+
+            // Sub-step movement only (prevents tunneling for fast enemies)
+            let remaining = dt;
+            while (remaining > 0) {
+                const step = remaining < MAX_MOVE_STEP ? remaining : MAX_MOVE_STEP;
+                e.move(step, flowField);
+                remaining -= step;
+            }
+            // Status updates (timers, burn, shield) run once with full dt
             e.update(dt);
 
+            let removed = false;
             if (!e.isAlive()) {
                 this.handleEnemyDeath(e);
                 this.state.enemyPool.free(e);
-                this.state.enemies.splice(i, 1);
+                // Swap-and-pop: O(1) instead of O(n) splice
+                enemies[i] = enemies[enemies.length - 1];
+                enemies.length--;
+                removed = true;
             } else if (e.finished) {
                 this.handleEnemyFinished(e);
-                this.state.enemies.splice(i, 1);
                 this.state.enemyPool.free(e);
+                enemies[i] = enemies[enemies.length - 1];
+                enemies.length--;
+                removed = true;
             }
+
+            if (!removed) i++;
         }
     }
 

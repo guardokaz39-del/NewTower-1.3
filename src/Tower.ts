@@ -224,10 +224,10 @@ export class Tower {
                 else if (allEffects[i].type === 'spinup') spinupEffect = allEffects[i];
             }
             if (pierceEffect) {
-                pierce = pierceEffect.pierceCount || 0;
+                pierce = Math.max(0, pierceEffect.pierceCount || 0);
             }
 
-            const baseSpeedMult = mergedMods.attackSpeedMultiplier || 1.0;
+            const baseSpeedMult = Math.max(0.01, mergedMods.attackSpeedMultiplier || 1.0); // Guard against zero div
 
             if (mergedMods.targetingMode) {
                 this.targetingMode = mergedMods.targetingMode;
@@ -295,13 +295,15 @@ export class Tower {
 
             // Apply overlays (mutate frameStats — it's our own object)
             frameStats.dmg = (this.cachedStats as any)._baseDamage + bonusDamage;
-            frameStats.critChance = (this.cachedStats as any)._baseCrit + bonusCrit;
-            frameStats.cd = (this.cachedStats as any)._baseCd / ((this.cachedStats as any)._baseSpeedMult + spinupSpeedBonus);
+            frameStats.critChance = Math.max(0, Math.min(1, (this.cachedStats as any)._baseCrit + bonusCrit));
+            const divisor = Math.max(0.01, (this.cachedStats as any)._baseSpeedMult + spinupSpeedBonus);
+            frameStats.cd = (this.cachedStats as any)._baseCd / divisor;
         } else if (se) {
             // No spinup active — restore base values
             frameStats.dmg = (this.cachedStats as any)._baseDamage;
-            frameStats.critChance = (this.cachedStats as any)._baseCrit;
-            frameStats.cd = (this.cachedStats as any)._baseCd / (this.cachedStats as any)._baseSpeedMult;
+            frameStats.critChance = Math.max(0, Math.min(1, (this.cachedStats as any)._baseCrit));
+            const divisor = Math.max(0.01, (this.cachedStats as any)._baseSpeedMult);
+            frameStats.cd = (this.cachedStats as any)._baseCd / divisor;
         }
 
         // Apply Math Bounds (Safety Limits)
@@ -462,8 +464,8 @@ export class Tower {
 
         let needsSearch = this.searchTimer <= 0;
 
-        // Instant check if target became invalid
-        if (this.target && !this.target.isAlive()) {
+        // Instant check if target became invalid (dead or reached end)
+        if (this.target && (!this.target.isAlive() || this.target.finished)) {
             this.target = null;
             needsSearch = true; // Search immediately
         }

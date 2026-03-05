@@ -57,20 +57,23 @@ export class EnemyRenderer {
         // FIXED: enemy.id is number now, so we use modulo for variation
         const breathePhase = (performance.now() * 0.001) + ((enemy.id % 100) * 0.5);
         const breatheScale = 1.0 + Math.sin(breathePhase) * 0.03;
-        ctx.scale(breatheScale, breatheScale);
+
+        // Removed ctx.scale(breatheScale, breatheScale) to prevent raster blur 
+        // Pass scaled size instead
+        const finalScale = scale * breatheScale;
 
         // -- VISUAL STACK --
 
         // 1. Shadow Layer
-        EnemyRenderer.drawShadow(ctx, scale);
+        EnemyRenderer.drawShadow(ctx, finalScale);
 
         // 2. Body Layer (STRATEGY PATTERN DELEGATION)
         const renderer = EnemyRenderer.renderers[archetype] || EnemyRenderer.defaultRenderer;
         try {
-            renderer.drawBody(ctx, enemy, scale, moveAngle);
+            renderer.drawBody(ctx, enemy, finalScale, moveAngle);
         } catch (e) {
             console.error(`Renderer failed for ${archetype}`, e);
-            EnemyRenderer.defaultRenderer.drawBody(ctx, enemy, scale, moveAngle);
+            EnemyRenderer.defaultRenderer.drawBody(ctx, enemy, finalScale, moveAngle);
         }
 
         // 3. Props Layer
@@ -78,8 +81,8 @@ export class EnemyRenderer {
             for (let i = 0; i < props.length; i++) {
                 const propImg = Assets.get(props[i]);
                 if (propImg) {
-                    const pSize = 32 * scale;
-                    const pHalf = pSize / 2;
+                    const pSize = Math.round(32 * finalScale);
+                    const pHalf = Math.round(pSize / 2);
                     ctx.drawImage(propImg, -pHalf, -pHalf, pSize, pSize);
                 }
             }

@@ -126,6 +126,10 @@ export class GameScene extends BaseScene implements IGameScene {
     // Event Subscriptions
     private unsubs: (() => void)[] = [];
 
+    // AoE Recursion Guard (Phase 2.3)
+    private explosionDepth = 0;
+    private static readonly MAX_EXPLOSION_DEPTH = 3;
+
 
     // Ambient cycle
     private dayTime: number = 0;
@@ -202,14 +206,7 @@ export class GameScene extends BaseScene implements IGameScene {
                     decoy.y = enemy.y;
                     decoy.pathIndex = enemy.pathIndex;
 
-                    this.effects.add({
-                        type: 'explosion',
-                        x: enemy.x,
-                        y: enemy.y,
-                        radius: 40,
-                        life: 0.3,
-                        color: '#b0bec5'
-                    });
+                    this.effects.spawnExplosion(enemy.x, enemy.y, 40, 0.3, '#b0bec5');
 
                     this.showFloatingText('DECOY!', enemy.x, enemy.y - 30, '#b0bec5');
                 }
@@ -223,19 +220,12 @@ export class GameScene extends BaseScene implements IGameScene {
 
             if (!parent || !spawns || spawns.length === 0) return;
 
-            this.effects.add({
-                type: 'explosion',
-                x: parent.x,
-                y: parent.y,
-                radius: 55,
-                life: 0.5,
-                color: '#8b0000'
-            });
+            this.effects.spawnExplosion(parent.x, parent.y, 55, 0.5, '#8b0000');
 
             for (let i = 0; i < 10; i++) {
                 const angle = (i / 10) * Math.PI * 2 + Math.random() * 0.3;
                 const speed = 120 + Math.random() * 80;
-                this.effects.add({
+                this.effects.spawn({
                     type: 'debris',
                     x: parent.x + (Math.random() - 0.5) * 20,
                     y: parent.y + (Math.random() - 0.5) * 20,
@@ -758,22 +748,20 @@ export class GameScene extends BaseScene implements IGameScene {
      * Spawns an explosion that can damage enemies (Friendly Fire)
      */
     public triggerExplosion(x: number, y: number, radius: number, damage: number, friendlyFire: boolean = false) {
-        // 1. Main Explosion Visual
-        this.effects.add({
-            type: 'explosion',
-            x: x,
-            y: y,
-            radius: radius, // No multiplier - new effect looks good at base size
-            life: 0.45,
-            color: friendlyFire ? 'rgba(118, 255, 3, 0.8)' : 'rgba(255, 100, 0, 0.7)',
-        });
+        // Phase 2.3: AoE Recursion Guard — prevent cascading chain reactions
+        if (this.explosionDepth >= GameScene.MAX_EXPLOSION_DEPTH) return;
+        this.explosionDepth++;
+
+        // 1. Main Explosion Visual (Phase 2.4: use pool-based spawn)
+        this.effects.spawnExplosion(x, y, radius, 0.45,
+            friendlyFire ? 'rgba(118, 255, 3, 0.8)' : 'rgba(255, 100, 0, 0.7)');
 
         // 2. Explosion particles (debris flying out)
         const particleCount = friendlyFire ? 8 : 5;
         for (let i = 0; i < particleCount; i++) {
             const angle = (i / particleCount) * Math.PI * 2 + Math.random() * 0.5;
             const speed = 150 + Math.random() * 100;
-            this.effects.add({
+            this.effects.spawn({
                 type: 'debris',
                 x: x,
                 y: y,
@@ -805,5 +793,7 @@ export class GameScene extends BaseScene implements IGameScene {
                 }
             }
         }
+
+        this.explosionDepth--;
     }
 }

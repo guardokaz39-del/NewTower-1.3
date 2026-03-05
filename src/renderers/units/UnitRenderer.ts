@@ -67,48 +67,56 @@ export class DefaultUnitRenderer implements UnitRenderer {
         const bodyImg = Assets.get(bodyImgName);
 
         if (bodyImg) {
-            const size = 48 * scale;
-            const half = size / 2;
+            const size = Math.round(48 * scale);
+            const half = Math.round(size / 2);
 
             ctx.drawImage(bodyImg, -half, -half, size, size);
 
             if (tint) {
-                ctx.save();
+                const __oldFill = ctx.fillStyle;
+                const __oldAlpha = ctx.globalAlpha;
                 ctx.fillStyle = tint;
                 ctx.globalAlpha = 0.4;
                 ctx.beginPath();
                 ctx.arc(0, 0, 20 * scale, 0, Math.PI * 2);
                 ctx.fill();
-                ctx.restore();
+                ctx.fillStyle = __oldFill;
+                ctx.globalAlpha = __oldAlpha;
             }
 
             // Hit Flash
             if (enemy.hitFlashTimer > 0) {
-                ctx.save();
+                const __oldComp = ctx.globalCompositeOperation;
+                const __oldAlpha2 = ctx.globalAlpha;
                 ctx.globalCompositeOperation = 'lighter';
                 ctx.globalAlpha = 0.8;
                 ctx.drawImage(bodyImg, -half, -half, size, size);
-                ctx.restore();
+                ctx.globalCompositeOperation = __oldComp;
+                ctx.globalAlpha = __oldAlpha2;
             }
 
             // Status Tints
             if (enemy.slowDuration > 0) {
-                ctx.save();
+                const __oldFill2 = ctx.fillStyle;
+                const __oldAlpha3 = ctx.globalAlpha;
                 ctx.fillStyle = CONFIG.AMBIENT.LIGHTING.ICE || '#00e5ff';
                 ctx.globalAlpha = 0.4;
                 ctx.beginPath();
                 ctx.arc(0, 0, 20 * scale, 0, Math.PI * 2);
                 ctx.fill();
-                ctx.restore();
+                ctx.fillStyle = __oldFill2;
+                ctx.globalAlpha = __oldAlpha3;
             }
             if (enemy.burnDuration > 0 && enemy.burnStacks > 0) {
-                ctx.save();
+                const __oldFill3 = ctx.fillStyle;
+                const __oldAlpha4 = ctx.globalAlpha;
                 ctx.fillStyle = CONFIG.AMBIENT.LIGHTING.FIRE || '#ff3d00';
                 ctx.globalAlpha = 0.4;
                 ctx.beginPath();
                 ctx.arc(0, 0, 20 * scale, 0, Math.PI * 2);
                 ctx.fill();
-                ctx.restore();
+                ctx.fillStyle = __oldFill3;
+                ctx.globalAlpha = __oldAlpha4;
             }
         } else {
             // Fallback (Circle)

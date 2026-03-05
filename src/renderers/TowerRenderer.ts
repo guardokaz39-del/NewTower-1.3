@@ -123,13 +123,15 @@ export class TowerRenderer {
 
     private static drawActiveSprite(ctx: CanvasRenderingContext2D, tower: Tower, size: number) {
         // 0. Draw Shadow (Phase 3: Visual Polish)
-        ctx.save();
+        const __oldAlpha = ctx.globalAlpha;
+        const __oldFill = ctx.fillStyle;
         ctx.globalAlpha = 0.25;
         ctx.fillStyle = '#000';
         ctx.beginPath();
         ctx.ellipse(tower.x + 3, tower.y + 5, 22, 14, 0, 0, Math.PI * 2);
         ctx.fill();
-        ctx.restore();
+        ctx.globalAlpha = __oldAlpha;
+        ctx.fillStyle = __oldFill;
 
         // 1. Draw Base (Static - NO Rotation, NO Recoil)
         const halfSize = size / 2;
@@ -195,13 +197,15 @@ export class TowerRenderer {
 
             // Phase 2: Overheat Status Indicator (Fast Primitive with Pulse)
             if (tower.isOverheated) {
-                ctx.save();
+                const __oldAlpha2 = ctx.globalAlpha;
+                const __oldFill2 = ctx.fillStyle;
                 ctx.globalAlpha = 0.5 + Math.sin(performance.now() * 0.01) * 0.3; // Breathing pulse
                 ctx.fillStyle = '#ff4400';
                 ctx.beginPath();
                 ctx.arc(0, 0, 12, 0, Math.PI * 2); // Central glowing core
                 ctx.fill();
-                ctx.restore();
+                ctx.globalAlpha = __oldAlpha2;
+                ctx.fillStyle = __oldFill2;
             }
 
             // 5. Draw turret-specific effects (laser, heat haze)
@@ -302,20 +306,26 @@ export class TowerRenderer {
 
             if (visualLevel === 2) {
                 // LVL 2: Pulse Glow
-                // LVL 2: Pulse Glow
                 const pulse = 0.3 + Math.sin(performance.now() * 0.003) * 0.1;
                 const cardColor = mainCard?.type.color || '#fff';
 
+                const __oldAlpha3 = ctx.globalAlpha;
+                const __oldFill3 = ctx.fillStyle;
                 ctx.globalAlpha = pulse;
                 ctx.fillStyle = cardColor;
                 ctx.beginPath();
                 ctx.arc(0, 0, 25, 0, Math.PI * 2);
                 ctx.fill();
-                ctx.globalAlpha = 1.0;
+                ctx.globalAlpha = __oldAlpha3;
+                ctx.fillStyle = __oldFill3;
             } else if (visualLevel === 3) {
                 // LVL 3: Rotating Aura Ring
                 const rotation = (performance.now() * 0.002) % (Math.PI * 2);
                 const cardColor = mainCard?.type.color || '#fff';
+                const __oldStroke = ctx.strokeStyle;
+                const __oldLineWidth = ctx.lineWidth;
+                const __oldAlpha4 = ctx.globalAlpha;
+                
                 ctx.strokeStyle = cardColor;
                 ctx.lineWidth = 2;
                 ctx.globalAlpha = 0.5;
@@ -327,10 +337,17 @@ export class TowerRenderer {
                     ctx.arc(0, 0, 28, angle, angle + Math.PI / 3);
                     ctx.stroke();
                 }
-                ctx.globalAlpha = 1.0;
+                ctx.globalAlpha = __oldAlpha4;
+                ctx.lineWidth = __oldLineWidth;
+                ctx.strokeStyle = __oldStroke;
             }
 
             // Level counter badge
+            const __oldFill4 = ctx.fillStyle;
+            const __oldFont = ctx.font;
+            const __oldStroke2 = ctx.strokeStyle;
+            const __oldLineWidth2 = ctx.lineWidth;
+            
             ctx.fillStyle = '#ffd700'; // Gold
             ctx.font = 'bold 14px Arial';
             ctx.strokeStyle = '#000';
@@ -339,6 +356,11 @@ export class TowerRenderer {
             const levelStr = visualLevel.toString();
             ctx.strokeText(levelStr, 20, -20);
             ctx.fillText(levelStr, 20, -20);
+            
+            ctx.fillStyle = __oldFill4;
+            ctx.font = __oldFont;
+            ctx.strokeStyle = __oldStroke2;
+            ctx.lineWidth = __oldLineWidth2;
 
             ctx.restore();
         }

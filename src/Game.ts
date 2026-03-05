@@ -196,14 +196,9 @@ export class Game {
         const dt = (timestamp - this.lastTime) / 1000;
         this.lastTime = timestamp;
 
-        // Защита от скачков: ограничиваем dt до 0.1 (10 FPS минимум)
-        // Если dt больше, просто замедляем игру, но не пропускаем кадр
-        if (dt > 0.1) {
-            // dt = 0.1; // Optional: Force clamp?
-            // For now, let's just SKIP the return so logic runs even if slow
-            // But if we want to avoid huge jumps, we clamp:
-        }
-        const safeDt = Math.min(dt, 0.1);
+        // Защита от скачков: ограничиваем dt до 1/30 (Phase 2.1 — Lite Fixed Timestep)
+        // Предотвращает tunneling при tab-switch или тяжелых GC-паузах
+        const safeDt = Math.min(dt, 1 / 30);
 
         // 2. Передаем safeDt дальше
         this.input.update(safeDt);

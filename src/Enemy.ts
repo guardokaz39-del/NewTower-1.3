@@ -198,9 +198,9 @@ export class Enemy {
         const prevHpPercent = this.currentHealth / this.maxHealth;
 
         // 1. Modifiers & True Damage
-        let finalAmount = amount;
+        let finalAmount = Math.max(0, amount); // Prevent negative damage
         if (!(tags & DamageTags.TRUE_DAMAGE)) {
-            finalAmount *= this.damageModifier;
+            finalAmount *= Math.max(0, this.damageModifier); // Prevent negative bounds
             // Armor mitigates physical damage, but ensures at least 1 damage
             if (finalAmount > 0) {
                 finalAmount = Math.max(1, finalAmount - this.armor);
