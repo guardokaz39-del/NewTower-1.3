@@ -13,6 +13,7 @@ export class EditorSidebar {
     public onExport?: () => void;
     public onImport?: () => void;
     public onMenu?: () => void;
+    public onToggle?: (isCollapsed: boolean) => void;
 
     // References for dynamic updates
     private timeBtn!: HTMLButtonElement;
@@ -29,17 +30,18 @@ export class EditorSidebar {
 
     private createContainer(): HTMLElement {
         const el = UIUtils.createContainer({
-            position: 'relative', // flex child in parent
+            position: 'absolute', // absolute for overlay mode
+            top: '0',
+            left: '0',
             width: '240px',
-            flexShrink: '0',
             height: '100%',
             background: VISUALS.UI.COLORS.glass.bgDark,
             display: 'flex',
             flexDirection: 'column',
-            zIndex: '1000',
+            zIndex: '50', // high z-index to overlay canvas
             pointerEvents: 'auto'
         });
-        el.style.transition = 'width 0.3s ease';
+        el.style.transition = 'transform 160ms ease'; // transition transform, not width
         el.style.borderRight = `1px solid ${VISUALS.UI.COLORS.glass.border}`;
         return el;
     }
@@ -61,7 +63,9 @@ export class EditorSidebar {
 
         const title = document.createElement('span');
         title.innerText = 'Editor Tools';
-        title.style.display = this.isCollapsed ? 'none' : 'block';
+        title.style.transition = 'opacity 160ms ease'; // Smooth fade
+        title.style.opacity = this.isCollapsed ? '0' : '1';
+        title.style.pointerEvents = this.isCollapsed ? 'none' : 'auto';
 
         const toggleBtn = document.createElement('button');
         toggleBtn.innerText = '≡';
@@ -70,8 +74,16 @@ export class EditorSidebar {
         });
         toggleBtn.onclick = () => {
             this.isCollapsed = !this.isCollapsed;
-            this.container.style.width = this.isCollapsed ? '40px' : '240px';
-            this.render();
+            this.container.style.transform = this.isCollapsed ? 'translateX(-200px)' : 'translateX(0)';
+
+            // Fade out content instead of display:none to prevent reflow
+            title.style.opacity = this.isCollapsed ? '0' : '1';
+            title.style.pointerEvents = this.isCollapsed ? 'none' : 'auto';
+            this.contentContainer.style.opacity = this.isCollapsed ? '0' : '1';
+            this.contentContainer.style.pointerEvents = this.isCollapsed ? 'none' : 'auto';
+
+            // Notify listeners (like EditorScene overlay)
+            this.onToggle?.(this.isCollapsed);
         };
 
         header.appendChild(title);
@@ -83,17 +95,20 @@ export class EditorSidebar {
         Object.assign(this.contentContainer.style, {
             flex: '1',
             overflowY: 'auto',
-            display: this.isCollapsed ? 'none' : 'flex',
+            display: 'flex', // always flex, visibility handled by opacity
             flexDirection: 'column',
             gap: '10px',
             padding: '10px',
-            pointerEvents: 'auto'
+            pointerEvents: this.isCollapsed ? 'none' : 'auto',
+            opacity: this.isCollapsed ? '0' : '1',
+            transition: 'opacity 160ms ease'
         });
         this.container.appendChild(this.contentContainer);
 
-        if (!this.isCollapsed) {
-            this.renderSections();
-        }
+        this.renderSections();
+
+        // Initial state sync
+        this.container.style.transform = this.isCollapsed ? 'translateX(-200px)' : 'translateX(0)';
     }
 
     private renderSections() {
@@ -248,10 +263,64 @@ export class EditorSidebar {
         return this.container;
     }
 
+    /**
+     * Injects a custom DOM element section into the sidebar content container.
+     */
+    public injectCustomElement(title: string, element: HTMLElement): void {
+        const section = document.createElement('div');
+        section.style.border = '1px solid #444';
+        section.style.borderRadius = '4px';
+        section.style.padding = '5px';
+        section.style.marginTop = '10px';
+
+        // Hide if sidebar is collapsed
+        if (this.isCollapsed) {
+            section.style.opacity = '0';
+            section.style.pointerEvents = 'none';
+        }
+
+        const header = document.createElement('div');
+        header.innerText = title;
+        header.style.color = '#aaa';
+        header.style.fontSize = '12px';
+        header.style.marginBottom = '5px';
+        header.style.fontWeight = 'bold';
+        section.appendChild(header);
+
+        section.appendChild(element);
+        this.contentContainer.appendChild(section);
+
+        // Store reference for toggling visibility
+        this.container.dataset.customSections = (parseInt(this.container.dataset.customSections || '0') + 1).toString();
+    }
+
     public destroy(): void {
         this.state.onChange = null;
         if (this.container.parentNode) {
             this.container.parentNode.removeChild(this.container);
+        }
+    }
+
+    // --- Overlay API ---
+    public getIsCollapsed(): boolean {
+        return this.isCollapsed;
+    }
+
+    public collapse(): void {
+        if (!this.isCollapsed) {
+            this.isCollapsed = true;
+            this.container.style.transform = 'translateX(-200px)';
+
+            // Fade out content
+            const title = this.container.querySelector('span');
+            if (title) {
+                title.style.opacity = '0';
+                title.style.pointerEvents = 'none';
+            }
+            this.contentContainer.style.opacity = '0';
+            this.contentContainer.style.pointerEvents = 'none';
+
+            this.onToggle?.(this.isCollapsed);
         }
     }
 }

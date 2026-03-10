@@ -32,7 +32,6 @@ export class EditorScene extends BaseScene {
 
     // FEATURE: Saved maps panel
     private mapsPanel!: HTMLElement;
-    private mapsPanelExpanded: boolean = false;
     private currentMapName: string = '';
 
     // Race condition guard для async refreshMapsPanel
@@ -81,26 +80,63 @@ export class EditorScene extends BaseScene {
     protected onEnterImpl() {
         this.originalCanvasParent = this.game.canvas.parentNode;
 
-        // Setup Layout
+        // Setup Layout (Overlay Mode)
         this.editorRoot = document.createElement('div');
         this.editorRoot.id = 'editor-root';
         Object.assign(this.editorRoot.style, {
             position: 'absolute',
             top: '0',
             left: '0',
-            width: '100%',
-            height: '100%',
-            display: 'flex',
+            width: '100vw',
+            height: '100vh',
+            zIndex: '1000',
             overflow: 'hidden'
         });
 
+        // 1. Sidebar (absolute, z: 50)
         this.editorRoot.appendChild(this.sidebar.getElement());
 
+        // 2. Overlay Backdrop (absolute, z: 40)
+        const overlay = document.createElement('div');
+        overlay.className = 'editor-overlay';
+        Object.assign(overlay.style, {
+            position: 'absolute',
+            inset: '0',
+            background: 'rgba(0,0,0,0.5)',
+            zIndex: '40',
+            opacity: '0',
+            pointerEvents: 'none',
+            transition: 'opacity 160ms ease'
+        });
+
+        // Link sidebar collapse to overlay visibility
+        this.sidebar.onToggle = (isCollapsed: boolean) => {
+            if (isCollapsed) {
+                overlay.style.opacity = '0';
+                overlay.style.pointerEvents = 'none';
+            } else {
+                overlay.style.opacity = '1';
+                overlay.style.pointerEvents = 'auto'; // Block clicks to canvas while interacting with sidebar
+            }
+        };
+
+        // Click overlay to close sidebar
+        overlay.onclick = () => {
+            this.sidebar.collapse(); // Needs new public method in EditorSidebar
+        };
+
+        this.editorRoot.appendChild(overlay);
+
+        // 3. Canvas Wrap (absolute, z: 0)
         this.canvasWrap = document.createElement('div');
         this.canvasWrap.id = 'editor-canvas-wrap';
         Object.assign(this.canvasWrap.style, {
-            flex: '1',
-            position: 'relative'
+            position: 'absolute',
+            top: '0',
+            left: '0',
+            width: '100%',
+            height: '100%',
+            zIndex: '0'
         });
 
         this.canvasWrap.appendChild(this.game.canvas);
@@ -126,11 +162,18 @@ export class EditorScene extends BaseScene {
         document.body.appendChild(this.editorRoot);
         this.game.resize();
 
+        // Initial state sync
+        this.sidebar.onToggle(this.sidebar.getIsCollapsed());
+
         this.mapsPanel.style.display = 'block';
 
         // Hide standard game UI
         (this.game as any).uiRoot.hideGameUI(); // Cast as any if TS doesn't know yet
 
+        // Remove any leaked Bestiary buttons
+        document.querySelectorAll('button[title="Bestiary"]').forEach(btn => {
+            if (btn.parentNode) btn.parentNode.removeChild(btn);
+        });
         // Initial fog render
         this.fog.update(0);
 
@@ -160,12 +203,6 @@ export class EditorScene extends BaseScene {
         }
         this.game.resize();
 
-        if (this.mapsPanel && this.mapsPanel.parentNode) {
-            this.mapsPanel.parentNode.removeChild(this.mapsPanel);
-        }
-        if (this.history) {
-            this.history.clear();
-        }
         if (this.activeWaveEditor) {
             this.activeWaveEditor.destroy();
             this.activeWaveEditor = null;
@@ -751,62 +788,25 @@ export class EditorScene extends BaseScene {
 
     // FEATURE: Create saved maps panel
     private createMapsPanel() {
-        this.mapsPanel = UIUtils.createContainer({
-            position: 'absolute',
-            top: '20px',
-            left: '20px',
-            background: 'rgba(0, 0, 0, 0.9)',
-            borderRadius: '8px',
-            padding: '10px',
-            maxWidth: '300px',
-            maxHeight: '80vh',
-            overflowY: 'auto',
-            display: 'none',
-            zIndex: '2000'
-        });
-
-        const header = document.createElement('div');
-        Object.assign(header.style, {
+        this.mapsPanel = document.createElement('div');
+        Object.assign(this.mapsPanel.style, {
+            width: '100%',
             display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            marginBottom: '10px',
-            cursor: 'pointer',
-            color: '#fff',
-            fontWeight: 'bold',
+            flexDirection: 'column',
+            gap: '4px'
         });
 
-        header.innerHTML = `
-            <span>📁 SAVED MAPS</span>
-            <span style="font-size: 20px;">${this.mapsPanelExpanded ? '▼' : '▶'}</span>
-        `;
+        // Add to sidebar at the bottom
+        this.sidebar.injectCustomElement('📁 SAVED MAPS', this.mapsPanel);
 
-        header.onclick = () => {
-            this.mapsPanelExpanded = !this.mapsPanelExpanded;
-            this.refreshMapsPanel();
-        };
-
-        this.mapsPanel.appendChild(header);
-        document.body.appendChild(this.mapsPanel);
         this.refreshMapsPanel();
     }
 
     private refreshMapsPanel() {
         const gen = ++this._refreshGeneration;
 
-        // Clear current content except header
-        while (this.mapsPanel.children.length > 1) {
-            this.mapsPanel.removeChild(this.mapsPanel.lastChild!);
-        }
-
-        // Update toggle icon
-        const header = this.mapsPanel.children[0] as HTMLElement;
-        header.innerHTML = `
-            <span>📁 SAVED MAPS</span>
-            <span style="font-size: 20px;">${this.mapsPanelExpanded ? '▼' : '▶'}</span>
-        `;
-
-        if (!this.mapsPanelExpanded) return;
+        // Clear current content
+        this.mapsPanel.innerHTML = '';
 
         // Фаза 1 (sync): показать local карты мгновенно
         const localMaps = MapStorage.getLocalMaps();
@@ -867,18 +867,28 @@ export class EditorScene extends BaseScene {
         item.setAttribute('data-map-name', name);
         Object.assign(item.style, {
             background: source === 'bundled' ? '#1a2a3a' : '#222',
-            padding: '10px',
-            marginBottom: '5px',
+            padding: '8px 5px',
             borderRadius: '4px',
             display: 'flex',
             justifyContent: 'space-between',
             alignItems: 'center',
+            width: '100%',
+            boxSizing: 'border-box'
         });
 
         const nameSpan = document.createElement('span');
         nameSpan.className = 'map-name';
-        nameSpan.style.color = '#fff';
-        nameSpan.style.flex = '1';
+        nameSpan.title = name;
+        Object.assign(nameSpan.style, {
+            color: '#fff',
+            flex: '1',
+            whiteSpace: 'nowrap',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            marginRight: '5px',
+            fontSize: '12px'
+        });
+
         const icon = source === 'bundled' ? '📦' : '💾';
         const suffix = overridesBundled ? ' ⚡' : '';
         nameSpan.innerText = `${icon} ${name}${suffix}`;
@@ -886,6 +896,7 @@ export class EditorScene extends BaseScene {
         const btnContainer = document.createElement('div');
         btnContainer.style.display = 'flex';
         btnContainer.style.gap = '5px';
+        btnContainer.style.flexShrink = '0'; // Prevent buttons from squishing
 
         // Load button — always available
         const loadBtn = document.createElement('button');
@@ -895,7 +906,7 @@ export class EditorScene extends BaseScene {
             background: '#4caf50',
             color: '#fff',
             border: 'none',
-            padding: '5px 10px',
+            padding: '4px 8px',
             borderRadius: '4px',
             cursor: 'pointer',
             fontSize: '12px',
@@ -912,7 +923,7 @@ export class EditorScene extends BaseScene {
                 background: '#f44336',
                 color: '#fff',
                 border: 'none',
-                padding: '5px 10px',
+                padding: '4px 8px',
                 borderRadius: '4px',
                 cursor: 'pointer',
                 fontSize: '12px',
@@ -946,7 +957,7 @@ export class EditorScene extends BaseScene {
             background: '#ff9800',
             color: '#fff',
             border: 'none',
-            padding: '5px 10px',
+            padding: '4px 8px',
             borderRadius: '4px',
             cursor: 'pointer',
             fontSize: '12px',
