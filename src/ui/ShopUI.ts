@@ -2,6 +2,7 @@ import { IGameScene } from '../scenes/IGameScene';
 import { CONFIG } from '../Config';
 import { EventBus, Events } from '../EventBus';
 import { VISUALS } from '../VisualConfig';
+import { getAllCardKeys } from '../MapData';
 
 export class ShopUI {
     private scene: IGameScene;
@@ -69,12 +70,13 @@ export class ShopUI {
 
     public rerollShop() {
         this.shopCards = [];
-        const allKeys = Object.keys(CONFIG.CARD_TYPES);
+        let allKeys = this.scene.mapData?.allowedCards ?? getAllCardKeys();
+        if (allKeys.length === 0) allKeys = getAllCardKeys(); // fail-safe
 
         // IMPROVED: Ensure diversity - no duplicates if possible
         const shuffled = [...allKeys].sort(() => Math.random() - 0.5);
         for (let i = 0; i < 3; i++) {
-            this.shopCards.push(shuffled[i % shuffled.length]);
+            this.shopCards.push(shuffled[i % Math.max(1, shuffled.length)]);
         }
 
         this.selectedSlot = -1;
@@ -82,7 +84,8 @@ export class ShopUI {
     }
 
     private getRandomCardKey(): string {
-        const keys = Object.keys(CONFIG.CARD_TYPES);
+        let keys = this.scene.mapData?.allowedCards ?? getAllCardKeys();
+        if (keys.length === 0) keys = getAllCardKeys(); // fail-safe
         return keys[Math.floor(Math.random() * keys.length)];
     }
 

@@ -9,6 +9,7 @@ import { CardSelectionUI } from './CardSelectionUI';
 import { loadSessionData, saveSessionData } from './Utils';
 import { Enemy } from './Enemy';
 import { PerformanceMonitor } from './utils/PerformanceMonitor';
+import { getAllCardKeys } from './MapData';
 
 export class Game {
     public canvas: HTMLCanvasElement;
@@ -155,10 +156,18 @@ export class Game {
 
     private pendingMapData?: IMapData;
 
+    /** Выбрать 1 случайную карту из пула разрешённых */
+    private pickRandomAllowedCard(mapData?: IMapData): string {
+        const pool = mapData?.allowedCards ?? getAllCardKeys();
+        if (pool.length === 0) return getAllCardKeys()[0]; // ultimate fallback
+        return pool[Math.floor(Math.random() * pool.length)];
+    }
+
     public toGame(mapData?: IMapData) {
-        // Store map data and show card selection
+        // Store map data and immediately start game with 1 random card
         this.pendingMapData = mapData;
-        this.cardSelection.show();
+        const card = this.pickRandomAllowedCard(mapData);
+        this.startGameWithCards([card]);
     }
 
     // ...

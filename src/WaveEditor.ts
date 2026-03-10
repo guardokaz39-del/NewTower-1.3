@@ -1,6 +1,8 @@
 import { IWaveConfig } from './MapData';
 import { WaveModel } from './editor/WaveModel';
+import { getAllCardKeys, resolveAllowedCards } from './MapData';
 import { WaveList } from './editor/components/WaveList';
+import { CONFIG } from './Config';
 import { WavePresetPanel } from './editor/components/WavePresetPanel';
 import { ValidationPanel } from './editor/components/ValidationPanel';
 import './editor/editor.css';
@@ -11,7 +13,8 @@ export class WaveEditor {
     private waveList!: WaveList;
     private presetPanel!: WavePresetPanel;
     private validationPanel!: ValidationPanel;
-    private onSave: (waves: IWaveConfig[]) => void;
+    private allowedCards: string[];
+    private onSave: (waves: IWaveConfig[], allowedCards: string[] | undefined) => void;
     private onClose: () => void;
 
     // Toolbar elements (for updating disabled state)
@@ -24,12 +27,19 @@ export class WaveEditor {
 
     /**
      * @param initialWaves - The initial configuration of waves (will be copied)
+     * @param initialAllowedCards - The initial allowed cards for this map
      * @param onSave - Callback when user clicks Save
      * @param onClose - Callback when user clicks Cancel
      */
-    constructor(initialWaves: IWaveConfig[], onSave: (waves: IWaveConfig[]) => void, onClose: () => void) {
+    constructor(
+        initialWaves: IWaveConfig[],
+        initialAllowedCards: string[] | undefined,
+        onSave: (waves: IWaveConfig[], allowedCards: string[] | undefined) => void,
+        onClose: () => void
+    ) {
         this.onSave = onSave;
         this.onClose = onClose;
+        this.allowedCards = initialAllowedCards ? [...initialAllowedCards] : [...getAllCardKeys()];
 
         // Initialize Model with draft data
         this.model = new WaveModel(initialWaves);
@@ -126,6 +136,39 @@ export class WaveEditor {
         this.validationPanel = new ValidationPanel(this.model.validateExtended());
         this.validationPanel.mount(this.container);
 
+        // === Allowed Cards Section ===
+        const cardSection = document.createElement('div');
+        cardSection.className = 'we-card-section';
+        cardSection.style.cssText = 'padding: 10px; background: rgba(0,0,0,0.2); border-top: 1px solid rgba(255,255,255,0.1); margin-top: 10px;';
+        cardSection.innerHTML = '<h3 style="margin:0 0 10px 0; font-size:14px; color:#aaa;">🃏 Доступные карты башен</h3>';
+
+        const cardGrid = document.createElement('div');
+        cardGrid.style.cssText = 'display: flex; gap: 10px; flex-wrap: wrap;';
+
+        const allKeys = getAllCardKeys();
+        allKeys.forEach(key => {
+            const config = (CONFIG as any).CARD_TYPES[key];
+            if (!config) return;
+            const label = document.createElement('label');
+            label.className = 'we-card-checkbox';
+            label.style.cssText = 'display:flex; align-items:center; gap:6px; padding:4px 0; color:#ddd; cursor:pointer; font-size:13px;';
+            const cb = document.createElement('input');
+            cb.type = 'checkbox';
+            cb.checked = this.allowedCards.includes(key);
+            cb.onchange = () => {
+                if (cb.checked) {
+                    if (!this.allowedCards.includes(key)) this.allowedCards.push(key);
+                } else {
+                    this.allowedCards = this.allowedCards.filter(k => k !== key);
+                }
+            };
+            label.appendChild(cb);
+            label.appendChild(document.createTextNode(` ${config.icon || ''} ${config.name || key}`));
+            cardGrid.appendChild(label);
+        });
+        cardSection.appendChild(cardGrid);
+        this.container.appendChild(cardSection);
+
         // 5. Footer (Buttons)
         const footer = document.createElement('div');
         footer.className = 'we-footer';
@@ -178,7 +221,15 @@ export class WaveEditor {
             this.validationPanel.updateResult(result);
             return;
         }
-        this.onSave(this.model.getWaves());
+
+        // Validation: не менее 1 карты разрешено
+        if (this.allowedCards.length === 0) {
+            alert('Ошибка: Выберите хотя бы одну карту башни!');
+            return;
+        }
+
+        const finalCards = resolveAllowedCards(this.allowedCards);
+        this.onSave(this.model.getWaves(), finalCards);
         this.destroy();
     }
 

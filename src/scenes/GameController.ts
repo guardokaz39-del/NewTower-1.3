@@ -240,8 +240,10 @@ export class GameController {
     // === Card Management ===
 
     public giveRandomCard(): void {
-        const keys = Object.keys(CONFIG.CARD_TYPES);
-        const key = keys[Math.floor(Math.random() * keys.length)];
+        const pool = this.mapData?.allowedCards ?? Object.keys(CONFIG.CARD_TYPES);
+        if (pool.length === 0) return; // Fail-safe
+
+        const key = pool[Math.floor(Math.random() * pool.length)];
         this.cardSys.addCard(key, 1);
         this.ui.update();
     }

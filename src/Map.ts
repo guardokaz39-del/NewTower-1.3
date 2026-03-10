@@ -23,6 +23,7 @@ export class MapManager {
     public waypointsMode: WaypointsMode = 'ENDPOINTS'; // Default
 
     public waves: IWaveConfig[] = [];
+    public allowedCards?: string[]; // Allowed card types for this map
     public lighting?: LightingSystem;
     public objects: IMapObject[] = []; // Objects for decoration and blocking
     public flowField: FlowField;
@@ -42,6 +43,7 @@ export class MapManager {
         this.rows = data.height;
         this.tiles = data.tiles;
         this.waves = (data.waves as IWaveConfig[]) || [];
+        this.allowedCards = data.allowedCards; // Load allowed cards
         this.objects = data.objects || []; // Load objects
 
         // Default or Derived Waypoints Mode

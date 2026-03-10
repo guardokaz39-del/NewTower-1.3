@@ -10,7 +10,29 @@ description: Common mistakes, anti-patterns, and lessons learned from NewTower d
 
 ## 🔴 CRITICAL: Ошибки, которые ломают игру
 
-### 1. Splice в hot-loop (GC-шторм)
+### 1. Division by Zero & Empty Array Randomness (Math Crashes)
+
+**Ошибка:** Обращение к элементам по модулю `i % arr.length` или случайный выбор `arr[Math.floor(Math.random() * arr.length)]` без проверки на пустоту массива (`length === 0`).
+
+**Признак:** `NaN` при вычислении индекса, `undefined` при доступе к элементу, крах движка или UI-потока. Особенно актуально для динамически формируемых пулов (например, разрешенные карты), которые могут оказаться пустыми из-за бага сохранения/редактора.
+
+**Решение:**
+
+1. Для случайного выбора: Абсолютный fallback-guard.
+
+```typescript
+if (pool.length === 0) pool = fallbackPool; 
+```
+
+1. Для модуля `%`: Защита от деления на 0 через `Math.max`.
+
+```typescript
+const item = arr[i % Math.max(1, arr.length)];
+```
+
+---
+
+### 2. Splice в hot-loop (GC-шторм)
 
 **Ошибка:** Использование `Array.splice(i, 1)` для удаления мёртвых врагов.
 

@@ -68,10 +68,33 @@ export interface IMapData {
     waypointsMode?: WaypointsMode; // Defines the source of truth for navigation
     fogData?: number[]; // ARRAY: fog density per tile (0=Visible, 1-5=Fog density 20%-100%)
     timeOfDay?: 'day' | 'night';
+    allowedCards?: string[]; // Какие карты башен разрешены на этой карте. undefined = все.
     schemaVersion?: number;
 }
 
 export type WaypointsMode = 'ENDPOINTS' | 'FULLPATH';
+
+import { CONFIG } from './Config';
+
+/** Все доступные ключи карт из CONFIG, отсортированные для стабильного порядка */
+export function getAllCardKeys(): string[] {
+    return Object.keys(CONFIG.CARD_TYPES).sort();
+}
+
+/**
+ * Нормализует allowedCards из сырых данных.
+ * - undefined / не массив → undefined (= все разрешены)
+ * - убирает дубликаты
+ * - отфильтровывает ключи, которых нет в CONFIG.CARD_TYPES
+ * - если после фильтрации пусто → undefined (= все разрешены, fallback)
+ */
+export function resolveAllowedCards(raw: unknown): string[] | undefined {
+    if (!Array.isArray(raw)) return undefined;
+    const valid = getAllCardKeys();
+    const filtered = [...new Set(raw)].filter(k => typeof k === 'string' && valid.includes(k));
+    if (filtered.length === 0 || filtered.length === valid.length) return undefined;
+    return filtered;
+}
 
 // Заглушка (чтобы старый код не ломался, если где-то используется)
 export const DEMO_MAP: IMapData = {
@@ -129,6 +152,7 @@ export function migrateMapData(raw: unknown): IMapData {
             : 'ENDPOINTS',
         fogData: Array.isArray(data.fogData) ? (data.fogData as number[]) : [],
         timeOfDay: (data.timeOfDay === 'night') ? 'night' : 'day',
+        allowedCards: resolveAllowedCards(data.allowedCards),
         schemaVersion: MAP_SCHEMA_VERSION,
     };
 

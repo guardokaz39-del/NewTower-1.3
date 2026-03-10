@@ -685,8 +685,9 @@ export class EditorScene extends BaseScene {
 
         this.activeWaveEditor = new WaveEditor(
             currentWaves,
-            (waves) => {
-                this.saveMap(waves);
+            this.map.allowedCards,
+            (waves, allowedCards) => {
+                this.saveMap(waves, allowedCards);
                 this.activeWaveEditor = null;
             },
             () => {
@@ -696,9 +697,10 @@ export class EditorScene extends BaseScene {
         );
     }
 
-    private saveMap(waves: any[]) {
+    private saveMap(waves: any[], allowedCards?: string[]) {
         // [FIX] Ensure map waves are updated before serialization
         this.map.waves = waves;
+        this.map.allowedCards = allowedCards;
 
         // Resolve sparse editor waypoints → dense BFS path for validation
         if (this.waypointMgr.isValid()) {
@@ -721,6 +723,7 @@ export class EditorScene extends BaseScene {
         data.fogData = this.fog.getFogData();
         data.manualPath = this.waypointMgr.isValid(); // Using waypoint manager
         data.timeOfDay = this.state.timeOfDay;
+        data.allowedCards = allowedCards;
 
         const name = prompt('Enter map name:', this.currentMapName || 'MyMap');
         if (!name) return;

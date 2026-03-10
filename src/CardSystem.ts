@@ -136,8 +136,10 @@ export class CardSystem {
     }
 
     public addRandomCardToHand() {
-        const keys = Object.keys(CONFIG.CARD_TYPES);
-        const randomKey = keys[Math.floor(Math.random() * keys.length)];
+        let pool = this.scene.mapData?.allowedCards ?? Object.keys(CONFIG.CARD_TYPES);
+        if (pool.length === 0) pool = Object.keys(CONFIG.CARD_TYPES); // Absolute safety fallback
+
+        const randomKey = pool[Math.floor(Math.random() * pool.length)];
         this.addCard(randomKey, 1);
     }
 
