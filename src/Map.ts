@@ -114,8 +114,6 @@ export class MapManager {
 
         // Prerender the static map logic
         this.prerender();
-        // Cache torches logic
-        this.cacheTorches();
     }
 
     /**
@@ -166,7 +164,7 @@ export class MapManager {
         if (!ctx) return;
         ctx.clearRect(0, 0, w, h);
 
-        this._animatedTilePositions = [];
+        this._animatedTilePositions.length = 0;
         const TS = CONFIG.TILE_SIZE;
 
         for (let y = 0; y < this.rows; y++) {
@@ -204,6 +202,20 @@ export class MapManager {
                     this.drawTile(ctx, 'grass', px, py); // Fallback
                 }
             }
+        }
+
+        // Phase 2A: Bake objects to cacheCanvas
+        for (const obj of this.objects) {
+            const px = obj.x * TS;
+            const py = obj.y * TS;
+            ObjectRenderer.draw(ctx, obj.type as ObjectType, px, py, obj.size || 1);
+        }
+
+        // Phase 2A: Bake torch stands
+        this.cacheTorches();
+        for (const torch of this.torchPositions) {
+            ctx.fillStyle = '#5d4037';
+            ctx.fillRect(torch.x - 2, torch.y, 4, 6);
         }
     }
 
@@ -276,14 +288,7 @@ export class MapManager {
             ctx.drawImage(this.cacheCanvas, 0, 0);
         }
 
-        const TS = CONFIG.TILE_SIZE;
-
-        // 2. Draw dynamic objects (trees, rocks, etc that are "objects" not tiles)
-        for (const obj of this.objects) {
-            const px = obj.x * TS;
-            const py = obj.y * TS;
-            ObjectRenderer.draw(ctx, obj.type as ObjectType, px, py, obj.size || 1);
-        }
+        // Objects are now baked in cacheCanvas
 
         if (this.waypoints.length > 0) {
             const start = this.waypoints[0];
@@ -299,9 +304,9 @@ export class MapManager {
     private cacheTorches() {
         this.torchPositions = [];
         const TS = CONFIG.TILE_SIZE;
-        const checkGrass = (cx: number, cy: number) => {
-            if (cx < 0 || cx >= this.cols || cy < 0 || cy >= this.rows) return true;
-            return this.tiles[cy][cx] !== 1;
+        const isValidTorchGround = (cx: number, cy: number): boolean => {
+            if (cx < 0 || cx >= this.cols || cy < 0 || cy >= this.rows) return false;
+            return this.isTorchGroundTile(this.tiles[cy][cx]);
         };
 
         const spacing = 4; // Every 4th valid spot roughly
@@ -310,10 +315,10 @@ export class MapManager {
             for (let x = 0; x < this.cols; x++) {
                 if (this.tiles[y][x] === 1) { // Path
                     // Identify borders with grass
-                    const top = checkGrass(x, y - 1);
-                    const bottom = checkGrass(x, y + 1);
-                    const left = checkGrass(x - 1, y);
-                    const right = checkGrass(x + 1, y);
+                    const top = isValidTorchGround(x, y - 1);
+                    const bottom = isValidTorchGround(x, y + 1);
+                    const left = isValidTorchGround(x - 1, y);
+                    const right = isValidTorchGround(x + 1, y);
 
                     // Add to cache if valid
                     if (top && (x + y * 7) % spacing === 0) {
@@ -344,9 +349,6 @@ export class MapManager {
             const flickerBase = Math.sin(time * 0.1 + torch.colorHash) * 0.05 + Math.sin(time * 0.03 + torch.colorHash * 2) * 0.05;
             const pop = (Math.random() > 0.98) ? (Math.random() * 0.1) : 0;
             const flickerLocal = 1.0 + flickerBase + pop;
-
-            ctx.fillStyle = '#5d4037';
-            ctx.fillRect(torch.x - 2, torch.y, 4, 6);
 
             const size = (8 + flickerBase * 4);
             ctx.fillStyle = `rgba(255, 87, 34, ${0.8 + flickerBase})`;
@@ -412,8 +414,16 @@ export class MapManager {
         } else if (key === 'bridge') {
             const col = Math.floor(x / CONFIG.TILE_SIZE);
             const row = Math.floor(y / CONFIG.TILE_SIZE);
-            // vertical bridge if connected top or bottom to another bridge, else horizontal
-            const isVertical = ((row > 0 && this.tiles[row - 1][col] === 4) || (row < this.rows - 1 && this.tiles[row + 1][col] === 4));
+
+            const up = row > 0 ? this.tiles[row - 1][col] : -1;
+            const down = row < this.rows - 1 ? this.tiles[row + 1][col] : -1;
+            const left = col > 0 ? this.tiles[row][col - 1] : -1;
+            const right = col < this.cols - 1 ? this.tiles[row][col + 1] : -1;
+
+            const verticalScore = (up === 4 || up === 1 ? 1 : 0) + (down === 4 || down === 1 ? 1 : 0);
+            const horizontalScore = (left === 4 || left === 1 ? 1 : 0) + (right === 4 || right === 1 ? 1 : 0);
+
+            const isVertical = verticalScore >= horizontalScore; // При равенстве — вертикальный (default)
             img = Assets.get(isVertical ? 'bridge_v' : 'bridge_h');
         } else {
             img = Assets.get(key);
@@ -514,5 +524,9 @@ export class MapManager {
         }
 
         return errors;
+    }
+
+    private isTorchGroundTile(t: number): boolean {
+        return t === 0 || t === 3; // Grass, Sand
     }
 }

@@ -182,6 +182,11 @@ export class ObjectRenderer {
         const centerX = x + TS / 2;
         const bottomY = y + TS - 5;
 
+        const col = Math.floor(x / TS);
+        const row = Math.floor(y / TS);
+        const seed = col * 73 + row * 137;
+        const crownScale = 0.85 + (seed % 30) * 0.01; // 0.85 - 1.15
+
         // Trunk shadow
         ctx.fillStyle = 'rgba(0, 0, 0, 0.2)';
         ctx.fillRect(centerX - 6, bottomY - 25, 14, 28);
@@ -193,15 +198,15 @@ export class ObjectRenderer {
         // Foliage shadow
         ctx.fillStyle = 'rgba(0, 0, 0, 0.2)';
         ctx.beginPath();
-        ctx.arc(centerX + 3, bottomY - 20, 18, 0, Math.PI * 2);
+        ctx.arc(centerX + 3, bottomY - 20, 18 * crownScale, 0, Math.PI * 2);
         ctx.fill();
 
         // Foliage (3 circles for depth)
         const foliageColors = ['#1b5e20', '#2e7d32', '#388e3c'];
         const foliageOffsets = [
-            { x: -5, y: -5, r: 14 },
-            { x: 5, y: -3, r: 16 },
-            { x: 0, y: -10, r: 15 }
+            { x: -5, y: -5, r: 14 * crownScale },
+            { x: 5, y: -3, r: 16 * crownScale },
+            { x: 0, y: -10, r: 15 * crownScale }
         ];
 
         foliageOffsets.forEach((offset, i) => {
