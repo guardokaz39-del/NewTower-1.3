@@ -511,6 +511,23 @@ export class GameScene extends BaseScene implements IGameScene {
         const cullMargin = 64; // Safe margin for large sprites/effects
 
         PerformanceMonitor.startTimer('RenderEntities');
+
+        // Phase 2B.2 Z-Sorting Hack: Combine dynamic objects and enemies into one array
+        const renderables: { y: number, render: (ctx: CanvasRenderingContext2D) => void }[] = [];
+        
+        // 1. Dynamic map objects (Crystals, etc.)
+        const dynamicObjs = this.map.getDynamicRenderables(this.gameState.frames);
+        for (let i = 0; i < dynamicObjs.length; i++) {
+            const obj = dynamicObjs[i];
+            // Simple culling
+            if (obj.x < -cullMargin || obj.x > viewW + cullMargin ||
+                obj.y - CONFIG.TILE_SIZE < -cullMargin || obj.y - CONFIG.TILE_SIZE > viewH + cullMargin) {
+                continue;
+            }
+            renderables.push(obj);
+        }
+
+        // 2. Enemies
         for (let i = 0; i < this.gameState.enemies.length; i++) {
             const e = this.gameState.enemies[i];
             // Culling: Skip if off-screen
@@ -518,8 +535,18 @@ export class GameScene extends BaseScene implements IGameScene {
                 e.y < -cullMargin || e.y > viewH + cullMargin) {
                 continue;
             }
-            e.draw(ctx);
+            renderables.push({
+                y: e.y,
+                render: (ctx: CanvasRenderingContext2D) => e.draw(ctx)
+            });
         }
+
+        // 3. Sort by Y and render linearly
+        renderables.sort((a, b) => a.y - b.y);
+        for (let i = 0; i < renderables.length; i++) {
+            renderables[i].render(ctx);
+        }
+
         PerformanceMonitor.endTimer('RenderEntities');
 
         this.projectileSystem.draw(ctx);

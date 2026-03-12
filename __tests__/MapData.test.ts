@@ -36,6 +36,34 @@ describe('MapData Helpers', () => {
     });
 
     describe('migrateMapData', () => {
+        it('replaces unknown tile types with 0 (grass)', () => {
+            const raw: Partial<IMapData> = {
+                width: 2, height: 2,
+                tiles: [[99, 0], [6, 1]],
+                waypoints: [],
+            };
+            const migrated = migrateMapData(raw);
+            expect(migrated.tiles[0][0]).toBe(0);
+            expect(migrated.tiles[0][1]).toBe(0);
+            expect(migrated.tiles[1][0]).toBe(6);
+            expect(migrated.tiles[1][1]).toBe(1);
+        });
+
+        it('filters out objects with unknown types', () => {
+            const raw: Partial<IMapData> = {
+                width: 2, height: 2,
+                tiles: [[0, 0], [0, 0]],
+                waypoints: [],
+                objects: [
+                    { type: 'tree', x: 0, y: 0 } as any,
+                    { type: 'alien_ship', x: 1, y: 1 } as any
+                ]
+            };
+            const migrated = migrateMapData(raw);
+            expect(migrated.objects.length).toBe(1);
+            expect(migrated.objects[0].type).toBe('tree');
+        });
+
         it('preserves allowedCards if it is a valid subset', () => {
             const raw: Partial<IMapData> = {
                 width: 10, height: 10,

@@ -119,6 +119,7 @@ export class EditorSidebar {
             { id: 'paint_sand', icon: '🏜️', label: 'Sand (3)' },
             { id: 'paint_bridge', icon: '🌉', label: 'Bridge(4)' },
             { id: 'paint_lava', icon: '🌋', label: 'Lava (5)' },
+            { id: 'paint_dirt', icon: '🟤', label: 'Dirt (6)' },
             { id: 'paint_fog', icon: '🌫️', label: 'Fog' },
         ]);
 
@@ -133,6 +134,10 @@ export class EditorSidebar {
             { id: 'place_crate', icon: '📦', label: 'Crate' },
             { id: 'place_barrel', icon: '🛢️', label: 'Barrel' },
             { id: 'place_torch_stand', icon: '🔥', label: 'Torch' },
+            { id: 'place_mushroom', icon: '🍄', label: 'Mushroom' },
+            { id: 'place_stump', icon: '🪵', label: 'Stump' },
+            { id: 'place_bones', icon: '🦴', label: 'Bones' },
+            { id: 'place_crystal', icon: '💎', label: 'Crystal' },
         ]);
 
         this.createSection('🛤️ Path', [

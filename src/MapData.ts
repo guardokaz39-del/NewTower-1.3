@@ -38,7 +38,7 @@ export interface IWaveConfig {
 
 // Полная структура файла сохранения
 export interface IMapObject {
-    type: string; // 'stone' | 'rock' | 'tree' | 'wheat' | 'flowers' | 'bush' | 'pine' | 'crate' | 'barrel' | 'torch_stand'
+    type: string; // 'stone' | 'rock' | 'tree' | 'wheat' | 'flowers' | 'bush' | 'pine' | 'crate' | 'barrel' | 'torch_stand' | 'mushroom' | 'stump' | 'bones' | 'crystal'
     x: number;
     y: number;
     properties?: Record<string, any>;
@@ -113,6 +113,9 @@ export const DEMO_MAP: IMapData = {
 
 export const MAP_SCHEMA_VERSION = 2;
 
+const VALID_TILES = new Set([0, 1, 2, 3, 4, 5, 6]);
+const VALID_OBJECTS = new Set(['stone', 'rock', 'tree', 'wheat', 'flowers', 'bush', 'pine', 'crate', 'barrel', 'torch_stand', 'mushroom', 'stump', 'bones', 'crystal']);
+
 /**
  * Validates and migrates raw map data from any source (localStorage, JSON import, etc.)
  * to the current IMapData format, filling in missing fields with safe defaults.
@@ -121,29 +124,38 @@ export const MAP_SCHEMA_VERSION = 2;
  */
 export function migrateMapData(raw: unknown): IMapData {
     if (!raw || typeof raw !== 'object') {
-        throw new Error('Map data is not an object');
+        console.error('[MapData] Map data is not an object. Falling back to DEMO_MAP.');
+        return structuredClone(DEMO_MAP);
     }
 
     const data = raw as Record<string, unknown>;
 
     // Required: tiles must be 2D number array
-    if (!Array.isArray(data.tiles) || data.tiles.length === 0) {
-        throw new Error('Map data missing tiles array');
+    if (!Array.isArray(data.tiles) || data.tiles.length === 0 || !Array.isArray(data.tiles[0])) {
+        console.error('[MapData] Map data missing valid tiles array. Falling back to DEMO_MAP.');
+        return structuredClone(DEMO_MAP);
     }
 
     const tiles = data.tiles as number[][];
     const height = tiles.length;
-    const width = tiles[0]?.length ?? 0;
+    const width = tiles[0].length;
     if (width === 0) {
-        throw new Error('Map data has empty tile rows');
+        console.error('[MapData] Map data has empty tile rows. Falling back to DEMO_MAP.');
+        return structuredClone(DEMO_MAP);
     }
+
+    const sanitizedTiles = tiles.map(row =>
+        row.map(cell => VALID_TILES.has(cell) ? cell : 0)
+    );
 
     const result: IMapData = {
         width: typeof data.width === 'number' ? data.width : width,
         height: typeof data.height === 'number' ? data.height : height,
-        tiles,
+        tiles: sanitizedTiles,
         waypoints: Array.isArray(data.waypoints) ? data.waypoints : [],
-        objects: Array.isArray(data.objects) ? (data.objects as IMapObject[]) : [],
+        objects: Array.isArray(data.objects) 
+            ? (data.objects as IMapObject[]).filter(obj => VALID_OBJECTS.has(obj.type))
+            : [],
         waves: Array.isArray(data.waves) ? (data.waves as IWaveConfig[]) : [],
         startingMoney: typeof data.startingMoney === 'number' ? data.startingMoney : 100,
         startingLives: typeof data.startingLives === 'number' ? data.startingLives : 20,

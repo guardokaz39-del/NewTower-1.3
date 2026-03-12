@@ -198,6 +198,8 @@ export class MapManager {
                     const SOUTH = (y < this.rows - 1 && this.tiles[y + 1][x] === 5) ? 1 : 0;
                     const bitmask = NORTH | (WEST << 1) | (EAST << 2) | (SOUTH << 3);
                     this._animatedTilePositions.push({ type: 'lava', bitmask, px, py });
+                } else if (type === 6) {
+                    this.drawTile(ctx, 'dirt', px, py);
                 } else {
                     this.drawTile(ctx, 'grass', px, py); // Fallback
                 }
@@ -206,6 +208,7 @@ export class MapManager {
 
         // Phase 2A: Bake objects to cacheCanvas
         for (const obj of this.objects) {
+            if (obj.type === 'crystal') continue; // Animated, drawn dynamically
             const px = obj.x * TS;
             const py = obj.y * TS;
             ObjectRenderer.draw(ctx, obj.type as ObjectType, px, py, obj.size || 1);
@@ -234,6 +237,26 @@ export class MapManager {
         }
     }
 
+    public getDynamicRenderables(time: number): { x: number, y: number, render: (ctx: CanvasRenderingContext2D) => void }[] {
+        const renderables: { x: number, y: number, render: (ctx: CanvasRenderingContext2D) => void }[] = [];
+        const TS = CONFIG.TILE_SIZE;
+        for (const obj of this.objects) {
+            if (obj.type === 'crystal') {
+                const px = obj.x * TS;
+                const py = obj.y * TS;
+                // Add y offset based on tile bottom for sorting
+                renderables.push({
+                    x: px,
+                    y: py + TS, // Sort by bottom edge
+                    render: (ctx: CanvasRenderingContext2D) => {
+                        (ObjectRenderer as any).draw(ctx, 'crystal', px, py, obj.size || 1, time);
+                    }
+                });
+            }
+        }
+        return renderables;
+    }
+
     public isBuildable(col: number, row: number): boolean {
         if (col < 0 || col >= this.cols || row < 0 || row >= this.rows) return false;
 
@@ -243,8 +266,8 @@ export class MapManager {
         // Water (2), Bridge (4), Lava (5) are NOT buildable
         if (this.tiles[row][col] === 2 || this.tiles[row][col] === 4 || this.tiles[row][col] === 5) return false;
 
-        // Grass (0) and Sand (3) ARE buildable.
-        if (this.tiles[row][col] !== 0 && this.tiles[row][col] !== 3) return false;
+        // Grass (0), Sand (3) and Dirt (6) ARE buildable.
+        if (this.tiles[row][col] !== 0 && this.tiles[row][col] !== 3 && this.tiles[row][col] !== 6) return false;
 
         // Check if any object occupies this tile
         const hasObject = this.objects.some(obj => {
@@ -425,6 +448,8 @@ export class MapManager {
 
             const isVertical = verticalScore >= horizontalScore; // При равенстве — вертикальный (default)
             img = Assets.get(isVertical ? 'bridge_v' : 'bridge_h');
+        } else if (key === 'dirt') {
+            img = Assets.get('dirt');
         } else {
             img = Assets.get(key);
         }
@@ -527,6 +552,6 @@ export class MapManager {
     }
 
     private isTorchGroundTile(t: number): boolean {
-        return t === 0 || t === 3; // Grass, Sand
+        return t === 0 || t === 3 || t === 6; // Grass, Sand, Dirt
     }
 }

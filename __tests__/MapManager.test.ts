@@ -2,6 +2,26 @@ import { describe, it, expect } from 'vitest';
 import { MapManager } from '../src/Map';
 
 describe('MapManager Tile Bitmasks', () => {
+    it('treats Dirt (6) as buildable', () => {
+        const mockMapData = {
+            width: 1, height: 1,
+            tiles: [[6]],
+            waypoints: [] as any[], waves: [] as any[], objects: [] as any[]
+        };
+        const map = new MapManager(mockMapData);
+        expect(map.isBuildable(0, 0)).toBe(true);
+    });
+
+    it('treats Dirt (6) as valid torch ground', () => {
+        const mockMapData = {
+            width: 1, height: 1,
+            tiles: [[6]],
+            waypoints: [] as any[], waves: [] as any[], objects: [] as any[]
+        };
+        const map = new MapManager(mockMapData);
+        expect(map['isTorchGroundTile'](6)).toBe(true);
+    });
+
     it('calculates correct bitmasks for water tiles', () => {
         const mockMapData = {
             width: 3, height: 3,

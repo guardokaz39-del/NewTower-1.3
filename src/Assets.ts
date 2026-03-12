@@ -307,6 +307,8 @@ export class Assets {
         for (let i = 0; i < 16; i++) {
             requiredAssets.push(`path_${i}`);
         }
+        
+        requiredAssets.push('dirt');
 
         // Добавляем enemies
         const enemies = Object.values(CONFIG.ENEMY_TYPES);
@@ -430,6 +432,19 @@ export class Assets {
             const isVertical = name === 'bridge_v';
             this.generateTexture(name, CONFIG.TILE_SIZE, (ctx, w, h) => {
                 TileRenderers.drawBridgeTile(ctx, w, h, isVertical);
+            });
+            this.loadStats.procedural++;
+        } else if (name === 'dirt') {
+            this.generateTexture('dirt', CONFIG.TILE_SIZE, (ctx, w, h) => {
+                // Коричневая земля с точками
+                ctx.fillStyle = '#6B4F10';
+                ctx.fillRect(0, 0, w, h);
+                ctx.fillStyle = '#5A400B';
+                for (let i = 0; i < 40; i++) {
+                    ctx.beginPath();
+                    ctx.arc(Math.random() * w, Math.random() * h, Math.random() * 2 + 1, 0, Math.PI * 2);
+                    ctx.fill();
+                }
             });
             this.loadStats.procedural++;
         } else {

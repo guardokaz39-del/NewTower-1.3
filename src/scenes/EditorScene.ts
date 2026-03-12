@@ -347,6 +347,20 @@ export class EditorScene extends BaseScene {
                 Pathfinder.invalidateCache();
                 this._tileDirty = true;
             }
+        } else if (this.state.mode === 'paint_dirt') {
+            if (oldTileType !== 6) {
+                this.history.pushInCompound(EditorActions.createTileAction(this.map.grid, col, row, oldTileType, 6));
+                this.map.grid[row][col].type = 6;
+                this.map.grid[row][col].decor = null;
+                Pathfinder.invalidateCache();
+                this._tileDirty = true;
+            }
+        } else if (this.state.mode === 'paint_fog') {
+            if (targetFogDensity >= 0 && oldFogDensity !== targetFogDensity) {
+                this.history.pushInCompound(EditorActions.createFogAction(this.fog, col, row, oldFogDensity, targetFogDensity));
+                this.fog.setFog(col, row, targetFogDensity);
+                this._tileDirty = true;
+            }
         } else if (this.state.mode === 'eraser') {
             // FEATURE: Eraser - reset to grass, remove fog, and remove objects
             const hasObject = this.map.objects.find(obj => {
@@ -433,6 +447,14 @@ export class EditorScene extends BaseScene {
             this.placeObject(col, row, 'barrel', 1);
         } else if (this.state.mode === 'place_torch_stand') {
             this.placeObject(col, row, 'torch_stand', 1);
+        } else if (this.state.mode === 'place_mushroom') {
+            this.placeObject(col, row, 'mushroom', 1);
+        } else if (this.state.mode === 'place_stump') {
+            this.placeObject(col, row, 'stump', 1);
+        } else if (this.state.mode === 'place_bones') {
+            this.placeObject(col, row, 'bones', 1);
+        } else if (this.state.mode === 'place_crystal') {
+            this.placeObject(col, row, 'crystal', 1);
         }
     }
 
@@ -466,6 +488,7 @@ export class EditorScene extends BaseScene {
             case 3: this.state.setMode('paint_sand'); break;
             case 4: this.state.setMode('paint_bridge'); break;
             case 5: this.state.setMode('paint_lava'); break;
+            case 6: this.state.setMode('paint_dirt'); break;
             default: this.state.setMode('paint_grass'); break;
         }
     }
@@ -482,6 +505,7 @@ export class EditorScene extends BaseScene {
             case 'paint_sand': targetType = 3; break;
             case 'paint_bridge': targetType = 4; break;
             case 'paint_lava': targetType = 5; break;
+            case 'paint_dirt': targetType = 6; break;
             default: return; // Can only fill with tile types, not objects
         }
 
@@ -580,6 +604,12 @@ export class EditorScene extends BaseScene {
         // It prevents saving them correctly.
         this.map.draw(ctx);
         this.map.drawAnimatedTiles(ctx, this.time);
+
+        // Draw dynamic objects (e.g., Crystals) that were stripped from baked prerendering
+        const dynamicRenderables = this.map.getDynamicRenderables(this.time);
+        for (let i = 0; i < dynamicRenderables.length; i++) {
+            dynamicRenderables[i].render(ctx);
+        }
 
         if (this.state.gridVisible) {
             ctx.strokeStyle = 'rgba(255,255,255,0.08)';

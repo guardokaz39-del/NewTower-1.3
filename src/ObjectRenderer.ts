@@ -1,6 +1,7 @@
 import { CONFIG } from './Config';
 import { VISUALS } from './VisualConfig';
 import { ProceduralGrass } from './renderers/ProceduralGrass';
+import { AssetCache } from './utils/AssetCache';
 
 /**
  * ObjectRenderer - programmatic rendering for map objects
@@ -8,7 +9,7 @@ import { ProceduralGrass } from './renderers/ProceduralGrass';
  * Designed to be easily replaced with asset-based rendering later
  */
 
-export type ObjectType = 'stone' | 'rock' | 'tree' | 'wheat' | 'flowers' | 'bush' | 'pine' | 'crate' | 'barrel' | 'torch_stand';
+export type ObjectType = 'stone' | 'rock' | 'tree' | 'wheat' | 'flowers' | 'bush' | 'pine' | 'crate' | 'barrel' | 'torch_stand' | 'mushroom' | 'stump' | 'bones' | 'crystal';
 
 export class ObjectRenderer {
     /**
@@ -19,7 +20,7 @@ export class ObjectRenderer {
      * @param y Pixel y coordinate
      * @param size Tile size (1 for most objects, 2-3 for rocks)
      */
-    static draw(ctx: CanvasRenderingContext2D, type: ObjectType, x: number, y: number, size: number = 1): void {
+    static draw(ctx: CanvasRenderingContext2D, type: ObjectType, x: number, y: number, size: number = 1, time: number = 0): void {
         const TS = CONFIG.TILE_SIZE;
 
         switch (type) {
@@ -52,6 +53,22 @@ export class ObjectRenderer {
                 break;
             case 'torch_stand':
                 this.drawTorchStand(ctx, x, y, TS);
+                break;
+            case 'mushroom':
+                this.drawMushroom(ctx, x, y, TS);
+                break;
+            case 'stump':
+                this.drawStump(ctx, x, y, TS);
+                break;
+            case 'bones':
+                this.drawBones(ctx, x, y, TS);
+                break;
+            case 'crystal':
+                this.drawCrystal(ctx, x, y, TS, time);
+                break;
+            default:
+                ctx.fillStyle = '#ff00ff';
+                ctx.fillRect(x, y, TS, TS);
                 break;
         }
     }
@@ -503,5 +520,135 @@ export class ObjectRenderer {
         // Metal holder at top
         ctx.fillStyle = '#424242';
         ctx.fillRect(centerX - 4, centerY - 12, 8, 4);
+    }
+
+    private static drawMushroom(ctx: CanvasRenderingContext2D, x: number, y: number, TS: number): void {
+        const cx = x + TS / 2;
+        const cy = y + TS / 2;
+
+        // Shadow
+        ctx.fillStyle = 'rgba(0,0,0,0.2)';
+        ctx.beginPath();
+        ctx.ellipse(cx + 2, cy + 8, 10, 4, 0, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Stem
+        ctx.fillStyle = '#e0e0e0';
+        ctx.fillRect(cx - 3, cy - 2, 6, 10);
+
+        // Cap
+        ctx.fillStyle = '#d32f2f';
+        ctx.beginPath();
+        ctx.arc(cx, cy - 2, 12, Math.PI, 0);
+        ctx.lineTo(cx + 12, cy - 2);
+        ctx.lineTo(cx - 12, cy - 2);
+        ctx.fill();
+
+        // Cap spots
+        ctx.fillStyle = '#fff';
+        ctx.beginPath(); ctx.arc(cx - 6, cy - 6, 2, 0, Math.PI * 2); ctx.fill();
+        ctx.beginPath(); ctx.arc(cx + 5, cy - 8, 2.5, 0, Math.PI * 2); ctx.fill();
+        ctx.beginPath(); ctx.arc(cx, cy - 10, 1.5, 0, Math.PI * 2); ctx.fill();
+    }
+
+    private static drawStump(ctx: CanvasRenderingContext2D, x: number, y: number, TS: number): void {
+        const cx = x + TS / 2;
+        const cy = y + TS / 2;
+
+        // Base shadow
+        ctx.fillStyle = 'rgba(0,0,0,0.3)';
+        ctx.beginPath();
+        ctx.ellipse(cx + 2, cy + 6, 14, 6, 0, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Trunk base
+        ctx.fillStyle = '#5d4037';
+        ctx.fillRect(cx - 10, cy - 4, 20, 10);
+
+        // Roots
+        ctx.beginPath(); ctx.moveTo(cx - 10, cy); ctx.lineTo(cx - 14, cy + 8); ctx.lineTo(cx - 6, cy + 6); ctx.fill();
+        ctx.beginPath(); ctx.moveTo(cx + 10, cy); ctx.lineTo(cx + 14, cy + 6); ctx.lineTo(cx + 6, cy + 6); ctx.fill();
+
+        // Top cut
+        ctx.fillStyle = '#8d6e63';
+        ctx.beginPath();
+        ctx.ellipse(cx, cy - 4, 10, 4, 0, 0, Math.PI * 2);
+        ctx.fill();
+        
+        // Tree rings
+        ctx.strokeStyle = '#5d4037';
+        ctx.lineWidth = 1;
+        ctx.beginPath(); ctx.ellipse(cx, cy - 4, 6, 2, 0, 0, Math.PI * 2); ctx.stroke();
+        ctx.beginPath(); ctx.ellipse(cx, cy - 4, 3, 1, 0, 0, Math.PI * 2); ctx.stroke();
+    }
+
+    private static drawBones(ctx: CanvasRenderingContext2D, x: number, y: number, TS: number): void {
+        const cx = x + TS / 2;
+        const cy = y + TS / 2;
+
+        ctx.fillStyle = '#e0e0e0';
+        ctx.strokeStyle = '#bdbdbd';
+        ctx.lineWidth = 1;
+
+        // Bone 1
+        ctx.save();
+        ctx.translate(cx - 4, cy + 4);
+        ctx.rotate(0.5);
+        ctx.fillRect(-6, -2, 12, 4);
+        ctx.beginPath(); ctx.arc(-6, -2, 2, 0, Math.PI*2); ctx.arc(-6, 2, 2, 0, Math.PI*2); ctx.fill();
+        ctx.beginPath(); ctx.arc(6, -2, 2, 0, Math.PI*2); ctx.arc(6, 2, 2, 0, Math.PI*2); ctx.fill();
+        ctx.restore();
+
+        // Bone 2
+        ctx.save();
+        ctx.translate(cx + 6, cy - 2);
+        ctx.rotate(-0.8);
+        ctx.fillRect(-5, -1.5, 10, 3);
+        ctx.beginPath(); ctx.arc(-5, -1.5, 1.5, 0, Math.PI*2); ctx.arc(-5, 1.5, 1.5, 0, Math.PI*2); ctx.fill();
+        ctx.beginPath(); ctx.arc(5, -1.5, 1.5, 0, Math.PI*2); ctx.arc(5, 1.5, 1.5, 0, Math.PI*2); ctx.fill();
+        ctx.restore();
+    }
+
+    private static drawCrystal(ctx: CanvasRenderingContext2D, x: number, y: number, TS: number, time: number): void {
+        const cx = x + TS / 2;
+        const cy = y + TS / 2;
+        
+        // Pulse effect
+        const pulse = Math.sin(time / 200) * 0.5 + 0.5; // 0 to 1
+        
+        // Base shadow
+        ctx.fillStyle = 'rgba(0,0,0,0.3)';
+        ctx.beginPath();
+        ctx.ellipse(cx, cy + 8, 12 + pulse * 2, 4 + pulse, 0, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Glow (Optimized via AssetCache)
+        const glowSize = 60; 
+        const glowSprite = AssetCache.getGlow('rgba(0, 255, 255, 1)', glowSize);
+        ctx.save();
+        ctx.globalAlpha = 0.3 + pulse * 0.3; // modulate alpha instead of rebuilding gradient
+        const targetSize = 40 + pulse * 20; // 40 to 60 diameter
+        ctx.drawImage(glowSprite, cx - targetSize / 2, cy - 4 - targetSize / 2, targetSize, targetSize);
+        ctx.restore();
+
+        // Crystal body
+        ctx.fillStyle = 'rgba(0, 200, 255, 0.8)';
+        ctx.beginPath();
+        ctx.moveTo(cx, cy - 16); // Top
+        ctx.lineTo(cx + 8, cy); // Right
+        ctx.lineTo(cx, cy + 8); // Bottom
+        ctx.lineTo(cx - 8, cy); // Left
+        ctx.closePath();
+        ctx.fill();
+
+        // Crystal highlight
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.6)';
+        ctx.beginPath();
+        ctx.moveTo(cx, cy - 16); // Top
+        ctx.lineTo(cx + 4, cy - 2); // Mid-right
+        ctx.lineTo(cx, cy + 4); // Mid-bottom
+        ctx.lineTo(cx, cy - 16);
+        ctx.closePath();
+        ctx.fill();
     }
 }
