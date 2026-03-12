@@ -380,7 +380,7 @@ static readonly BLOOD_DARK = '#b71c1c';
    this.drawDrippingGore(ctx, s, t, isMoving); // Animated drips
    ```
 
-2. **ctx.filter для hit flash** — вызывает зависание
+2. **ctx.filter для hit flash** — вызывает зависание (см. также `rendering_pipeline_guidelines.md`)
 
    ```typescript
    // ПЛОХО:

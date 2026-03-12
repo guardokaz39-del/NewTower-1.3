@@ -80,9 +80,9 @@ this.effects.spawnExplosion(x, y, radius, life, '#ff6600');
 
 ---
 
-### 3. Каскадные взрывы без depth guard
+### 3. Каскадные взрывы без очереди задержки (Deferred Event Queue)
 
-**Ошибка:** Взрыв убивает врага → враг при смерти взрывается → убивает ещё → ...
+**Ошибка:** Взрыв убивает врага → враг при смерти взрывается → убивает ещё → ... (Вызывает ошибку CallStack Depth)
 
 ```typescript
 // ❌ Бесконечная рекурсия при группе взрывных врагов
@@ -94,16 +94,11 @@ triggerExplosion(x, y, r, dmg) {
 }
 ```
 
-**Решение:** Depth counter:
+**Решение:** Использовать `CollisionSystem.explosionQueue` (Deferred Event Queue Pattern) для выноса эффектов взрыва из синхронного пайплайна:
 
 ```typescript
-private explosionDepth = 0;
-triggerExplosion(...) {
-    if (this.explosionDepth >= 3) return;
-    this.explosionDepth++;
-    // ... logic
-    this.explosionDepth--;
-}
+// ✅ Отложенный взрыв
+CollisionSystem.explosionQueue.push(x, y, radius, damage, sourceId);
 ```
 
 ---
@@ -216,4 +211,4 @@ if (mergedMods.targetingMode) this.targetingMode = mergedMods.targetingMode;
 - [ ] Координаты drawImage округлены через `Math.round()`?
 - [ ] Эффекты создаются через `spawn*()`, а не `add()`?
 - [ ] dt ограничен? Нет tunneling при низком FPS?
-- [ ] Каскадные операции (AoE, цепные реакции) имеют depth guard?
+- [ ] Каскадные операции (AoE, цепные реакции) используют очередь задержки (explosionQueue)?

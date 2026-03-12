@@ -295,6 +295,9 @@ export class GameScene extends BaseScene implements IGameScene {
             this.ui.setMode('game');
             this.ui.update();
         }
+        
+        // Show Game UI
+        this.game.uiRoot.showGameUI();
 
         // Initialize CardSystem UI safely AFTER the UIManager is set up
         this.session.cardSys.initUI();
@@ -317,8 +320,7 @@ export class GameScene extends BaseScene implements IGameScene {
         this.unsubs.forEach(u => u());
         this.unsubs = [];
 
-        const ui = document.getElementById('ui-layer');
-        if (ui) ui.style.display = 'none';
+        this.game.uiRoot.hideGameUI();
 
         // Note: this.bestiary is part of session, so session.destroy() handles it.
     }

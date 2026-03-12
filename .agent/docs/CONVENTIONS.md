@@ -141,19 +141,12 @@ if (this.target && (!this.target.isAlive() || this.target.finished)) {
 
 ### AoE / Chain Reaction Safety
 
-Любой метод, который наносит урон в цикле по врагам (взрывы, цепные реакции), **обязан** иметь depth guard:
+Любой метод, который наносит урон в цикле по врагам (взрывы, цепные реакции), **строго запрещено** выполнять синхронно, если он может вызвать рекурсивные вызовы (АоЕ убивает АоЕ монстра).
 
-```typescript
-private explosionDepth = 0;
-private static readonly MAX_EXPLOSION_DEPTH = 3;
-
-triggerExplosion(...) {
-    if (this.explosionDepth >= MAX_EXPLOSION_DEPTH) return;
-    this.explosionDepth++;
-    // ... damage logic
-    this.explosionDepth--;
-}
-```
+Всегда используйте паттерн **Deferred Queue**:
+- Добавляйте параметры взрыва в очередь: `CollisionSystem.explosionQueue.push(x, y, radius, damage, id)`
+- Чтение очереди происходит в основном цикле `CollisionSystem`.
+- Подробности смотри в `COMMON_MISTAKES.md` и `coding_standards.md`.
 
 ---
 

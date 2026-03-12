@@ -14,6 +14,8 @@ export class UIRoot {
         this.tooltipContainer = this.ensureElement('tooltip-container');
         this.overlayContainer = this.ensureElement('overlay-layer');
 
+        this.hideGameUI();
+
         // Ensure z-indices
         this.uiLayer.style.zIndex = '10';
         this.handContainer.style.zIndex = '20';

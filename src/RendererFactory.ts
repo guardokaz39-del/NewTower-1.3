@@ -43,6 +43,7 @@ export class RendererFactory {
 
     static drawMap(ctx: CanvasRenderingContext2D, map: MapManager) {
         map.draw(ctx);
+        map.drawAnimatedTiles(ctx, performance.now());
     }
 
     static drawProjectile(ctx: CanvasRenderingContext2D, projectile: Projectile) {
