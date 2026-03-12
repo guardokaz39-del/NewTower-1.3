@@ -11,6 +11,8 @@ export class BestiarySystem {
 
     private unsubSpawned: () => void = () => { };
 
+    private isDestroyed = false;
+
     constructor(scene: IGameScene) {
         this.scene = scene;
         this.loadProgress(); // Load saved unlocks
@@ -21,19 +23,20 @@ export class BestiarySystem {
 
         // Listen for enemy spawns to unlock them
         this.unsubSpawned = EventBus.getInstance().on(Events.ENEMY_SPAWNED, (enemyType: string) => {
+            if (this.isDestroyed) return;
             this.unlock(enemyType);
         });
     }
 
     public destroy() {
+        this.isDestroyed = true;
         this.unsubSpawned();
         if (this.btn && this.btn.parentNode) {
             this.btn.parentNode.removeChild(this.btn);
         }
         if (this.ui) {
-            this.ui.hide();
-            // BestiaryUI doesn't strictly need destroy if it just removes DOM, 
-            // but we could add it if needed. For now, removing the button is key.
+            this.ui.destroy();
+            this.ui = null;
         }
     }
 

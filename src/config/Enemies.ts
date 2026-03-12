@@ -17,6 +17,7 @@ export const ENEMY_TYPES: Record<string, IEnemyTypeConfig> = {
         desc: 'Обычный скелет',
         archetype: 'SKELETON',
         scale: 1.0,
+        tags: ['💀 Нежить'],
     },
     SCOUT: {
         id: 'scout',
@@ -29,6 +30,7 @@ export const ENEMY_TYPES: Record<string, IEnemyTypeConfig> = {
         desc: 'Быстрый хищник из преисподней',
         archetype: 'HELLHOUND',
         scale: 0.9,
+        tags: ['⚡ Быстрый'],
     },
     TANK: {
         id: 'tank',
@@ -41,6 +43,7 @@ export const ENEMY_TYPES: Record<string, IEnemyTypeConfig> = {
         desc: 'Живой таран в тяжелой броне',
         archetype: 'ORC',
         scale: 1.3,
+        tags: ['🛡️ Крепкий', '🐌 Медленный'],
     },
     BOSS: {
         id: 'boss',
@@ -53,6 +56,7 @@ export const ENEMY_TYPES: Record<string, IEnemyTypeConfig> = {
         desc: 'Неуязвимая сущность',
         archetype: 'WRAITH',
         scale: 1.2,
+        tags: ['👻 Босс', '✨ Магия'],
     },
     // --- NEW VARIANTS ---
     SKELETON_MINER: {
@@ -66,6 +70,7 @@ export const ENEMY_TYPES: Record<string, IEnemyTypeConfig> = {
         desc: 'Крепкий работяга с киркой и мешком угля.',
         archetype: 'SKELETON_MINER',
         scale: 1.05, // Slightly bigger presence
+        tags: ['🛡️ Броня'],
     },
     SKELETON_BERSERKER: {
         id: 'skeleton_berserker',
@@ -78,6 +83,7 @@ export const ENEMY_TYPES: Record<string, IEnemyTypeConfig> = {
         desc: 'Огромный скелет с двуручным топором. При HP < 50% впадает в ярость, удваивая скорость.',
         archetype: 'SKELETON_BERSERKER',
         scale: 1.25, // Visually larger and more intimidating
+        tags: ['⚡ Ярость'],
     },
     SKELETON_COMMANDER: {
         id: 'skeleton_commander',
@@ -90,7 +96,8 @@ export const ENEMY_TYPES: Record<string, IEnemyTypeConfig> = {
         desc: 'Становится сильнее от смертей союзников',
         archetype: 'SKELETON_COMMANDER',
         scale: 1.3,
-        tint: '#ffd700'
+        tint: '#ffd700',
+        tags: ['👑 Аура', '🛡️ Крепкий'],
     },
     SPIDER_POISON: {
         id: 'spider_poison',
@@ -103,7 +110,8 @@ export const ENEMY_TYPES: Record<string, IEnemyTypeConfig> = {
         desc: 'Оставляет лечащую лужу после смерти',
         archetype: 'SPIDER',
         scale: 1.15,
-        tint: '#76ff03'
+        tint: '#76ff03',
+        tags: ['🧪 Яд', '⚡ Быстрый'],
     },
     TROLL_ARMORED: {
         id: 'troll_armored',
@@ -116,7 +124,8 @@ export const ENEMY_TYPES: Record<string, IEnemyTypeConfig> = {
         desc: 'Снежный тролль с тяжелой дубиной',
         archetype: 'TROLL',
         scale: 1.3,
-        tint: '#cfd8dc'
+        tint: '#cfd8dc',
+        tags: ['🛡️ Броня', '🐌 Медленный'],
     },
     GOBLIN: {
         id: 'goblin',
@@ -129,6 +138,7 @@ export const ENEMY_TYPES: Record<string, IEnemyTypeConfig> = {
         desc: 'Жадный мародер с мешком',
         archetype: 'GOBLIN',
         scale: 1.35,
+        tags: ['⚡ Быстрый', '💰 Жадный'],
     },
     SAPPER_RAT: {
         id: 'sapper_rat',
@@ -141,6 +151,7 @@ export const ENEMY_TYPES: Record<string, IEnemyTypeConfig> = {
         desc: 'Взрывается при смерти, нанося урон ВСЕМ',
         archetype: 'RAT',
         scale: 1.15,
+        tags: ['💥 Взрыв', '⚡ Быстрый'],
     },
     MAGMA_KING: {
         id: 'magma_king',
@@ -153,6 +164,7 @@ export const ENEMY_TYPES: Record<string, IEnemyTypeConfig> = {
         desc: 'Древний архидемон из расплавленной магмы. Сбрасывает остывшую оболочку при получении урона.',
         archetype: 'MAGMA',
         scale: 1.4,
+        tags: ['🌋 Босс', '🔥 Огонь'],
     },
     MAGMA_STATUE: {
         id: 'magma_statue',
@@ -180,6 +192,7 @@ export const ENEMY_TYPES: Record<string, IEnemyTypeConfig> = {
         desc: 'Троянский конь. При смерти из него вырываются 2 скелета и адская гончая.',
         archetype: 'FLESH',
         scale: 1.5,
-        deathSpawns: ['GRUNT', 'GRUNT', 'SCOUT']
+        deathSpawns: ['GRUNT', 'GRUNT', 'SCOUT'],
+        tags: ['🛡️ Броня', '🧟 Рой'],
     }
 };

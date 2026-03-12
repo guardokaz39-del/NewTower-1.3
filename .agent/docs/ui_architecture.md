@@ -24,6 +24,9 @@ class BadUI {
     constructor() {
         btn.addEventListener('click', this.onClick.bind(this)); // Creates new function ref!
         EventBus.getInstance().on('EVENT', () => this.update());
+        
+        // Inline handlers create closures that hold 'this'
+        this.elOverlay.onclick = () => this.hide(); 
     }
     // No destroy method -> Memory Leak & Duplicate Logs
 }
@@ -40,6 +43,9 @@ class GoodUI {
         this.boundClick = () => this.onClick();
         btn.addEventListener('click', this.boundClick);
         
+        // Inline handler
+        this.elOverlay.onclick = () => this.hide();
+
         // Store Unsubscribe Function
         this.unsubEvent = EventBus.getInstance().on(Events.MONEY_CHANGED, this.onEvent);
     }
@@ -48,8 +54,16 @@ class GoodUI {
         // Remove DOM Listener
         btn.removeEventListener('click', this.boundClick);
         
+        // Break inline listener closures
+        this.elOverlay.onclick = null;
+        
         // Call Unsubscribe Function
         this.unsubEvent();
+        
+        // Remove DOM Element
+        if (this.elOverlay.parentNode) {
+            this.elOverlay.remove();
+        }
     }
 }
 ```
@@ -151,6 +165,8 @@ this.startButton.onclick = () => {
 };
 ```
 
+> ⚠️ **Warning on Inline Closures:** Even with `onclick`, the arrow function `() => { ... }` creates a closure that retains the `this` context. If you dynamically create UI elements (like a Bestiary overlay) and remove them from the DOM without setting `element.onclick = null`, the closure might still exist in memory until the next garbage collection cycle, potentially holding onto the entire Scene. **Always set inline handlers to `null` in `destroy()`.**
+
 ---
 
 ## 🎨 Design Token System (`src/design/`)
@@ -159,14 +175,14 @@ All UI styling must reference the project's design tokens rather than hardcoded 
 
 ### Token Files
 
-| File | Exports | Key Values |
-|------|---------|------------|
-| `colors.ts` | `UI_COLORS` | Primary, status colors, `glass.bg` (`rgba(30,30,40,0.85)`), `glass.border` (`rgba(255,255,255,0.1)`) |
-| `spacing.ts` | `UI_SPACING` | `xs: 4`, `sm: 8`, `md: 16`, `lg: 24`, `xl: 32` |
-| `borders.ts` | `UI_BORDERS` | `radius.sm: 4`, `radius.md: 8`, `radius.lg: 12` |
-| `shadows.ts` | `UI_SHADOWS` | `shadow.sm`, `shadow.lg`, `shadow.glass` |
-| `transitions.ts` | `UI_TRANSITIONS` | `duration.fast: 150ms`, `duration.normal: 300ms`, `presets.*` |
-| `fonts.ts` | `UI_FONTS` | Font families, sizes, weights |
+| File                 | Exports            | Key Values                                                                                              |
+|----------------------|--------------------|---------------------------------------------------------------------------------------------------------|
+| `colors.ts`          | `UI_COLORS`        | Primary, status colors, `glass.bg` (`rgba(30,30,40,0.85)`), `glass.border` (`rgba(255,255,255,0.1)`)    |
+| `spacing.ts`         | `UI_SPACING`       | `xs: 4`, `sm: 8`, `md: 16`, `lg: 24`, `xl: 32`                                                          |
+| `borders.ts`         | `UI_BORDERS`       | `radius.sm: 4`, `radius.md: 8`, `radius.lg: 12`                                                         |
+| `shadows.ts`         | `UI_SHADOWS`       | `shadow.sm`, `shadow.lg`, `shadow.glass`                                                                |
+| `transitions.ts`     | `UI_TRANSITIONS`   | `duration.fast: 150ms`, `duration.normal: 300ms`, `presets.*`                                           |
+| `fonts.ts`           | `UI_FONTS`         | Font families, sizes, weights                                                                           |
 
 ### Usage Rule
 
@@ -238,12 +254,12 @@ Slots are containers (`80×112px`) that visually hold cards. Cards inside slots 
 
 ### Slot Variants
 
-| Class | Purpose | Border Color |
-|-------|---------|--------------|
-| `.slot` | Base slot | `rgba(255,255,255,0.12)` (dashed) |
-| `.slot.shop-slot` | Shop purchase slot | `rgba(255,215,0,0.25)` (gold) |
-| `.slot.forge-slot` | Forge input slot | `rgba(255,152,0,0.2)` (orange) |
-| `.slot.forge-slot.slot-empty` | Empty forge slot | Shows "+" and "Карта" via `::before`/`::after` |
+| Class                         | Purpose                | Border Color                                   |
+|-------------------------------|------------------------|------------------------------------------------|
+| `.slot`                       | Base slot              | `rgba(255,255,255,0.12)` (dashed)              |
+| `.slot.shop-slot`             | Shop purchase slot     | `rgba(255,215,0,0.25)` (gold)                  |
+| `.slot.forge-slot`            | Forge input slot       | `rgba(255,152,0,0.2)` (orange)                 |
+| `.slot.forge-slot.slot-empty` | Empty forge slot       | Shows "+" and "Карта" via `::before`/`::after` |
 
 ### Forge Slot Empty State
 
@@ -353,16 +369,16 @@ The `IGameScene` interface is the contract that allows UI components to talk to 
 
 ## 📑 Key UI Files
 
-| File | Role |
-|------|------|
-| `index.html` | All CSS styles + HTML structure for UI panels |
-| `src/ui/GameHUD.ts` | HUD: Lives, Money, Wave, Enemy counter, Forge button |
-| `src/ui/ShopUI.ts` | Shop: Slot rendering, Buy/Reroll, selection logic |
-| `src/ForgeSystem.ts` | Forge: Slot management, drag drop, evolution modal |
-| `src/CardSystem.ts` | Hand rendering, card creation, drag ghost |
-| `src/design/*.ts` | Design tokens (colors, spacing, borders, shadows, transitions, fonts) |
-| `src/ui/MapSelectionUI.ts` | Map Selector: Overlay lifecycle, map previews, integration with `MapStorage` |
-| `src/utils/MapPreviewRenderer.ts` | Stateless fast-renderer for map canvas previews. |
+| File                              | Role                                                                         |
+|-----------------------------------|------------------------------------------------------------------------------|
+| `index.html`                      | All CSS styles + HTML structure for UI panels                                |
+| `src/ui/GameHUD.ts`               | HUD: Lives, Money, Wave, Enemy counter, Forge button                         |
+| `src/ui/ShopUI.ts`                | Shop: Slot rendering, Buy/Reroll, selection logic                            |
+| `src/ForgeSystem.ts`              | Forge: Slot management, drag drop, evolution modal                           |
+| `src/CardSystem.ts`               | Hand rendering, card creation, drag ghost                                    |
+| `src/design/*.ts`                 | Design tokens (colors, spacing, borders, shadows, transitions, fonts)        |
+| `src/ui/MapSelectionUI.ts`        | Map Selector: Overlay lifecycle, map previews, integration with `MapStorage` |
+| `src/utils/MapPreviewRenderer.ts` | Stateless fast-renderer for map canvas previews.                             |
 
 ---
 

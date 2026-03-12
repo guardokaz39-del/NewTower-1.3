@@ -38,6 +38,7 @@ export interface IEnemyTypeConfig {
     tint?: string;    // Hex color override
     isHidden?: boolean; // If true, hidden from Editor/Bestiary lists
     deathSpawns?: string[]; // Enemy types to spawn on death (Flesh Colossus)
+    tags?: string[]; // Visual capability tags
 }
 
 // ============================================

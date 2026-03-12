@@ -17,17 +17,26 @@ export class BestiaryUI {
     private elTabEnemies!: HTMLElement;
     private elTabIntel!: HTMLElement;
 
-    // Content Containers
     private elEnemiesView!: HTMLElement;
+    private elEnemiesList!: HTMLElement;
+    private elEnemyDetails!: HTMLElement;
     private elIntelView!: HTMLElement;
+    private elTitleDisplay!: HTMLElement;
 
     private activeTab: 'enemies' | 'intel' = 'enemies';
     private selectedEnemyId: string | null = null;
+    
+    private maxHpMod: number = 1;
+    private maxSpeed: number = 1;
 
     constructor(scene: IGameScene, unlockedEnemies: Set<string>) {
         this.scene = scene;
         this.unlockedEnemies = unlockedEnemies;
         this.analyst = new WaveAnalyst(this.scene.waveManager as any, this.unlockedEnemies);
+
+        const allEnemies = Object.values(ENEMY_TYPES).filter(e => !e.isHidden);
+        this.maxHpMod = Math.max(...allEnemies.map(e => e.hpMod || 1));
+        this.maxSpeed = Math.max(...allEnemies.map(e => e.speed || 1));
 
         this.createUI();
     }
@@ -53,6 +62,11 @@ export class BestiaryUI {
     public unlockEnemy(id: string) {
         if (!this.unlockedEnemies.has(id)) {
             this.unlockedEnemies.add(id);
+            this.updateHeader();
+            if (this.elEnemiesList) {
+                this.renderEnemiesList();
+                this.renderEnemyDetails();
+            }
             if (this.elOverlay.style.display === 'flex') this.render();
         }
     }
@@ -91,8 +105,7 @@ export class BestiaryUI {
 
         this.elTabsContainer = UIUtils.createContainer({
             display: 'flex',
-            height: '100%',
-            flexGrow: '1'
+            height: '100%'
         });
 
         this.elTabEnemies = this.createTab('ENEMIES', 'enemies');
@@ -106,11 +119,22 @@ export class BestiaryUI {
             padding: '0 20px',
             fontWeight: 'bold'
         });
-        closeBtn.style.marginLeft = 'auto';
+        // Removed marginLeft: auto from closeBtn so titleDisplay can take it
 
         this.elTabsContainer.appendChild(this.elTabEnemies);
         this.elTabsContainer.appendChild(this.elTabIntel);
         header.appendChild(this.elTabsContainer);
+
+        const titleDisplay = document.createElement('div');
+        titleDisplay.style.color = '#fff';
+        titleDisplay.style.fontWeight = 'bold';
+        titleDisplay.style.fontSize = '18px';
+        titleDisplay.style.margin = '0 20px 0 auto'; // push to the right
+        titleDisplay.style.whiteSpace = 'nowrap';
+        this.elTitleDisplay = titleDisplay;
+        this.updateHeader();
+
+        header.appendChild(titleDisplay);
         header.appendChild(closeBtn);
         this.elContent.appendChild(header);
 
@@ -130,6 +154,29 @@ export class BestiaryUI {
             display: 'flex',
             gap: '20px'
         });
+
+        this.elEnemiesList = UIUtils.createContainer({
+            width: '30%',
+            height: '100%',
+            overflowY: 'auto',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '5px',
+            padding: '0 5px 0 0' // padding for scrollbar
+        });
+
+        this.elEnemyDetails = UIUtils.createContainer({
+            width: '70%',
+            height: '100%',
+            background: 'rgba(0,0,0,0.3)',
+            borderRadius: '4px',
+            padding: '20px',
+            display: 'flex',
+            flexDirection: 'column'
+        });
+
+        this.elEnemiesView.appendChild(this.elEnemiesList);
+        this.elEnemiesView.appendChild(this.elEnemyDetails);
 
         // Intel View
         this.elIntelView = UIUtils.createContainer({
@@ -168,6 +215,18 @@ export class BestiaryUI {
         return tab;
     }
 
+    private updateHeader() {
+        if (!this.elTitleDisplay) return;
+        const total = Object.values(ENEMY_TYPES).filter(e => !e.isHidden).length;
+        const unlocked = this.unlockedEnemies.size;
+        
+        if (unlocked >= total) {
+            this.elTitleDisplay.innerHTML = `<span style="background:linear-gradient(45deg, #ffd700, #ff8c00); color:#000; padding:4px 10px; border-radius:12px;">🏆 Полный Бестиарий</span>`;
+        } else {
+            this.elTitleDisplay.innerHTML = `Открыто: <span style="color:#ffd700">${unlocked}</span> / ${total}`;
+        }
+    }
+
     private render() {
         // Tab States
         const activeColor = '#ffd700';
@@ -185,38 +244,18 @@ export class BestiaryUI {
         this.elIntelView.style.display = this.activeTab === 'intel' ? 'flex' : 'none';
 
         if (this.activeTab === 'enemies') {
-            this.renderEnemies();
+            if (this.elEnemiesList.children.length === 0) {
+                this.renderEnemiesList();
+                this.renderEnemyDetails();
+            }
         } else {
             this.renderIntel();
         }
     }
 
     // --- ENEMIES TAB ---
-    private renderEnemies() {
-        this.elEnemiesView.innerHTML = '';
-
-        // Left List
-        const list = UIUtils.createContainer({
-            width: '30%',
-            height: '100%',
-            overflowY: 'auto',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '5px',
-            padding: '0 5px 0 0' // padding for scrollbar
-        });
-
-        // Right Details
-        const details = UIUtils.createContainer({
-            width: '70%',
-            height: '100%',
-            background: 'rgba(0,0,0,0.3)',
-            borderRadius: '4px',
-            padding: '20px',
-            display: 'flex',
-            flexDirection: 'column'
-        });
-
+    private renderEnemiesList() {
+        this.elEnemiesList.innerHTML = '';
         const allEnemies = Object.values(ENEMY_TYPES).filter(e => !e.isHidden);
         let firstUnlockedId = '';
 
@@ -245,64 +284,85 @@ export class BestiaryUI {
                 if (isUnlocked) {
                     this.selectedEnemyId = e.id;
                     SoundManager.play('click', SoundPriority.LOW);
-                    this.renderEnemies(); // Re-render to highlight selection and show details
+                    this.updateListSelection();
+                    this.renderEnemyDetails();
                 }
             };
 
-            list.appendChild(item);
+            this.elEnemiesList.appendChild(item);
         });
 
         // Auto-select first if none selected
         if (!this.selectedEnemyId && firstUnlockedId) {
             this.selectedEnemyId = firstUnlockedId;
-            // Don't re-render here to avoid loop, just rely on next update or user click
+            this.updateListSelection();
         }
+    }
 
-        // Render Details
-        if (this.selectedEnemyId) {
-            const conf = ENEMY_TYPES[this.selectedEnemyId.toUpperCase()];
-            if (conf) {
-                details.innerHTML = `
-                    <div style="display:flex; gap: 20px; margin-bottom: 20px; align-items:center;">
-                        <div style="font-size: 64px; background:rgba(0,0,0,0.5); width:100px; height:100px; display:flex; align-items:center; justify-content:center; border-radius:8px;">
-                            ${conf.symbol}
-                        </div>
-                        <div>
-                            <h2 style="margin:0; color:${conf.color || '#fff'}">${conf.name}</h2>
-                            <div style="color:#aaa; font-style:italic;">${conf.archetype}</div>
-                        </div>
-                    </div>
-
-                    <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 20px;">
-                        <div style="background:rgba(255,255,255,0.05); padding:10px; border-radius:4px;">
-                            <div style="color:#888; font-size:12px;">HEALTH</div>
-                            <div style="font-size:18px;">${Math.round(CONFIG.ENEMY.BASE_HP * conf.hpMod)} <span style="font-size:12px;color:#aaa">(x${conf.hpMod})</span></div>
-                        </div>
-                        <div style="background:rgba(255,255,255,0.05); padding:10px; border-radius:4px;">
-                            <div style="color:#888; font-size:12px;">SPEED</div>
-                            <div style="font-size:18px;">${conf.speed}</div>
-                        </div>
-                        <div style="background:rgba(255,255,255,0.05); padding:10px; border-radius:4px;">
-                            <div style="color:#888; font-size:12px;">REWARD</div>
-                            <div style="font-size:18px; color:gold;">${conf.reward}💰</div>
-                        </div>
-                        <div style="background:rgba(255,255,255,0.05); padding:10px; border-radius:4px;">
-                            <div style="color:#888; font-size:12px;">THREAT</div>
-                            <div style="font-size:18px;">${conf.hpMod > 2 ? 'HIGH' : 'NORMAL'}</div>
-                        </div>
-                    </div>
-
-                    <div style="background:rgba(0,0,0,0.2); padding:15px; border-radius:4px; border-left: 3px solid ${conf.color}">
-                        ${conf.desc}
-                    </div>
-                `;
+    private updateListSelection() {
+        let idx = 0;
+        const allEnemies = Object.values(ENEMY_TYPES).filter(e => !e.isHidden);
+        allEnemies.forEach(e => {
+            const item = this.elEnemiesList.children[idx] as HTMLElement;
+            if (item) {
+                const isSelected = this.selectedEnemyId === e.id;
+                item.style.background = isSelected ? 'rgba(255, 215, 0, 0.2)' : 'rgba(255,255,255,0.05)';
+                item.style.border = isSelected ? '1px solid #ffd700' : '1px solid transparent';
             }
-        } else {
-            details.innerHTML = `<div style="display:flex; align-items:center; justify-content:center; height:100%; color:#555;">Select an enemy</div>`;
+            idx++;
+        });
+    }
+
+    private renderEnemyDetails() {
+        if (!this.selectedEnemyId) {
+            this.elEnemyDetails.innerHTML = `<div style="display:flex; align-items:center; justify-content:center; height:100%; color:#555;">Select an enemy</div>`;
+            return;
         }
 
-        this.elEnemiesView.appendChild(list);
-        this.elEnemiesView.appendChild(details);
+        const conf = ENEMY_TYPES[this.selectedEnemyId.toUpperCase()];
+        if (conf) {
+            this.elEnemyDetails.innerHTML = `
+                <div style="display:flex; gap: 20px; margin-bottom: 20px; align-items:center;">
+                    <div style="font-size: 64px; background:rgba(0,0,0,0.5); width:100px; height:100px; display:flex; align-items:center; justify-content:center; border-radius:8px;">
+                        ${conf.symbol}
+                    </div>
+                    <div>
+                        <h2 style="margin:0; color:${conf.color || '#fff'}">${conf.name}</h2>
+                        <div style="color:#aaa; font-style:italic;">${conf.archetype}</div>
+                        ${conf.tags ? `<div style="display:flex; gap:5px; margin-top:5px; flex-wrap:wrap;">` + conf.tags.map(t => `<span style="background:rgba(255,255,255,0.1); color:#ddd; font-size:11px; padding:2px 6px; border-radius:4px;">${t}</span>`).join('') + `</div>` : ''}
+                    </div>
+                </div>
+
+                <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 20px;">
+                    <div style="background:rgba(255,255,255,0.05); padding:10px; border-radius:4px;">
+                        <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
+                            <span style="color:#888; font-size:12px;">HEALTH</span>
+                            <span style="font-size:12px;">${Math.round(CONFIG.ENEMY.BASE_HP * conf.hpMod)}</span>
+                        </div>
+                        <div style="width: 100%; background: #333; height: 6px; border-radius: 3px; overflow: hidden;">
+                            <div style="width: ${Math.min(100, conf.hpMod / this.maxHpMod * 100)}%; background: #4caf50; height: 100%;"></div>
+                        </div>
+                    </div>
+                    <div style="background:rgba(255,255,255,0.05); padding:10px; border-radius:4px;">
+                        <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
+                            <span style="color:#888; font-size:12px;">SPEED</span>
+                            <span style="font-size:12px;">${conf.speed}</span>
+                        </div>
+                        <div style="width: 100%; background: #333; height: 6px; border-radius: 3px; overflow: hidden;">
+                            <div style="width: ${Math.min(100, conf.speed / this.maxSpeed * 100)}%; background: #2196f3; height: 100%;"></div>
+                        </div>
+                    </div>
+                    <div style="background:rgba(255,255,255,0.05); padding:10px; border-radius:4px;">
+                        <div style="color:#888; font-size:12px;">REWARD</div>
+                        <div style="font-size:18px; color:gold;">${conf.reward}💰</div>
+                    </div>
+                </div>
+
+                <div style="background:rgba(0,0,0,0.2); padding:15px; border-radius:4px; border-left: 3px solid ${conf.color}">
+                    ${conf.desc}
+                </div>
+            `;
+        }
     }
 
     // --- INTEL TAB ---
@@ -311,8 +371,8 @@ export class BestiaryUI {
 
         const currentWave = this.scene.wave;
 
-        // Show next 5 waves
-        for (let i = 0; i < 5; i++) {
+        // Show next 2 waves (reduced from 5 to build tension and focus)
+        for (let i = 0; i < 2; i++) {
             const waveNum = currentWave + i;
             const intel = this.analyst.getWaveIntel(waveNum);
 
@@ -334,18 +394,13 @@ export class BestiaryUI {
             header.style.justifyContent = 'space-between';
             header.style.alignItems = 'center';
 
-            let threatColor = '#4caf50'; // Low
-            if (intel.threatLevel === 'MEDIUM') threatColor = '#ffeb3b';
-            if (intel.threatLevel === 'HIGH') threatColor = '#ff9800';
-            if (intel.threatLevel === 'EXTREME') threatColor = '#f44336';
-
             header.innerHTML = `
                 <div style="font-size: 18px; font-weight: bold; color: ${i === 0 ? '#fff' : '#aaa'}">
                     Wave ${waveNum} ${i === 0 ? '<span style="font-size:12px; background:#4caf50; padding:2px 6px; border-radius:4px; margin-left:10px;">CURRENT</span>' : ''}
                 </div>
-                <div style="display:flex; gap:15px; font-size:14px;">
+                <div style="display:flex; gap:15px; font-size:14px; align-items:center;">
                     <span style="color:gold">Est. ${intel.totalReward}💰</span>
-                    <span style="color:${threatColor}">⚠️ ${intel.threatLevel}</span>
+                    <span style="color:#bbb">Enemies: ${intel.totalCount}</span>
                 </div>
             `;
             card.appendChild(header);
@@ -394,5 +449,30 @@ export class BestiaryUI {
             card.appendChild(enemiesContainer);
             this.elIntelView.appendChild(card);
         }
+    }
+
+    public destroy() {
+        if (!this.elOverlay) return;
+
+        // 1. Remove inline event listeners to break closure chain
+        this.elOverlay.onclick = null;
+        if (this.elContent) this.elContent.onclick = null;
+        if (this.elTabEnemies) this.elTabEnemies.onclick = null;
+        if (this.elTabIntel) this.elTabIntel.onclick = null;
+
+        // 2. Remove DOM
+        this.elOverlay.remove();
+
+        // 3. Nullify references
+        this.elOverlay = null as any;
+        this.elContent = null as any;
+        this.elTabsContainer = null as any;
+        this.elTabEnemies = null as any;
+        this.elTabIntel = null as any;
+        this.elEnemiesView = null as any;
+        this.elIntelView = null as any;
+        
+        this.scene = null as any;
+        this.analyst = null as any;
     }
 }

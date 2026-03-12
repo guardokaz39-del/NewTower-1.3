@@ -13,8 +13,6 @@ export interface IWaveSummary {
     }>;
     totalCount: number;
     totalReward: number;
-    threatLevel: 'LOW' | 'MEDIUM' | 'HIGH' | 'EXTREME';
-    threatScore: number;
 }
 
 export class WaveAnalyst {
@@ -69,25 +67,11 @@ export class WaveAnalyst {
             });
         });
 
-        // Threat Calculation
-        // Base threat usually increases by ~1.3x per wave in power
-        // Simple heuristic: Total HP / Standard Tower DPS (approx 5)
-        const dpsBenchmark = 5 * Math.max(1, waveNum * 0.5); // Expected DPS grows with wave
-        const timeToKill = totalHP / dpsBenchmark;
-
-        // Normalize threat
-        let threat: IWaveSummary['threatLevel'] = 'LOW';
-        if (timeToKill > 60) threat = 'MEDIUM';
-        if (timeToKill > 120) threat = 'HIGH';
-        if (timeToKill > 200) threat = 'EXTREME';
-
         return {
             waveNumber: waveNum,
             enemies: enemiesList,
             totalCount,
-            totalReward: Math.floor(totalReward),
-            threatLevel: threat,
-            threatScore: Math.floor(timeToKill)
+            totalReward: Math.floor(totalReward)
         };
     }
 }

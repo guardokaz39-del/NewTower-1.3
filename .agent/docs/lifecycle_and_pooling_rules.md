@@ -52,3 +52,15 @@ this.myBuffs.length = 0;
 
 **Как очищать ссылки:**
 Если ваш объект держал ссылку на другой DOM элемент, класс или функцию — обнулите её (`null` или `undefined`), иначе это спровоцирует классическую утечку памяти (Memory Leak), так как пул будет вечно удерживать ссылку, не давая GC ее удалить.
+
+Пример для компонентов UI:
+
+```typescript
+public destroy() {
+    this.elOverlay.remove();
+    // 💀 КРИТИЧЕСКИ ВАЖНО: Разрыв ссылок на DOM
+    this.elOverlay = null as any; 
+    this.elContent = null as any;
+    this.scene = null as any; 
+}
+```
