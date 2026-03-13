@@ -44,6 +44,8 @@ export class RendererFactory {
     static drawMap(ctx: CanvasRenderingContext2D, map: MapManager) {
         map.draw(ctx);
         map.drawAnimatedTiles(ctx, performance.now());
+        // Phase 1D: Pulsating glow under portal and base
+        map.drawEndpointGlows(ctx, performance.now());
     }
 
     static drawProjectile(ctx: CanvasRenderingContext2D, projectile: Projectile) {

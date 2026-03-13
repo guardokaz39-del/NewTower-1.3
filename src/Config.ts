@@ -22,7 +22,7 @@ export const CONFIG = {
     },
 
     PLAYER: {
-        START_MONEY: 250,
+        START_MONEY: 100,
         START_LIVES: 20,
         HAND_LIMIT: 7,
     },

@@ -261,6 +261,7 @@ export class GameScene extends BaseScene implements IGameScene {
         // 1. Wave Completed
         this.unsubs.push(EventBus.getInstance().on(Events.WAVE_COMPLETED, () => {
             this.saveProgress();
+            this.map.setWaveActive(false); // Phase 1B: Wave sync
         }));
 
         // 2. Card Installed (or just dropped effectively)
@@ -268,6 +269,27 @@ export class GameScene extends BaseScene implements IGameScene {
             // Only save if actionId is present (implies successful drop logic initiated)
             // or just save anyway, cheap operation with deltas
             this.saveProgress();
+        }));
+
+        // === Phase 1B: Portal Wave Sync ===
+        this.unsubs.push(EventBus.getInstance().on(Events.WAVE_STARTED, () => {
+            this.map.setWaveActive(true);
+        }));
+
+        // === Phase 1C+1E: Base Lives Ratio + Damage Text ===
+        this.unsubs.push(EventBus.getInstance().on(Events.LIVES_CHANGED, (lives: number) => {
+            this.map.setLivesRatio(lives / this.gameState.startingLives);
+            // Hit flash: floating text at base position
+            const basePos = this.map.getBasePos();
+            if (basePos) {
+                const TS = CONFIG.TILE_SIZE;
+                this.showFloatingText(
+                    '-1',
+                    basePos.x * TS + TS / 2,
+                    basePos.y * TS,
+                    '#ff4444'
+                );
+            }
         }));
     }
 

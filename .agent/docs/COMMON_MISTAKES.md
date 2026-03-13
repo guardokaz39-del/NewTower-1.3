@@ -250,6 +250,53 @@ if (mergedMods.targetingMode) this.targetingMode = mergedMods.targetingMode;
 
 ---
 
+### 12. AssetCache.getGlow с динамическим цветом (Cache-Bouncing)
+
+**Ошибка:** Передача вычисляемого RGB-цвета в `AssetCache.getGlow()` — ключ `glow_${color}_${size}` формируется каждый кадр с новым значением → бесконечный рост кэша → hard limit 4096 → полный `clear()` → GC spike.
+
+```typescript
+// ❌ Interpolated color = бесконечные ключи
+const r = Math.floor(livesRatio * 255);
+const glow = AssetCache.getGlow(`rgba(${r},0,0,1)`, 128);
+```
+
+**Решение:** Дискретная палитра (фиксированные ключи, max N записей в кэше):
+
+```typescript
+// ✅ Max 4 записи в кэше
+const PALETTE = ['rgba(0,120,255,1)', 'rgba(120,120,255,1)', 'rgba(255,160,80,1)', 'rgba(255,60,60,1)'];
+const stage = Math.min(3, Math.floor((1 - ratio) * 4));
+const glow = AssetCache.getGlow(PALETTE[stage], 128);
+```
+
+---
+
+### 13. EventBus подписки без lifecycle-очистки
+
+**Ошибка:** `EventBus.getInstance().on(...)` без сохранения unsubscribe-функции → подписка живёт вечно → при рестарте уровня дублируется → listener count растёт.
+
+```typescript
+// ❌ Утечка: новая подписка при каждом рестарте
+EventBus.getInstance().on(Events.LIVES_CHANGED, (lives) => {...});
+```
+
+**Решение:** Все подписки ОБЯЗАНЫ идти через `this.unsubs.push(...)`, очистка в `onExitImpl()`:
+
+```typescript
+// ✅ Паттерн из GameScene
+this.unsubs.push(EventBus.getInstance().on(Events.LIVES_CHANGED, (lives: number) => {
+    this.map.setLivesRatio(lives / this.gameState.startingLives);
+}));
+
+// onExitImpl()
+this.unsubs.forEach(u => u());
+this.unsubs = [];
+```
+
+**Тест:** Рестарт уровня 3 раза → DevTools → EventListeners count не растёт.
+
+---
+
 ## 📋 Чеклист перед коммитом
 
 - [ ] В hot-loop нет `new`, `{ }`, `.filter()`, `.map()`, `.splice()`?
@@ -259,3 +306,6 @@ if (mergedMods.targetingMode) this.targetingMode = mergedMods.targetingMode;
 - [ ] Эффекты создаются через `spawn*()`, а не `add()`?
 - [ ] dt ограничен? Нет tunneling при низком FPS?
 - [ ] Каскадные операции (AoE, цепные реакции) используют очередь задержки (explosionQueue)?
+- [ ] `AssetCache.getGlow()` вызывается ТОЛЬКО с фиксированными цветами (палитра)?
+- [ ] Каждая `EventBus.on(...)` обёрнута в `this.unsubs.push(...)`?
+- [ ] При добавлении рендера в `Map.ts` — обновлены ОБЕ сцены (GameScene + EditorScene)?

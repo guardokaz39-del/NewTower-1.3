@@ -101,9 +101,10 @@ The game uses a **Logical Coordinate System** decoupled from physical pixels to 
 
 **Render Graph Layers (GameScene.draw):**
 
-1. **Map/Ground**: Tiles, Torches, Decals (Acid, Tracks).
-2. **Objects**: Towers, Useable Items.
-3. **Units**: Enemies (Sorted by Y for depth).
+1. **Map/Ground**: Tiles, Animated Tiles (water, lava), Torches.
+1b. **Glow**: `Map.drawEndpointGlows()` — pulsating glow under Portal/Base (via `AssetCache.getGlow`, discrete palette).
+2. **Decals**: Acid puddles, Tracks.
+3. **Objects/Entities**: Towers, Z-sorted Enemies + Dynamic Map Objects (crystals, **portal, base**).
 4. **VFX**: Projectiles, Explosions, Particles.
 5. **Overlay**: Fog of War (Post-VFX), Lighting, Emissive.
 6. **UI**: Tooltips, HUD (HTML Overlay).

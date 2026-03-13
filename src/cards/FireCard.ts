@@ -6,15 +6,15 @@ import { IUpgradeCard } from './CardType';
  * Role: AoE damage dealer, good against groups
  * Trade-off: Lower single-target DPS for splash
  * 
- * Level 1: +12 damage, splash 45px, -15% speed
- * Level 2: +22 damage, splash 70px, -10% speed
- * Level 3: +25 damage, splash 80px, explode on death
+ * Level 1: +10 damage, splash 45px, -15% speed
+ * Level 2: +20 damage, splash 70px, -10% speed
+ * Level 3: +30 damage, splash 80px, explode on death
  */
 export const FIRE_UPGRADES: Record<number, IUpgradeCard> = {
     1: {
         level: 1,
         modifiers: {
-            damage: 12,               // Nerfed from 15
+            damage: 10,               // Nerfed from 15
             attackSpeedMultiplier: 0.85,
         },
         effects: [
@@ -37,7 +37,7 @@ export const FIRE_UPGRADES: Record<number, IUpgradeCard> = {
     2: {
         level: 2,
         modifiers: {
-            damage: 22,               // Nerfed from 30
+            damage: 20,               // Nerfed from 30
             attackSpeedMultiplier: 0.90,
         },
         effects: [
@@ -55,7 +55,7 @@ export const FIRE_UPGRADES: Record<number, IUpgradeCard> = {
     3: {
         level: 3,
         modifiers: {
-            damage: 25,               // Nerfed from 30
+            damage: 30,               // Nerfed from 30
             attackSpeedMultiplier: 0.90,
         },
         effects: [

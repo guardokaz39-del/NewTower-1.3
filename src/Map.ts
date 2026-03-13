@@ -5,6 +5,7 @@ import { Pathfinder } from './Pathfinder';
 import { FlowField } from './FlowField';
 import { LightingSystem } from './systems/LightingSystem';
 import { ObjectRenderer, ObjectType } from './ObjectRenderer';
+import { AssetCache } from './utils/AssetCache';
 
 export interface PathError {
     x: number;
@@ -30,6 +31,10 @@ export class MapManager {
 
     private cacheCanvas!: HTMLCanvasElement;
     public _animatedTilePositions: { type: string, bitmask: number, px: number, py: number }[] = [];
+
+    // Cached endpoint positions (Phase 0: Waypoint Guard)
+    private _portalPos: { x: number; y: number } | null = null;
+    private _basePos: { x: number; y: number } | null = null;
 
     // Dirty flag pattern for FlowField optimization
     private isFlowFieldDirty: boolean = false;
@@ -106,6 +111,18 @@ export class MapManager {
             this.flowField = new FlowField(this.cols, this.rows);
         } else {
             this.flowField.resize(this.cols, this.rows);
+        }
+
+        // Phase 0: Cache endpoint positions (Waypoint Guard)
+        if (this.waypoints.length >= 2) {
+            this._portalPos = { x: this.waypoints[0].x, y: this.waypoints[0].y };
+            this._basePos = {
+                x: this.waypoints[this.waypoints.length - 1].x,
+                y: this.waypoints[this.waypoints.length - 1].y
+            };
+        } else {
+            this._portalPos = null;
+            this._basePos = null;
         }
 
         // Initial generation
@@ -254,6 +271,32 @@ export class MapManager {
                 });
             }
         }
+
+        // Phase 1F: Portal/Base as Z-sorted renderables
+        if (this._portalPos && this._basePos) {
+            const portalPx = this._portalPos.x * TS;
+            const portalPy = this._portalPos.y * TS;
+            renderables.push({
+                x: portalPx,
+                y: portalPy + TS, // Sort by bottom edge
+                render: (ctx: CanvasRenderingContext2D) => {
+                    const sprite = Assets.get('portal_idle');
+                    if (sprite) ctx.drawImage(sprite, portalPx, portalPy, TS, TS);
+                }
+            });
+
+            const basePx = this._basePos.x * TS;
+            const basePy = this._basePos.y * TS;
+            renderables.push({
+                x: basePx,
+                y: basePy + TS,
+                render: (ctx: CanvasRenderingContext2D) => {
+                    const sprite = Assets.get('base_idle');
+                    if (sprite) ctx.drawImage(sprite, basePx, basePy, TS, TS);
+                }
+            });
+        }
+
         return renderables;
     }
 
@@ -310,15 +353,7 @@ export class MapManager {
         if (this.cacheCanvas) {
             ctx.drawImage(this.cacheCanvas, 0, 0);
         }
-
-        // Objects are now baked in cacheCanvas
-
-        if (this.waypoints.length > 0) {
-            const start = this.waypoints[0];
-            const end = this.waypoints[this.waypoints.length - 1];
-            this.drawIcon(ctx, '☠️', start.x, start.y);
-            this.drawIcon(ctx, '🏰', end.x, end.y);
-        }
+        // Portal/base rendering moved to getDynamicRenderables() for Z-sorting (Phase 1F)
     }
 
     // [NEW] Cache torch positions to avoid grid scanning every frame
@@ -553,5 +588,70 @@ export class MapManager {
 
     private isTorchGroundTile(t: number): boolean {
         return t === 0 || t === 3 || t === 6; // Grass, Sand, Dirt
+    }
+
+    // === Phase 0: Public getters for cached positions ===
+    public getPortalPos(): { x: number; y: number } | null { return this._portalPos; }
+    public getBasePos(): { x: number; y: number } | null { return this._basePos; }
+
+    // === Phase 1B: Wave sync state ===
+    private _waveActive: boolean = false;
+
+    public setWaveActive(active: boolean): void {
+        this._waveActive = active;
+    }
+
+    public get isWaveActive(): boolean { return this._waveActive; }
+
+    // === Phase 1C: Lives ratio state ===
+    private _livesRatio: number = 1.0;
+
+    public setLivesRatio(ratio: number): void {
+        this._livesRatio = Math.max(0, Math.min(1, ratio));
+    }
+
+    public get baseStateKey(): string {
+        if (this._livesRatio > 0.75) return 'base_100';
+        if (this._livesRatio > 0.50) return 'base_75';
+        if (this._livesRatio > 0.25) return 'base_50';
+        return 'base_25';
+    }
+
+    // === Phase 1D: Glow effects ===
+    private static readonly BASE_GLOW_PALETTE = [
+        'rgba(0,120,255,1)',    // stage 0: HP > 75% — blue (healthy)
+        'rgba(120,120,255,1)',  // stage 1: HP 50-75% — lavender (warning)
+        'rgba(255,160,80,1)',   // stage 2: HP 25-50% — orange (danger)
+        'rgba(255,60,60,1)',    // stage 3: HP < 25% — red (critical)
+    ];
+
+    public drawEndpointGlows(ctx: CanvasRenderingContext2D, time: number): void {
+        if (!this._portalPos || !this._basePos) return;
+        const TS = CONFIG.TILE_SIZE;
+
+        // Portal glow — purple pulsating
+        const portalGlow = AssetCache.getGlow('rgba(138,43,226,1)', TS * 2);
+        const speed = this._waveActive ? 0.015 : 0.005;
+        ctx.globalAlpha = 0.3 + Math.sin(time * speed) * 0.2;
+        ctx.drawImage(
+            portalGlow,
+            this._portalPos.x * TS - TS / 2,
+            this._portalPos.y * TS - TS / 2,
+            TS * 2, TS * 2
+        );
+        ctx.globalAlpha = 1;
+
+        // Base glow — discrete color by HP stage (max 4 cache entries)
+        const stage = Math.min(3, Math.floor((1 - this._livesRatio) * 4));
+        const baseColor = MapManager.BASE_GLOW_PALETTE[stage];
+        const baseGlow = AssetCache.getGlow(baseColor, TS * 2);
+        ctx.globalAlpha = 0.3 + Math.sin(time * 0.003) * 0.15;
+        ctx.drawImage(
+            baseGlow,
+            this._basePos.x * TS - TS / 2,
+            this._basePos.y * TS - TS / 2,
+            TS * 2, TS * 2
+        );
+        ctx.globalAlpha = 1;
     }
 }

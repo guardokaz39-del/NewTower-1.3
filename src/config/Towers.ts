@@ -1,6 +1,6 @@
 export const TOWER_CONFIG = {
-    BASE_RANGE: 120,
-    BASE_DMG: 5,
+    BASE_RANGE: 100,
+    BASE_DMG: 4,
     BASE_CD: 0.9, // 54 / 60 = 0.9 seconds
     BUILD_TIME: 1.0, // 60 / 60 = 1.0 second
     MAX_CARDS: 3,

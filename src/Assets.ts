@@ -295,7 +295,8 @@ export class Assets {
             'mod_ice', 'mod_fire', 'mod_sniper', 'mod_split', 'mod_minigun',
             'projectile_standard', 'projectile_ice', 'projectile_fire', 'projectile_sniper', 'projectile_split', 'projectile_minigun',
             'effect_muzzle_flash', 'shadow_small',
-            'fx_boss_aura', 'fx_boss_eye', 'fx_boss_shield', 'fx_soul', 'fx_glow_red'
+            'fx_boss_aura', 'fx_boss_eye', 'fx_boss_shield', 'fx_soul', 'fx_glow_red',
+            'portal_idle', 'base_idle'
         ];
 
         // Добавляем fog tiles
@@ -445,6 +446,89 @@ export class Assets {
                     ctx.arc(Math.random() * w, Math.random() * h, Math.random() * 2 + 1, 0, Math.PI * 2);
                     ctx.fill();
                 }
+            });
+            this.loadStats.procedural++;
+        } else if (name === 'portal_idle') {
+            this.generateTexture('portal_idle', CONFIG.TILE_SIZE, (ctx, w, h) => {
+                const cx = w / 2;
+                const cy = h / 2;
+                const r = w * 0.4;
+                // Outer glow ring
+                const outerGrad = ctx.createRadialGradient(cx, cy, r * 0.5, cx, cy, r);
+                outerGrad.addColorStop(0, 'rgba(138,43,226,0)');
+                outerGrad.addColorStop(0.6, 'rgba(138,43,226,0.5)');
+                outerGrad.addColorStop(1, 'rgba(75,0,130,0.8)');
+                ctx.fillStyle = outerGrad;
+                ctx.beginPath();
+                ctx.arc(cx, cy, r, 0, Math.PI * 2);
+                ctx.fill();
+                // Inner dark vortex
+                const innerGrad = ctx.createRadialGradient(cx, cy, 0, cx, cy, r * 0.55);
+                innerGrad.addColorStop(0, '#1a0033');
+                innerGrad.addColorStop(0.6, 'rgba(40,0,80,0.9)');
+                innerGrad.addColorStop(1, 'rgba(138,43,226,0)');
+                ctx.fillStyle = innerGrad;
+                ctx.beginPath();
+                ctx.arc(cx, cy, r * 0.55, 0, Math.PI * 2);
+                ctx.fill();
+                // Swirl particles (8 dots baked in)
+                for (let i = 0; i < 8; i++) {
+                    const angle = (i / 8) * Math.PI * 2;
+                    const pr = r * (0.25 + (i % 3) * 0.1);
+                    const px = cx + Math.cos(angle) * pr;
+                    const py = cy + Math.sin(angle) * pr;
+                    ctx.fillStyle = `rgba(200,150,255,${0.4 + (i % 3) * 0.2})`;
+                    ctx.beginPath();
+                    ctx.arc(px, py, 2, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+                // Center bright point
+                ctx.fillStyle = '#e0b0ff';
+                ctx.beginPath();
+                ctx.arc(cx, cy, 3, 0, Math.PI * 2);
+                ctx.fill();
+            });
+            this.loadStats.procedural++;
+        } else if (name === 'base_idle') {
+            this.generateTexture('base_idle', CONFIG.TILE_SIZE, (ctx, w, h) => {
+                const cx = w / 2;
+                // Stone base platform
+                ctx.fillStyle = '#5d6b7a';
+                ctx.fillRect(w * 0.15, h * 0.45, w * 0.7, h * 0.45);
+                // Walls (two towers)
+                ctx.fillStyle = '#4a5568';
+                ctx.fillRect(w * 0.12, h * 0.2, w * 0.2, h * 0.7);
+                ctx.fillRect(w * 0.68, h * 0.2, w * 0.2, h * 0.7);
+                // Battlement teeth on towers
+                ctx.fillStyle = '#4a5568';
+                for (let i = 0; i < 3; i++) {
+                    ctx.fillRect(w * 0.12 + i * w * 0.07, h * 0.12, w * 0.05, h * 0.12);
+                    ctx.fillRect(w * 0.68 + i * w * 0.07, h * 0.12, w * 0.05, h * 0.12);
+                }
+                // Gate
+                ctx.fillStyle = '#2d3748';
+                ctx.beginPath();
+                ctx.arc(cx, h * 0.7, w * 0.12, Math.PI, 0);
+                ctx.fillRect(cx - w * 0.12, h * 0.7, w * 0.24, h * 0.2);
+                ctx.fill();
+                // Flag pole
+                ctx.strokeStyle = '#a0aec0';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.moveTo(cx, h * 0.4);
+                ctx.lineTo(cx, h * 0.05);
+                ctx.stroke();
+                // Flag
+                ctx.fillStyle = '#e53e3e';
+                ctx.beginPath();
+                ctx.moveTo(cx, h * 0.05);
+                ctx.lineTo(cx + w * 0.2, h * 0.12);
+                ctx.lineTo(cx, h * 0.19);
+                ctx.fill();
+                // Window lights
+                ctx.fillStyle = '#fbd38d';
+                ctx.fillRect(w * 0.19, h * 0.35, 4, 5);
+                ctx.fillRect(w * 0.75, h * 0.35, 4, 5);
             });
             this.loadStats.procedural++;
         } else {

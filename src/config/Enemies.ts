@@ -10,9 +10,9 @@ export const ENEMY_TYPES: Record<string, IEnemyTypeConfig> = {
         id: 'grunt',
         name: 'Скелет',
         symbol: '💀',
-        hpMod: 1.2,
+        hpMod: 1.3,
         speed: 90, // 1.5 * 60 = 90
-        reward: 4,
+        reward: 2,
         color: '#e0e0e0',
         desc: 'Обычный скелет',
         archetype: 'SKELETON',
@@ -25,7 +25,7 @@ export const ENEMY_TYPES: Record<string, IEnemyTypeConfig> = {
         symbol: '🐕',
         hpMod: 0.85,
         speed: 168, // 2.8 * 60 = 168
-        reward: 2,
+        reward: 3,
         color: '#212121', // Dark fur color
         desc: 'Быстрый хищник из преисподней',
         archetype: 'HELLHOUND',
@@ -36,9 +36,9 @@ export const ENEMY_TYPES: Record<string, IEnemyTypeConfig> = {
         id: 'tank',
         name: 'Воевода Орков',
         symbol: '👹', // Or maybe 🛡️? Sticking with ogre/oni usually works for Orcs, or use custom unicode if preferred.
-        hpMod: 3.65,
+        hpMod: 3.85,
         speed: 68, // Decreased by ~20% from 48
-        reward: 10,
+        reward: 6,
         color: '#558b2f',
         desc: 'Живой таран в тяжелой броне',
         archetype: 'ORC',
@@ -63,9 +63,9 @@ export const ENEMY_TYPES: Record<string, IEnemyTypeConfig> = {
         id: 'skeleton_miner',
         name: 'Скелет-Шахтёр',
         symbol: '⛏️',
-        hpMod: 1.44, // 20% more than basic skeleton (1.2)
+        hpMod: 1.64, // 20% more than basic skeleton (1.2)
         speed: 85, // Slightly slower than basic skeleton
-        reward: 5,
+        reward: 3,
         color: '#d7ccc8', // Dirty bone color
         desc: 'Крепкий работяга с киркой и мешком угля.',
         archetype: 'SKELETON_MINER',
@@ -78,7 +78,7 @@ export const ENEMY_TYPES: Record<string, IEnemyTypeConfig> = {
         symbol: '🪓',
         hpMod: 2.0, // High health pool
         speed: 65, // Slow base speed, becomes 130 when enraged
-        reward: 8,
+        reward: 5,
         color: '#c62828', // Enrage red color
         desc: 'Огромный скелет с двуручным топором. При HP < 50% впадает в ярость, удваивая скорость.',
         archetype: 'SKELETON_BERSERKER',
@@ -91,7 +91,7 @@ export const ENEMY_TYPES: Record<string, IEnemyTypeConfig> = {
         symbol: '👑',
         hpMod: 3.0,
         speed: 72, // Heavy (1.2 * 60)
-        reward: 12,
+        reward: 7,
         color: '#ffd700',
         desc: 'Становится сильнее от смертей союзников',
         archetype: 'SKELETON_COMMANDER',
@@ -105,7 +105,7 @@ export const ENEMY_TYPES: Record<string, IEnemyTypeConfig> = {
         symbol: '🧪',
         hpMod: 1.4,
         speed: 132, // 2.2 * 60 = 132
-        reward: 6,
+        reward: 4,
         color: '#76ff03',
         desc: 'Оставляет лечащую лужу после смерти',
         archetype: 'SPIDER',
@@ -119,7 +119,7 @@ export const ENEMY_TYPES: Record<string, IEnemyTypeConfig> = {
         symbol: '🛡️',
         hpMod: 7.0,
         speed: 42, // 0.7 * 60 = 42
-        reward: 15,
+        reward: 10,
         color: '#eceff1', // Snow White
         desc: 'Снежный тролль с тяжелой дубиной',
         archetype: 'TROLL',
@@ -144,9 +144,9 @@ export const ENEMY_TYPES: Record<string, IEnemyTypeConfig> = {
         id: 'sapper_rat',
         name: 'Алхимическая Крыса',
         symbol: '🐀',
-        hpMod: 1.8, // Durable carrier
+        hpMod: 2.8, // Durable carrier
         speed: 130, // Slightly slower to compensate for HP
-        reward: 12,
+        reward: 2,
         color: '#3e2723', // Darker brown
         desc: 'Взрывается при смерти, нанося урон ВСЕМ',
         archetype: 'RAT',
@@ -170,7 +170,7 @@ export const ENEMY_TYPES: Record<string, IEnemyTypeConfig> = {
         id: 'magma_statue',
         name: 'Обсидиановая Статуя',
         symbol: '🗿',
-        hpMod: 8.0,
+        hpMod: 6.5,
         speed: 1,
         reward: 0,
         color: '#212121', // Obsidian
@@ -184,7 +184,7 @@ export const ENEMY_TYPES: Record<string, IEnemyTypeConfig> = {
         id: 'flesh_colossus',
         name: 'Мясной Колосс',
         symbol: '🧟',
-        hpMod: 8.0,
+        hpMod: 9.0,
         speed: 45,
         reward: 0, // No direct reward — reward comes from spawns
         armor: 5,
