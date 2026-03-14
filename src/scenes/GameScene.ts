@@ -130,7 +130,7 @@ export class GameScene extends BaseScene implements IGameScene {
     private explosionDepth = 0;
     private static readonly MAX_EXPLOSION_DEPTH = 3;
 
-
+    private gameEnded = false; // Double-fire guard
     // Ambient cycle
     private dayTime: number = 0;
 
@@ -255,6 +255,14 @@ export class GameScene extends BaseScene implements IGameScene {
             this.showFloatingText('BURST!', parent.x, parent.y - 40, '#ff5252');
             SoundManager.play('explosion');
             this.triggerShake(0.35, 7);
+        }));
+
+        this.unsubs.push(EventBus.getInstance().on(Events.GAME_OVER, () => {
+            this.gameOver();
+        }));
+
+        this.unsubs.push(EventBus.getInstance().on(Events.GAME_WON, () => {
+            this.gameWon();
         }));
 
         // === SAFE SAVE CADENCE ===
@@ -785,10 +793,25 @@ export class GameScene extends BaseScene implements IGameScene {
     }
 
     public gameOver(): void {
+        if (this.gameEnded) return; // Double-fire guard
+        this.gameEnded = true;
+
         this.saveProgress();
         this.gameState.endGame();
         this.metrics.endGame(false);
-        this.ui.showGameOver(this.gameState.wave);
+        const stats = this.metrics.getCurrentSessionStats();
+        this.ui.showGameOver(this.gameState.wave, stats, false);
+    }
+
+    public gameWon(): void {
+        if (this.gameEnded) return;
+        this.gameEnded = true;
+
+        this.saveProgress();
+        this.gameState.endGame();
+        this.metrics.endGame(true);
+        const stats = this.metrics.getCurrentSessionStats();
+        this.ui.showGameOver(this.gameState.wave, stats, true);
     }
 
     public triggerShake(duration: number, intensity: number): void {

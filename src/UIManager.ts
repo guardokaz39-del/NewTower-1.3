@@ -1,7 +1,7 @@
 import { IGameScene } from './scenes/IGameScene';
 import { GameHUD } from './ui/GameHUD';
 import { PauseMenu } from './ui/PauseMenu';
-import { GameOverUI } from './ui/GameOverUI';
+import { GameOverUI, IGameEndStats } from './ui/GameOverUI';
 import { ShopUI } from './ui/ShopUI';
 
 export type UIMode = 'menu' | 'game' | 'gameOver';
@@ -52,9 +52,9 @@ export class UIManager {
                 this.show();
                 break;
             case 'gameOver':
-                // Handled in showGameOver mostly, but ensure overlays
                 this.elUiLayer.style.display = 'block';
-                this.elHandContainer.style.display = 'none'; // Hide hand on game over
+                // Hand container is hidden, and we'll let GameOverUI show its own overlay
+                this.elHandContainer.style.display = 'none';
                 break;
         }
     }
@@ -76,9 +76,9 @@ export class UIManager {
     }
     // ------------------------------------------
 
-    public showGameOver(wave: number) {
+    public showGameOver(wave: number, stats: IGameEndStats, isVictory: boolean) {
         this.setMode('gameOver');
-        this.gameOver.show(wave);
+        this.gameOver.show(wave, stats, isVictory);
     }
 
     public hideGameOver() {

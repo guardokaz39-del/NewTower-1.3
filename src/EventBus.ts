@@ -14,6 +14,7 @@ export interface EventPayloadMap {
 
     // Game State
     GAME_OVER: number;
+    GAME_WON: void;
     GAME_RESTART: void;
     TOGGLE_PAUSE: boolean;
 
@@ -122,6 +123,7 @@ export const Events = {
     WAVE_STARTED: 'WAVE_STARTED',
     WAVE_COMPLETED: 'WAVE_COMPLETED',
     GAME_OVER: 'GAME_OVER',
+    GAME_WON: 'GAME_WON',
     GAME_RESTART: 'GAME_RESTART',
     TOGGLE_PAUSE: 'TOGGLE_PAUSE',
     ENEMY_IMMUNE: 'ENEMY_IMMUNE',

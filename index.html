@@ -643,6 +643,103 @@
             align-items: center;
             color: white;
             z-index: 10000;
+            pointer-events: auto;
+        }
+
+        .game-end-panel {
+            background: linear-gradient(135deg, rgba(30, 10, 10, 0.95), rgba(50, 15, 15, 0.9));
+            border: 2px solid rgba(255, 60, 60, 0.4);
+            border-radius: 20px;
+            padding: 40px 50px;
+            text-align: center;
+            min-width: 360px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.7), 0 0 40px rgba(255, 50, 50, 0.15);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            animation: gameEndAppear 0.4s ease-out;
+        }
+
+        #game-over.victory .game-end-panel {
+            background: linear-gradient(135deg, rgba(10, 30, 10, 0.95), rgba(15, 50, 15, 0.9));
+            border-color: rgba(76, 175, 80, 0.5);
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.7), 0 0 40px rgba(76, 175, 80, 0.2);
+        }
+
+        @keyframes gameEndAppear {
+            from { transform: scale(0.85); opacity: 0; }
+            to { transform: scale(1); opacity: 1; }
+        }
+
+        #game-end-title {
+            font-size: 42px;
+            margin: 0 0 25px 0;
+            color: #ff4444;
+            text-shadow: 0 0 20px rgba(255, 60, 60, 0.5);
+            letter-spacing: 3px;
+            text-transform: uppercase;
+        }
+
+        #game-over.victory #game-end-title {
+            color: #4caf50;
+            text-shadow: 0 0 20px rgba(76, 175, 80, 0.5);
+        }
+
+        .game-end-stats {
+            margin-bottom: 30px;
+        }
+
+        .stat-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 10px 20px;
+            font-size: 18px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+        }
+
+        .stat-row:last-child {
+            border-bottom: none;
+        }
+
+        .stat-row span:first-child {
+            color: #aaa;
+        }
+
+        .stat-row span:last-child {
+            color: #fff;
+            font-weight: bold;
+        }
+
+        .game-end-buttons {
+            display: flex;
+            gap: 15px;
+            justify-content: center;
+        }
+
+        .game-end-buttons button {
+            width: 160px;
+            padding: 12px 20px;
+            font-size: 16px;
+            border-radius: 10px;
+            border: none;
+            cursor: pointer;
+            font-weight: bold;
+            transition: transform 0.15s, box-shadow 0.15s;
+        }
+
+        .game-end-buttons button:hover {
+            transform: scale(1.05);
+        }
+
+        #restart-btn {
+            background: linear-gradient(135deg, #ff9800, #f57c00);
+            color: #fff;
+            box-shadow: 0 4px 15px rgba(255, 152, 0, 0.4);
+        }
+
+        #menu-btn {
+            background: linear-gradient(135deg, #607d8b, #455a64);
+            color: #fff;
+            box-shadow: 0 4px 15px rgba(96, 125, 139, 0.4);
         }
 
         /* Map Selection UI */
@@ -1340,10 +1437,18 @@
             </div>
 
             <div id="game-over">
-                <h1>GAME OVER</h1>
-                <p>Wave reached: <span id="final-wave">0</span></p>
-                <br>
-                <button id="restart-btn" style="width: 200px;">Try Again</button>
+                <div class="game-end-panel">
+                    <h1 id="game-end-title">НЕУДАЧА</h1>
+                    <div class="game-end-stats">
+                        <div class="stat-row"><span>⚔️ Волн пройдено</span><span id="stat-waves">0</span></div>
+                        <div class="stat-row"><span>💀 Врагов убито</span><span id="stat-kills">0</span></div>
+                        <div class="stat-row"><span>💰 Заработано</span><span id="stat-money">0</span></div>
+                    </div>
+                    <div class="game-end-buttons">
+                        <button id="restart-btn">🔄 Заново</button>
+                        <button id="menu-btn">🏠 В меню</button>
+                    </div>
+                </div>
             </div>
         </div>
 

@@ -114,7 +114,17 @@ The `UIManager` now controls the high-level state of the interface via `setMode(
 
 - **`'menu'`**: Hides Game HUD, Shop, Game Over. Shows Main Menu (managed by MenuScene).
 - **`'game'`**: Shows Game HUD, Shop. Hides Game Over.
-- **`'gameOver'`**: Shows Game Over overlay on top of the Game HUD.
+- **`'gameOver'`**: Shows Game Over overlay on top of the Game HUD. Disables interaction with HUD and hides card-hand.
+
+---
+
+## 🛑 Blocking Underlying Interaction (Modal Pattern)
+
+При показе полноэкранных оверлеев (MapSelection, GameOver, Pause) важно соблюдать правила блокировки:
+
+1. **Pointer Events**: Оверлей ОБЯЗАН иметь `pointer-events: auto`, чтобы клики не "проваливались" на игровое поле.
+2. **Keyboard Focus**: Клавиатурные слушатели (ESC, Space) должны проверять флаг `gameState.isRunning`. Если игра на паузе или в режиме Game Over — игровые горячие клавиши должны быть заблокированы (`PauseMenu.ts`, `GameController.ts`).
+3. **HUD Visibility**: В режиме конца игры рука с картами (`#hand-container`) должна быть полностью скрыта (`display: none`), чтобы исключить случайный Drag-and-Drop мёртвого игрового процесса.
 
 Always use `ui.setMode()` instead of manually toggling elements when switching states.
 

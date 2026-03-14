@@ -83,9 +83,10 @@ export class MapSelectionUI {
 
     public show(): void {
         this.container.style.display = 'flex';
-        // Автоматически выбрать Демо-карту если ничего не выбрано (UX)
+        // Автоматически выбрать первую карту если ничего не выбрано (UX)
         if (!this.activeMapData) {
-            this.selectMap('Demo Map', DEMO_MAP);
+            const firstItem = this.listContainer.querySelector('.map-list-item') as HTMLElement | null;
+            if (firstItem) firstItem.click();
         }
     }
 
@@ -96,8 +97,8 @@ export class MapSelectionUI {
     private refreshList(): void {
         this.listContainer.innerHTML = '';
 
-        // Демо мапа
-        this.createListElement('Demo Map', DEMO_MAP, '🌟');
+        // Демо мапа (скрыта — не нужна, но DEMO_MAP остаётся как fallback в MapData.ts)
+        // this.createListElement('Demo Map', DEMO_MAP, '🌟');
 
         // Локальные мапы (синхронно)
         const local = MapStorage.getLocalMaps();

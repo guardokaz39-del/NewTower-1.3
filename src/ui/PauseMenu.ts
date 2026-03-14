@@ -26,6 +26,7 @@ export class PauseMenu {
 
     private handleKeyDown(e: KeyboardEvent) {
         if (e.code === 'Escape') {
+            if (!this.scene.gameState.isRunning) return; // Don't trigger pause if game ended
             this.scene.togglePause();
         }
     }

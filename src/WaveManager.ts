@@ -165,6 +165,14 @@ export class WaveManager {
             }
             this.lastCardGivenForWave = this.scene.wave;
         }
+
+        // Victory check: only for maps with finite wave definitions
+        const mapWaves = this.scene.mapData?.waves;
+        if (mapWaves && mapWaves.length > 0
+            && this.scene.wave >= mapWaves.length
+            && this.pendingWaveStarts === 0) {
+            EventBus.getInstance().emit(Events.GAME_WON, undefined as any);
+        }
     }
 
     public getWaveConfig(waveNum: number): IWaveConfig | null {
